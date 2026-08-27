@@ -1,0 +1,172 @@
+# AutoDiag-WiCAN-Pro
+
+Open, modular Android automotive diagnostics and automation platform built around **WiCAN PRO** and designed to support additional automotive interfaces in the future.
+
+> **Status: early development (v0.1-dev).** Real-vehicle support is not yet considered validated unless explicitly marked as verified in the project documentation.
+
+## Vision
+
+Create a long-lived Android application that can use WiCAN PRO over Wi-Fi for:
+
+- raw CAN monitoring and logging
+- generic OBD-II diagnostics
+- Tesla Model 3/Y read-only diagnostics
+- battery and vehicle-health analysis
+- automated diagnostic tests
+- remote telemetry while the vehicle is parked on the home network
+- automation, notifications and Home Assistant/MQTT integration
+- future VAG and other manufacturer-specific diagnostics
+- carefully controlled custom actions where the required protocol and behavior are verified
+
+The goal is **not** to make a cosmetic WiCAN controller. WiCAN PRO remains the hardware/interface and firmware platform; AutoDiag provides the Android UI, diagnostic core, vehicle profiles and automation layer.
+
+## Architecture
+
+```text
+Android / AutoDiag
+        |
+        +-- Transport layer
+        |     +-- WiCAN ELM327 TCP :3333
+        |     +-- WiCAN SLCAN/raw CAN TCP :23
+        |     +-- mDNS discovery
+        |     +-- future OBD Bluetooth/Wi-Fi adapters
+        |     +-- simulator
+        |
+        +-- CAN / OBD / diagnostic core
+        |
+        +-- Vehicle profiles
+        |     +-- Tesla
+        |     +-- VAG
+        |     +-- Generic OBD-II
+        |
+        +-- Diagnostics
+        |     +-- battery
+        |     +-- charging
+        |     +-- thermal
+        |     +-- drive unit
+        |     +-- DTC
+        |
+        +-- Automation
+              +-- rules
+              +-- notifications
+              +-- MQTT / Home Assistant
+              +-- verified custom actions
+```
+
+## Repository layout
+
+```text
+README.md
+AI_CONTEXT.md
+ROADMAP.md
+ARCHITECTURE.md
+SAFETY.md
+CONTRIBUTING.md
+android/
+core/
+vehicles/
+simulator/
+captures/
+docs/
+tests/
+.github/workflows/
+```
+
+The exact implementation layout may evolve, but the separation between transport, diagnostic core, vehicle profiles and UI should remain.
+
+## WiCAN PRO integration
+
+AutoDiag is intended to use capabilities already provided by WiCAN PRO rather than reimplementing its firmware.
+
+The initial transport targets are:
+
+- **TCP :3333** — ELM327-compatible interface
+- **TCP :23** — SLCAN/raw CAN passthrough
+- **mDNS** — convenient device discovery where supported
+- **MQTT/HTTP(S)** — future telemetry and integration paths where useful
+
+These details must always be checked against the current WiCAN firmware/documentation before being treated as stable API guarantees.
+
+## Safety model
+
+The first development stages are **READ-first**.
+
+Unverified CAN IDs, signals and vehicle-specific behaviors must not be presented as confirmed facts.
+
+WRITE/control functionality is intentionally out of scope for the initial milestones. When introduced, it must be:
+
+- explicitly identified as experimental where appropriate,
+- disabled by default until verified,
+- isolated from the read-only core,
+- protected by deliberate user confirmation,
+- tested in the simulator before real-vehicle validation.
+
+See `SAFETY.md` for the project safety rules.
+
+## Verification levels
+
+Vehicle data and capabilities should carry a verification state:
+
+- `unverified` — source exists but behavior has not been independently confirmed
+- `partially_verified` — some independent validation exists
+- `verified` — reproducible validation exists for a defined vehicle/HW/software configuration
+
+A verified result is always tied to its scope. A signal verified on one vehicle generation is not automatically verified for another.
+
+## Development strategy
+
+The project deliberately supports development without a vehicle:
+
+1. Build and test parsers and transport code with unit tests.
+2. Use the WiCAN simulator/mock and recorded captures.
+3. Validate the decoder deterministically.
+4. Compare against independent reference data where possible.
+5. Only then validate on a real vehicle.
+
+This is intended to prevent the common failure mode where an APK appears to work until it is connected to a real car.
+
+## Android
+
+Planned baseline:
+
+- Kotlin
+- Jetpack Compose
+- modern AndroidX APIs
+- modular diagnostic core
+- minSdk 26 initially
+- current target SDK, updated as Android evolves
+
+The project aims for long-term maintainability across future Android releases. No software project can guarantee unchanged behavior for a fixed five-year period, so compatibility will be maintained through current APIs, automated builds/tests and regular dependency updates.
+
+## Roadmap
+
+See `ROADMAP.md` for the detailed milestone plan.
+
+Initial milestones:
+
+1. Android foundation and CI
+2. WiCAN mDNS discovery
+3. real TCP ELM327 connection on :3333
+4. raw/SLCAN connection on :23
+5. CAN monitor and capture logging
+6. simulator and replay
+7. generic OBD-II
+8. Tesla read-only decoder
+9. automated Tesla health test
+10. remote monitoring and automation
+11. carefully verified custom actions
+12. additional vehicle manufacturers
+
+## Current status
+
+**v0.1-dev / foundation**
+
+The repository is currently being established as a documentation-first project. Real WiCAN PRO and real Tesla validation will be added as separate milestones and will not be claimed before testing.
+
+## License
+
+License will be selected and documented before the first public software release.
+
+## Disclaimer
+
+This is experimental automotive software. Vehicle-specific diagnostic and control behavior can be safety-critical. Do not execute unverified write/control operations on a real vehicle.
