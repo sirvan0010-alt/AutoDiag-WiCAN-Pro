@@ -17,8 +17,17 @@ Create a long-lived Android application that can use WiCAN PRO over Wi-Fi for:
 - automation, notifications and Home Assistant/MQTT integration
 - future VAG and other manufacturer-specific diagnostics
 - carefully controlled custom actions where the required protocol and behavior are verified
+- DTC/alert explanations linked to verified OEM documentation and service procedures
 
 The goal is **not** to make a cosmetic WiCAN controller. WiCAN PRO remains the hardware/interface and firmware platform; AutoDiag provides the Android UI, diagnostic core, vehicle profiles and automation layer.
+
+## Documentation entry point
+
+Before changing diagnostic architecture, read [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md).
+
+For DTC/alert explanations, OEM procedures and source provenance, read [`docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`](docs/DIAGNOSTIC_KNOWLEDGE_BASE.md).
+
+For AI/development rules, read [`AI_CONTEXT.md`](AI_CONTEXT.md).
 
 ## Architecture
 
@@ -44,7 +53,14 @@ Android / AutoDiag
         |     +-- charging
         |     +-- thermal
         |     +-- drive unit
-        |     +-- DTC
+        |     +-- HV isolation / Riso
+        |     +-- DTC / alerts
+        |
+        +-- Diagnostic Knowledge Base
+        |     +-- OEM explanations
+        |     +-- troubleshooting procedures
+        |     +-- service/repair references
+        |     +-- evidence + verification
         |
         +-- Automation
               +-- rules
@@ -86,6 +102,36 @@ The initial transport targets are:
 - **MQTT/HTTP(S)** — future telemetry and integration paths where useful
 
 These details must always be checked against the current WiCAN firmware/documentation before being treated as stable API guarantees.
+
+## Diagnostic philosophy
+
+AutoDiag is deliberately more than a generic OBD reader. The long-term objective is to combine:
+
+1. real measurements from the vehicle,
+2. vehicle-specific decoding,
+3. automated repeatable tests,
+4. history and replay,
+5. evidence-based analysis,
+6. and source-linked technical documentation.
+
+For EVs this includes battery cell/module behavior during rest, acceleration/load, recovery, AC charging and DC fast charging where the vehicle exposes the required data. The application should be able to move from a simple driver-facing result to an expert numerical/replay view.
+
+A low-voltage cell during a high-current load is not automatically classified as a failed cell. Context, load response, recovery and repeated observations are required.
+
+## Diagnostic Knowledge Base
+
+When AutoDiag recognizes a supported DTC or alert, the result can expose:
+
+- what the code means,
+- affected system,
+- severity,
+- sourced possible causes,
+- recommended checks,
+- official troubleshooting procedure,
+- official service/repair procedure,
+- and the source/verification status.
+
+OEM information is kept separate from community reverse engineering. Missing documentation is shown as missing; the app must not invent a repair procedure.
 
 ## Safety model
 
@@ -153,9 +199,12 @@ Initial milestones:
 7. generic OBD-II
 8. Tesla read-only decoder
 9. automated Tesla health test
-10. remote monitoring and automation
-11. carefully verified custom actions
-12. additional vehicle manufacturers
+10. battery charge/load analysis and replay
+11. HV isolation/Riso data model
+12. diagnostic knowledge base with OEM references
+13. remote monitoring and automation
+14. carefully verified custom actions
+15. additional vehicle manufacturers
 
 ## Current status
 
