@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "pack_id": "vag_meb",
+  "version": "0.1.0",
+  "verification_policy": "Entries must declare manufacturer, platform/model scope, ECU and evidence before production use.",
+  "entries": []
+}
