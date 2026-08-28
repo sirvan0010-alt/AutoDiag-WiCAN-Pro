@@ -15,7 +15,7 @@ Tooltip je součástí diagnostického produktu, ne dekorace. Text musí vysvět
 ## Povinné tooltipy pro PRE-PURCHASE TEST
 
 ### Pyropojistka / HV odpojovač
-> Pyropojistka je bezpečnostní prvek vysokonapěťové baterie, který může při havárii nebo jiné kritické události fyzicky odpojit HV obvod. AutoDiag zde zobrazuje pouze stav, který skutečně poskytuje podporovaná řídicí jednotka. Stav „nelze zjistit“ neznamená, že je pyropojistka vadná ani že je v pořádku.
+> Pyropojistka je bezpečnostní prvek vysokonapěťové baterie, který může při havárii nebo jiné kritické události fyzicky odpojit HV obvod. AutoDiag zde zobrazuje pouze stav, který skutečně poskytuje podporovaná řídicí jednotka. Pokud vozidlo údaj neposkytne, nelze z toho usuzovat, že je pyropojistka vadná ani že je v pořádku.
 
 ### HV izolace (Riso)
 > Riso je izolační odpor mezi vysokonapěťovým systémem a karoserií. Nízká hodnota může souviset například s poškozením izolace, vlhkostí nebo závadou některého HV komponentu. Prahové hodnoty nejsou univerzální pro všechna vozidla; AutoDiag vždy uvádí zdroj a rozsah platnosti použitého limitu.
@@ -29,10 +29,10 @@ Tooltip je součástí diagnostického produktu, ne dekorace. Text musí vysvět
 ### Odometr
 > AutoDiag porovnává hodnoty kilometrů pouze z jednotek, které je skutečně poskytují. Rozdíl je nejprve označen jako nesrovnalost. Samotná latence CAN komunikace není důkazem stočeného tachometru.
 
-### Stav „Není k dispozici“
-> Vozidlo nebo připojené rozhraní neposkytuje potřebný údaj. Tento stav se nesmí převést na „OK“ ani „Chyba“.
+### Stav „Vozidlo údaj neposkytlo"
+> Vozidlo nebo připojené diagnostické rozhraní neposkytuje potřebný údaj. Tento stav neznamená, že je kontrolovaná součást v pořádku ani že je vadná. Znamená pouze, že nebyl získán dostatečný diagnostický důkaz. Tento stav se nesmí převést na „OK“ ani „Chyba“.
 
-### Stav „Neověřeno“
+### Stav „Neověřeno"
 > AutoDiag zná možný signál nebo interpretaci, ale nemá dostatečné důkazy pro potvrzení jeho významu pro tuto konkrétní verzi vozidla, ECU nebo firmwaru.
 
 ### Omezené hodnocení
@@ -68,8 +68,10 @@ Ikona `?` má být dostupná i u:
 - každého řádku výsledku;
 - každého diagnostického parametru;
 - každého barevného stavu;
-- `NOT_AVAILABLE`, `NOT_TESTED`, `UNASSESSED`, `ERROR`;
+- `Vozidlo údaj neposkytlo`, `Test neproveden`, `Nelze vyhodnotit`, `Chyba komunikace`;
 - hodnoty s použitým prahem;
 - confidence / důvěryhodnosti;
 - zdroje a verification state;
 - tlačítka `AUTO TEST`, pokud jeho rozsah není z obrazovky zřejmý.
+
+Interní enumy `NOT_AVAILABLE`, `NOT_TESTED`, `UNASSESSED` a `ERROR` mohou zůstat v datovém modelu a logu, ale nesmí být primárním textem určeným běžnému uživateli.
