@@ -3,6 +3,7 @@ package com.autodiag.wican
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,50 +16,93 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.autodiag.core.capability.Capability
+import com.autodiag.core.capability.CapabilityStatus
 import com.autodiag.core.discovery.WiCanMdnsDiscovery
+import com.autodiag.core.transport.TransportMode
 import com.autodiag.wican.ui.components.InfoTooltip
 import com.autodiag.wican.ui.theme.AutoDiagTheme
+import com.autodiag.wican.viewmodel.ConnectionPhase
+import com.autodiag.wican.viewmodel.ConnectionUiState
+import com.autodiag.wican.viewmodel.ConnectionViewModel
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
+    private val connectionViewModel: ConnectionViewModel by viewModels { ConnectionViewModel.Factory() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { AutoDiagTheme { DiscoveryScreen(WiCanMdnsDiscovery(this)) } }
+        val discovery = WiCanMdnsDiscovery(this)
+        setContent {
+            AutoDiagTheme {
+                val conn by connectionViewModel.uiState.collectAsState()
+                if (conn.phase == ConnectionPhase.IDLE) {
+                    DiscoveryScreen(
+                        discovery,
+                        onConnectElm = { host, port -> connectionViewModel.connectElm327(host, port) },
+                        onConnectSlcan = { host, port -> connectionViewModel.connectSlcan(host, port) }
+                    )
+                } else {
+                    ConnectionResultScreen(
+                        conn,
+                        onDisconnect = { connectionViewModel.disconnect() },
+                        onRetry = {
+                            val host = conn.host ?: return@ConnectionResultScreen
+                            when (conn.mode) {
+                                TransportMode.SLCAN_RAW -> connectionViewModel.connectSlcan(host, conn.port ?: 23)
+                                else -> connectionViewModel.connectElm327(host, conn.port ?: 3333)
+                            }
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun DiscoveryScreen(discovery: WiCanMdnsDiscovery) {
+private fun DiscoveryScreen(
+    discovery: WiCanMdnsDiscovery,
+    onConnectElm: (String, Int) -> Unit,
+    onConnectSlcan: (String, Int) -> Unit
+) {
     val devices by discovery.devices.collectAsState()
     val state by discovery.state.collectAsState()
     val error by discovery.error.collectAsState()
     var manualIp by remember { mutableStateOf("") }
     var timedOut by remember { mutableStateOf(false) }
 
+    DisposableEffect(Unit) {
+        discovery.start(preferWiCanOnly = false)
+        onDispose { discovery.stop() }
+    }
     LaunchedEffect(Unit) {
         timedOut = false
-        discovery.start(preferWiCanOnly = false)
         delay(10_000)
         if (devices.isEmpty()) timedOut = true
     }
 
     Scaffold { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -67,71 +111,141 @@ private fun DiscoveryScreen(discovery: WiCanMdnsDiscovery) {
                         Text("Připojení k WiCAN", style = MaterialTheme.typography.headlineSmall)
                         Text("Vyhledání adaptéru v místní síti")
                     }
-                    InfoTooltip(
-                        "AutoDiag nejprve hledá WiCAN v místní síti pomocí mDNS. " +
-                            "Nalezený endpoint ještě neznamená, že vozidlo nebo adaptér podporuje konkrétní diagnostickou funkci. " +
-                            "Schopnosti se ověří až po navázání spojení."
-                    )
+                    InfoTooltip("AutoDiag nejprve hledá WiCAN v místní síti pomocí mDNS. Nalezený endpoint ještě neznamená podporu diagnostických funkcí. Schopnosti se ověří až po spojení ELM327.")
                 }
             }
-
             if (devices.isNotEmpty()) {
                 item { Text("Nalezená zařízení", style = MaterialTheme.typography.titleMedium) }
-                items(devices) { device ->
+                items(devices, key = { "${it.hostAddress}:${it.port}:${it.serviceName}" }) { device ->
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
                             Text(device.serviceName, style = MaterialTheme.typography.titleMedium)
                             Text("IP: ${device.hostAddress}:${device.port}")
-                            Text(if (device.looksLikeWiCan) "Rozpoznáno jako WiCAN" else "Síťová služba – ověření bude provedeno po připojení")
+                            Text(if (device.looksLikeWiCan) "Rozpoznáno jako WiCAN" else "Síťová služba – ověření po připojení")
                             Spacer(Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { /* connection layer follows */ }) { Text("Připojit ELM327") }
-                                OutlinedButton(onClick = { /* SLCAN follows */ }) { Text("SLCAN") }
+                                val (elmHost, elmPort) = device.suggestedElm327Endpoint()
+                                val (slHost, slPort) = device.suggestedSlcanEndpoint()
+                                Button(onClick = { onConnectElm(elmHost, elmPort) }) { Text("Připojit ELM327") }
+                                OutlinedButton(onClick = { onConnectSlcan(slHost, slPort) }) { Text("SLCAN") }
                             }
                         }
                     }
                 }
             }
-
             item {
                 Text("Stav: ${state.toUiText()}")
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
-
             if (timedOut && devices.isEmpty()) {
                 item {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Zařízení nebylo nalezeno", style = MaterialTheme.typography.titleMedium)
-                                InfoTooltip(
-                                    "Prázdný výsledek neznamená, že WiCAN není v dosahu. " +
-                                        "Častou příčinou je AP/Client Isolation, hostující Wi-Fi nebo blokování multicastu. " +
-                                        "Telefon a WiCAN musí být ve stejné síti bez izolace klientů."
-                                )
+                                InfoTooltip("Prázdný výsledek neznamená, že WiCAN není v dosahu. Častou příčinou je AP/Client Isolation. Telefon a WiCAN musí být ve stejné síti bez izolace klientů.")
                             }
                             Spacer(Modifier.height(8.dp))
-                            Text("Zkuste ruční IP, vypnutí izolace Wi-Fi nebo přímé připojení telefonu k WiCAN v režimu Access Point.")
+                            Text("Zkuste ruční IP, vypnutí izolace Wi-Fi nebo režim Access Point WiCAN.")
                             Spacer(Modifier.height(12.dp))
                             OutlinedTextField(
-                                value = manualIp,
-                                onValueChange = { manualIp = it },
+                                manualIp,
+                                { manualIp = it },
                                 label = { Text("IP adresa WiCAN") },
                                 supportingText = { Text("Např. 192.168.4.1") },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { /* manual endpoint follows */ }) { Text("Použít IP") }
-                                OutlinedButton(onClick = {
-                                    timedOut = false
-                                    discovery.start(preferWiCanOnly = false)
-                                }) { Text("Hledat znovu") }
+                                Button(onClick = { if (manualIp.isNotBlank()) onConnectElm(manualIp.trim(), 3333) }, enabled = manualIp.isNotBlank()) { Text("ELM327") }
+                                OutlinedButton(onClick = { if (manualIp.isNotBlank()) onConnectSlcan(manualIp.trim(), 23) }, enabled = manualIp.isNotBlank()) { Text("SLCAN") }
+                                OutlinedButton(onClick = { timedOut = false; discovery.start(preferWiCanOnly = false) }) { Text("Hledat znovu") }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionResultScreen(state: ConnectionUiState, onDisconnect: () -> Unit, onRetry: () -> Unit) {
+    Scaffold { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            Text("Spojení", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text("${state.phase.labelCs} · ${state.host ?: "—"}:${state.port ?: "—"} · ${state.mode ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(16.dp))
+            when (state.phase) {
+                ConnectionPhase.CONNECTING, ConnectionPhase.INITIALIZING_ELM, ConnectionPhase.DISCOVERING_CAPABILITIES -> {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(); Spacer(Modifier.height(12.dp)); Text(state.phase.labelCs)
+                    }
+                }
+                ConnectionPhase.ERROR -> {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Spojení selhalo", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(8.dp)); Text(state.errorMessage ?: "Neznámá chyba")
+                            Spacer(Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = onRetry) { Text("Zkusit znovu") }
+                                OutlinedButton(onClick = onDisconnect) { Text("Zpět") }
+                            }
+                        }
+                    }
+                }
+                ConnectionPhase.READY -> {
+                    if (state.linkOnly) {
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(16.dp)) {
+                                Text("SLCAN link aktivní", style = MaterialTheme.typography.titleMedium)
+                                Spacer(Modifier.height(8.dp))
+                                Text("TCP spojení na portu ${state.port} je navázané. OBD/ELM schopnosti se na této cestě neprohlašují za dostupné — pouze surový link. Pro Capability Discovery použijte ELM327 (:3333).")
+                                Spacer(Modifier.height(8.dp))
+                                InfoTooltip("SLCAN je samostatná transportní cesta. Úspěšné TCP neznamená dostupnost Mode 01/03 ani VIN.")
+                            }
+                        }
+                    } else {
+                        val caps = state.snapshot?.capabilities?.values?.toList().orEmpty()
+                        state.snapshot?.vehicleIdentity?.vin?.let { Text("VIN: $it") }
+                        Spacer(Modifier.height(8.dp))
+                        LazyColumn(Modifier.weight(1f, fill = true), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(caps, key = { it.id }) { CapabilityCard(it) }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(onClick = onDisconnect, Modifier.fillMaxWidth()) { Text("Odpojit") }
+                }
+                ConnectionPhase.IDLE -> Unit
+            }
+        }
+    }
+}
+
+@Composable
+private fun CapabilityCard(cap: Capability) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(cap.displayName, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                Text(
+                    when (cap.status) {
+                        CapabilityStatus.AVAILABLE -> "Dostupné"
+                        CapabilityStatus.PARTIAL -> "Částečně"
+                        CapabilityStatus.UNAVAILABLE -> "Nedostupné"
+                        CapabilityStatus.UNKNOWN -> "Neznámé"
+                        CapabilityStatus.ERROR -> "Chyba"
+                    },
+                    color = when (cap.status) {
+                        CapabilityStatus.AVAILABLE -> MaterialTheme.colorScheme.primary
+                        CapabilityStatus.ERROR -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+            cap.detail?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            cap.userMessage?.let { msg -> Spacer(Modifier.height(4.dp)); InfoTooltip(msg) }
         }
     }
 }
