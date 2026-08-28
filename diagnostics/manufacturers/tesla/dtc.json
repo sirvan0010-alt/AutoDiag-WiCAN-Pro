@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "pack_id": "tesla",
+  "version": "0.1.0",
+  "verification_policy": "No manufacturer-specific entry is marked verified without a documented source and vehicle scope.",
+  "entries": []
+}
