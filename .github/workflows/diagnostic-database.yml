@@ -1,0 +1,39 @@
+name: Diagnostic database validation
+
+on:
+  push:
+    paths:
+      - 'diagnostics/**'
+      - 'tools/validate_diagnostic_packs.py'
+      - '.github/workflows/diagnostic-database.yml'
+  pull_request:
+    paths:
+      - 'diagnostics/**'
+      - 'tools/validate_diagnostic_packs.py'
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate diagnostic packs
+        run: python tools/validate_diagnostic_packs.py
+
+  update-policy:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain scheduled source review
+        run: |
+          echo "Scheduled database review is enabled."
+          echo "Production DTC interpretations must come from declared, reviewed sources."
+          echo "No blind web scraping or automatic promotion to VERIFIED is permitted."
