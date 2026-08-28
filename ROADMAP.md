@@ -7,6 +7,9 @@
 - [x] Architecture overview
 - [x] Diagnostic knowledge-base architecture
 - [x] Tesla market/region identification specification
+- [x] Capability Discovery specification
+- [x] Automation Engine specification
+- [x] Implementation task backlog
 - [ ] Safety policy
 - [ ] Android project skeleton
 - [ ] CI build/test pipeline
@@ -38,8 +41,11 @@
 
 ## Phase 4 — Vehicle identification and Tesla READ diagnostics
 
+- [ ] Capability Discovery implementation
+- [ ] Capability cache keyed by VIN + software/firmware scope where available
 - [ ] Vehicle make/model/year identification
-- [ ] Tesla market/region identification
+- [ ] Tesla market/region identification with explicit source
+- [ ] US-market warning when reliably identified
 - [ ] Vehicle profile: trim, drive unit, battery variant, supplier and chemistry where verifiable
 - [ ] Verified CAN signal database
 - [ ] Model 3/Y identification where possible
@@ -70,6 +76,8 @@
 - [ ] Drive-unit checks
 - [ ] Diagnostic score with confidence level
 - [ ] Replayable test log
+- [ ] Timestamp-indexed replay scrubber
+- [ ] Click-through Pack → Module/Brick → Cell inspection
 - [ ] Simple human-readable results
 - [ ] Expert battery/module/cell visualization
 - [ ] Exportable report
@@ -78,8 +86,9 @@
 
 - [ ] DTC/vehicle-alert normalization
 - [ ] OEM description mapping
+- [ ] Verified OEM explanation links
 - [ ] OEM troubleshooting links
-- [ ] OEM service/repair links
+- [ ] OEM service/repair links where legitimately public
 - [ ] Source and verification display
 - [ ] Vehicle-generation-specific procedure matching
 - [ ] Community references kept separate from OEM procedures
@@ -92,11 +101,14 @@
 - [ ] Remote telemetry while parked at home
 - [ ] MQTT integration
 - [ ] Home Assistant integration
-- [ ] Notifications
-- [ ] Rule engine
+- [ ] Notifications with rate limits/cooldowns
+- [ ] Rule engine stored as JSON/YAML
+- [ ] Rule replay/dry-run simulator
+- [ ] Rule execution audit log
 - [ ] Historical telemetry
 - [ ] User-defined dashboard/widgets
 - [ ] Automation triggers based on verified telemetry
+- [ ] One-tap profile-driven AUTO TEST / "Sexy Button"
 
 ## Phase 8 — Custom actions
 
