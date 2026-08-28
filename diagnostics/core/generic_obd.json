@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "pack_id": "generic_obd",
+  "version": "0.1.0",
+  "entries": [
+    {
+      "code": "P0000",
+      "kind": "generic_obd_dtc",
+      "description_cs": "Žádná diagnostická chyba není indikována.",
+      "severity": "INFO",
+      "verification": "verified",
+      "sources": [
+        {
+          "type": "standard",
+          "title": "SAE J2012 terminology / generic OBD-II code space",
+          "verification": "verified"
+        }
+      ]
+    }
+  ]
+}
