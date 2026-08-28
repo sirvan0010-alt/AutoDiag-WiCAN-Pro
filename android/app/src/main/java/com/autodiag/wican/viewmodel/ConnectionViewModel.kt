@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.autodiag.core.capability.CapabilityDiscovery
 import com.autodiag.core.capability.CapabilitySnapshot
 import com.autodiag.core.obd.Elm327Session
+import com.autodiag.core.transport.ConnectionState
+import com.autodiag.core.transport.SimulatorWiCanTransport
 import com.autodiag.core.transport.TcpWiCanTransport
 import com.autodiag.core.transport.TransportConfig
 import com.autodiag.core.transport.TransportMode
@@ -37,7 +39,8 @@ data class ConnectionUiState(
     val port: Int? = null,
     val snapshot: CapabilitySnapshot? = null,
     val errorMessage: String? = null,
-    val linkOnly: Boolean = false
+    val linkOnly: Boolean = false,
+    val transportState: ConnectionState? = null
 )
 
 /** ELM327 performs discovery; SLCAN establishes only a raw TCP link. */
@@ -54,6 +57,12 @@ class ConnectionViewModel(
 
     fun connectElm327(host: String, port: Int = 3333) = connect(host, port, TransportMode.ELM327, true)
     fun connectSlcan(host: String, port: Int = 23) = connect(host, port, TransportMode.SLCAN_RAW, false)
+    fun connectSimulator() = connect("simulator", 0, TransportMode.SIMULATOR, true)
+
+    private fun transportFor(mode: TransportMode): WiCanTransport = when (mode) {
+        TransportMode.SIMULATOR -> SimulatorWiCanTransport()
+        TransportMode.ELM327, TransportMode.SLCAN_RAW -> transportFactory()
+    }
 
     private fun connect(host: String, port: Int, mode: TransportMode, runDiscovery: Boolean) {
         job?.cancel()
@@ -66,16 +75,34 @@ class ConnectionViewModel(
                 linkOnly = !runDiscovery
             )
             runCatching {
-                require(host.isNotBlank()) { "IP adresa není vyplněna." }
+                if (mode != TransportMode.SIMULATOR) {
+                    require(host.isNotBlank()) { "IP adresa není vyplněna." }
+                }
                 runCatching { session?.close() }
                 runCatching { transport?.disconnect() }
 
-                val t = transportFactory()
+                val t = transportFor(mode)
                 transport = t
-                t.connect(TransportConfig(host, port, mode, autoReconnect = true)).getOrThrow()
+                t.connect(
+                    TransportConfig(
+                        host = host,
+                        port = port,
+                        mode = mode,
+                        autoReconnect = mode != TransportMode.SIMULATOR
+                    )
+                ).getOrThrow()
+                _uiState.update { it.copy(transportState = t.state) }
 
                 if (!runDiscovery) {
-                    _uiState.update { it.copy(phase = ConnectionPhase.READY, errorMessage = null, snapshot = null) }
+                    _uiState.update {
+                        it.copy(
+                            phase = ConnectionPhase.READY,
+                            errorMessage = null,
+                            snapshot = null,
+                            linkOnly = true,
+                            transportState = t.state
+                        )
+                    }
                     return@runCatching
                 }
 
@@ -86,9 +113,24 @@ class ConnectionViewModel(
 
                 _uiState.update { it.copy(phase = ConnectionPhase.DISCOVERING_CAPABILITIES) }
                 val snap = discovery.run(s)
-                _uiState.update { it.copy(phase = ConnectionPhase.READY, snapshot = snap, errorMessage = null, linkOnly = false) }
+                _uiState.update {
+                    it.copy(
+                        phase = ConnectionPhase.READY,
+                        snapshot = snap,
+                        errorMessage = null,
+                        linkOnly = false,
+                        transportState = t.state
+                    )
+                }
             }.onFailure { err ->
-                _uiState.update { it.copy(phase = ConnectionPhase.ERROR, errorMessage = humanize(err), snapshot = null) }
+                _uiState.update {
+                    it.copy(
+                        phase = ConnectionPhase.ERROR,
+                        errorMessage = humanize(err),
+                        snapshot = null,
+                        transportState = transport?.state
+                    )
+                }
                 runCatching { session?.close() }
                 runCatching { transport?.disconnect() }
                 session = null
