@@ -1,0 +1,53 @@
+name: Diagnostic Database
+
+on:
+  push:
+    paths:
+      - 'database/**'
+      - 'docs/DATABASE_ARCHITECTURE.md'
+      - '.github/workflows/diagnostic-database.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate database source layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d database ]; then
+            find database -type f -print | sort
+          else
+            echo 'database/ does not exist yet; architecture-only validation'
+          fi
+
+      - name: Validate JSON source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d database ]; then
+            python - <<'PY'
+            import json
+            from pathlib import Path
+            files = list(Path('database').rglob('*.json'))
+            for path in files:
+                with path.open(encoding='utf-8') as f:
+                    json.load(f)
+                print(f'OK {path}')
+            print(f'Validated {len(files)} JSON files')
+            PY
+          fi
+
+      - name: Report database implementation status
+        shell: bash
+        run: |
+          echo 'Database pack build/publish will be enabled when the database/ source tree is introduced.'
