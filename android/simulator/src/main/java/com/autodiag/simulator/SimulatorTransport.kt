@@ -26,7 +26,7 @@ class SimulatorTransport : WiCanTransport {
         if (_state != ConnectionState.CONNECTED) {
             return Result.failure(IllegalStateException("Simulator není připojen."))
         }
-        incoming.tryEmit("OK\r".toByteArray())
+        incoming.tryEmit("OK\r>".toByteArray())
         return Result.success(Unit)
     }
 
