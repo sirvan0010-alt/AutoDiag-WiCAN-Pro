@@ -58,17 +58,18 @@ class MainActivity : ComponentActivity() {
                     DiscoveryScreen(
                         discovery,
                         onConnectElm = { host, port -> connectionViewModel.connectElm327(host, port) },
-                        onConnectSlcan = { host, port -> connectionViewModel.connectSlcan(host, port) }
+                        onConnectSlcan = { host, port -> connectionViewModel.connectSlcan(host, port) },
+                        onConnectSimulator = { connectionViewModel.connectSimulator() }
                     )
                 } else {
                     ConnectionResultScreen(
                         conn,
                         onDisconnect = { connectionViewModel.disconnect() },
                         onRetry = {
-                            val host = conn.host ?: return@ConnectionResultScreen
                             when (conn.mode) {
-                                TransportMode.SLCAN_RAW -> connectionViewModel.connectSlcan(host, conn.port ?: 23)
-                                else -> connectionViewModel.connectElm327(host, conn.port ?: 3333)
+                                TransportMode.SIMULATOR -> connectionViewModel.connectSimulator()
+                                TransportMode.SLCAN_RAW -> conn.host?.let { connectionViewModel.connectSlcan(it, conn.port ?: 23) }
+                                else -> conn.host?.let { connectionViewModel.connectElm327(it, conn.port ?: 3333) }
                             }
                         }
                     )
@@ -82,7 +83,8 @@ class MainActivity : ComponentActivity() {
 private fun DiscoveryScreen(
     discovery: WiCanMdnsDiscovery,
     onConnectElm: (String, Int) -> Unit,
-    onConnectSlcan: (String, Int) -> Unit
+    onConnectSlcan: (String, Int) -> Unit,
+    onConnectSimulator: () -> Unit
 ) {
     val devices by discovery.devices.collectAsState()
     val state by discovery.state.collectAsState()
@@ -165,6 +167,22 @@ private fun DiscoveryScreen(
                     }
                 }
             }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Simulátor (bez hardwaru)", style = MaterialTheme.typography.titleMedium)
+                            InfoTooltip("In-process ELM327 bez sítě. Slouží k vývoji a testům. Odpovědi jsou syntetické a nereprezentují skutečné vozidlo.")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text("Deterministický ELM327 transport pro UI a CI testy.")
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = onConnectSimulator, modifier = Modifier.fillMaxWidth()) {
+                            Text("Připojit simulátor")
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -175,6 +193,7 @@ private fun ConnectionResultScreen(state: ConnectionUiState, onDisconnect: () ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             Text("Spojení", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text("${state.phase.labelCs} · ${state.host ?: "—"}:${state.port ?: "—"} · ${state.mode ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Transport: ${state.mode ?: "—"} · ${state.transportState ?: "—"} · ${state.host ?: "—"}:${state.port ?: "—"}", style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(16.dp))
             when (state.phase) {
                 ConnectionPhase.CONNECTING, ConnectionPhase.INITIALIZING_ELM, ConnectionPhase.DISCOVERING_CAPABILITIES -> {
@@ -208,6 +227,10 @@ private fun ConnectionResultScreen(state: ConnectionUiState, onDisconnect: () ->
                         }
                     } else {
                         val caps = state.snapshot?.capabilities?.values?.toList().orEmpty()
+                        if (state.mode == TransportMode.SIMULATOR) {
+                            Text("SIMULÁTOR – syntetická data, ne data z vozidla", style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(8.dp))
+                        }
                         state.snapshot?.vehicleIdentity?.vin?.let { Text("VIN: $it") }
                         Spacer(Modifier.height(8.dp))
                         LazyColumn(Modifier.weight(1f, fill = true), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -245,6 +268,9 @@ private fun CapabilityCard(cap: Capability) {
                 )
             }
             cap.detail?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            if (cap.status == CapabilityStatus.UNAVAILABLE) {
+                Text("Vozidlo údaj neposkytlo", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             cap.userMessage?.let { msg -> Spacer(Modifier.height(4.dp)); InfoTooltip(msg) }
         }
     }
