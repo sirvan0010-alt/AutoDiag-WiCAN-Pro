@@ -6,166 +6,95 @@ The Automation Engine turns verified read-only vehicle data into repeatable rule
 
 ## Action classes
 
-Automation actions are explicitly classified:
-
-### READ / LOG / ANALYZE
-
-Read vehicle data, record a session, calculate metrics, create a report, or run a replay analysis. These actions do not command the vehicle.
-
-### NOTIFY / ALERT
-
-Push notification, local notification, MQTT publish, Home Assistant event, or other external alert. Notification actions have their own rate limits, cooldowns and audit log. They are not vehicle writes.
-
-### WRITE / COMMAND
-
-Any action that changes vehicle state or transmits a control/diagnostic write. This class is disabled by default and is outside the initial AutoDiag milestones. It must never be reached accidentally by a read-only rule.
+- `READ / LOG / ANALYZE` — acquire data, persist captures, calculate metrics and analyze replay sessions.
+- `NOTIFY / ALERT` — push/local notifications, MQTT and Home Assistant events. These have independent cooldowns, rate limits and audit logging.
+- `WRITE / COMMAND` — disabled by default and outside the initial diagnostic automation layer. No read-only rule may reach it accidentally.
 
 ## Rule model
 
-Rules are data, not UI-only configuration. They should be exportable and versionable as JSON/YAML.
+Rules are data, not UI-only state. They should be exportable/versionable as JSON or YAML and reference stable semantic signals rather than undocumented CAN IDs.
 
-Conceptual example:
+## Dry-run / replay
 
-```yaml
-name: Tesla parked battery monitor
-when:
-  vehicle: identified
-if:
-  - signal: battery.soc
-    operator: lt
-    value: 30
-then:
-  - action: notify
-    channel: mqtt
-    message: "Battery SOC below configured level"
-```
-
-A rule references signals by stable semantic identifiers. It must not contain undocumented CAN IDs as a substitute for a decoder.
-
-## Dry-run / replay simulation
-
-Every rule should support simulation against a recorded session before activation.
-
-The simulator reports:
-
-- when the rule would have triggered
-- which samples satisfied each condition
-- which action would have executed
-- how often notification cooldowns would have suppressed an action
-
-No vehicle command is sent during replay.
+Every rule can be simulated against a recorded session before activation. The simulator reports trigger timestamps, satisfied conditions, measured values/context, the action that would execute, and notification cooldown suppression. Replay never sends vehicle commands.
 
 ## Session boundaries
 
-A session is an explicit unit of recorded evidence. Recommended phases:
-
-- `PARKED`
-- `REST`
-- `DRIVE`
-- `LOAD_TEST`
-- `RECOVERY`
-- `AC_CHARGE`
-- `DC_CHARGE`
-- `POST_CHARGE`
-- `ENDED`
-
-The orchestration layer closes a session deliberately rather than relying on an endless logger. Battery and charging analyses consume the appropriate session type.
+A recorded session has explicit phases: `PARKED`, `REST`, `DRIVE`, `LOAD_TEST`, `RECOVERY`, `AC_CHARGE`, `DC_CHARGE`, `POST_CHARGE`, `ENDED`. The logger must close sessions deliberately and record start/end timestamps and end reason.
 
 ## Automatic Health Check
 
-The automatic test is a profile-driven sequence, not a fixed universal script:
+The one-tap `AUTO TEST` is profile-driven and capability-driven, not a universal fixed script:
 
 ```text
 Capability Discovery
-  -> identification
-  -> communication check
-  -> DTC/alert read
-  -> battery snapshot
-  -> cell/module snapshot if available
-  -> HV isolation/Riso if available
-  -> thermal data
-  -> charging state/data
-  -> drive-unit data
-  -> optional controlled road capture
-  -> STATIC/LOAD/RECOVERY analysis
-  -> report
-  -> replayable session
+ -> vehicle identification / market hint
+ -> communication check
+ -> DTC / vehicle alerts
+ -> battery snapshot
+ -> module/cell data when available
+ -> HV isolation / Riso when available
+ -> thermal data
+ -> charging state/data
+ -> drive-unit data
+ -> optional controlled road capture
+ -> STATIC / LOAD / RECOVERY / TREND / CONFIDENCE analysis
+ -> report + replay session
 ```
 
-Unsupported capabilities become `NOT_AVAILABLE`; they do not become failures.
+Unsupported capabilities are `NOT_AVAILABLE`, never automatic failures.
 
-## Remote telemetry / home use
+## Pre-purchase test
 
-A core project goal is to allow an owner to leave the WiCAN interface in the vehicle and monitor read-only telemetry over the home Wi-Fi network when the vehicle/interface supports it.
+`PRE_PURCHASE_TEST` is a dedicated read-only workflow for a borrowed/inspected vehicle. It must optimize useful evidence within limited access time and report confidence instead of inventing a definitive SOH percentage.
 
-Potential outputs:
+When supported, capture VIN/model/year/market hint, DTCs and warnings, battery SOC/voltage/current/temperature, module and cell voltage/temperature, cell imbalance across rest/load/recovery, AC/DC charging observations, HV isolation/Riso and drive-unit/thermal data. If the vehicle is available for only about one hour, missing long-rest baseline is explicitly shown as `Limited assessment`.
 
-- live dashboard
-- MQTT
-- Home Assistant
-- local notifications
-- periodic health snapshots
-- battery/temperature trend history
+## US-market indication
 
-The design must account for Wi-Fi sleep, vehicle sleep, adapter power loss, reconnection and stale data. A stale value must never be presented as live.
+Market detection must be evidence-based: VIN decoding, verified vehicle metadata or a verified OEM diagnostic signal. If `market_hint=US` is supported with a confidence/source, the UI displays a visible `⚠ US-market vehicle detected` indicator and explains the source. A guessed VIN pattern alone must not be presented as fact.
 
-## Sexy Button / one-tap workflow
+## Battery charging and cell tracking
 
-The UI should eventually provide a prominent one-tap action such as:
+When cell-level data exists, the same tracking engine operates during both `AC_CHARGE` and `DC_CHARGE`. Record absolute cell voltage, deviation from pack/peers, minimum/maximum cell identity, temperature/delta, charge current/power, SOC and phase duration.
 
-> **AUTO TEST**
+The instantaneous lowest cell during acceleration is **not** automatically called the weakest cell. Under load it is a voltage-response observation. Stronger conclusions require persistent behavior across suitable conditions and evidence.
 
-The button starts only the tests supported by the discovered vehicle capabilities and current safety policy. It does not mean every possible diagnostic function is executed.
+## Replay hierarchy
 
-Example result:
+Replay follows:
 
-```text
-AUTO TEST COMPLETE
+`Session → Phase → Pack → Module → Cell → Sample`
 
-Vehicle          Tesla Model Y
-Communication   OK
-DTC / Alerts    0 detected
-Battery         Data captured
-Cell analysis   Available
-Riso            Status available
-Charging        Not tested
-Drive unit      Data captured
+The user can scrub through time and inspect the exact recorded voltage of every available cell at that timestamp. A selected cell retains its history while pack/module views highlight its relative deviation. Timestamp indexing uses binary-search-friendly structures so thousands of samples do not require a full scan for every scrub operation.
 
-Confidence      84%
-Replay          Available
-```
+## Remote telemetry
+
+When supported by the interface and vehicle, read-only telemetry may be exposed through a live dashboard, MQTT, Home Assistant, notifications and periodic health snapshots. Wi-Fi sleep, vehicle sleep, adapter power loss, reconnects and stale data must be handled explicitly; stale data must never be shown as live.
+
+## Explainability
+
+Every alert/report finding must state why it exists and which diagnostic pillar contributed: `STATIC`, `LOAD`, `RECOVERY`, `TREND` or `CONFIDENCE`. It must include the observation, context and evidence/threshold provenance. Insufficient evidence becomes `UNKNOWN`/`LIMITED_ASSESSMENT`, never a fabricated fault.
 
 ## Auditability
 
-Every rule execution records:
-
-- rule ID/version
-- timestamp
-- vehicle identity scope
-- capability snapshot
-- input values
-- condition results
-- actions attempted
-- notification result
-- errors/timeouts
+Every execution records rule ID/version, timestamp, vehicle identity scope, capability snapshot, input values, condition results, actions attempted, notification result and errors/timeouts.
 
 ## Safety boundaries
 
 - Read-only is the default.
-- No hidden writes.
-- No automatic coding.
-- No automatic resets.
+- No hidden writes, coding or resets.
 - No automatic contactor/actuator commands.
-- Experimental WRITE support, if ever added, must use a separate command subsystem and explicit user confirmation.
+- A future WRITE subsystem requires a separate safety review, explicit user confirmation, vehicle-specific allowlists and independent audit logging.
 
 ## Implementation order
 
 1. Rule data model
-2. replay/dry-run evaluator
-3. notification abstraction and rate limiting
-4. session manager
-5. scheduled read-only telemetry
+2. Replay/dry-run evaluator
+3. Notification abstraction and rate limiting
+4. Session manager
+5. Scheduled read-only telemetry
 6. Automatic Health Check orchestrator
 7. MQTT/Home Assistant integration
 8. UI rule editor
-9. only after separate safety review: experimental write subsystem
+9. Only after separate safety review: experimental write subsystem
