@@ -75,6 +75,20 @@ Authoritative working backlog. Tasks are ordered by dependency, testability and 
 - [ ] distinguish loaded minimum voltage from evidence of a weak cell
 - [ ] one-hour/short-loan mode with explicit limited-confidence result
 
+## P1 — PRE-PURCHASE forensic audit
+
+- [ ] ECU/Gateway VIN identity comparison where both values are exposed
+- [ ] ECU replacement/identity mismatch finding with non-definitive wording
+- [ ] odometer cross-check from documented/verified sources
+- [ ] crash/airbag evidence inventory from available DTCs/status/history
+- [ ] BMS/HV pyrotechnic-disconnect evidence where exposed
+- [ ] explicitly distinguish HV pyrofuse/PBDU from airbag squib circuits
+- [ ] do not treat generic squib resistance as pyrofuse resistance
+- [ ] suspicious equal-resistance pattern as `SUSPICIOUS_CONFIGURATION`, never automatic proof of emulator
+- [ ] evidence manifest for every forensic finding
+- [ ] `NO_RELEVANT_EVIDENCE_FOUND / EVIDENCE_FOUND / INSUFFICIENT_COVERAGE / UNVERIFIED` states
+- [ ] Czech explanations and source/verification state for every forensic result
+
 ## P1 — Riso / HV isolation
 
 - [ ] vehicle-reported numeric isolation values where exposed
@@ -84,6 +98,7 @@ Authoritative working backlog. Tasks are ordered by dependency, testability and 
 - [ ] threshold provenance
 - [ ] physical isolation test results stored separately from vehicle-reported diagnostics
 - [ ] isolation trend across sessions
+- [ ] apply DC/AC isolation criteria according to verified vehicle architecture; do not hard-code 200 kΩ as a universal ISO minimum
 
 ## P1 — replay / expert analysis
 
@@ -99,6 +114,24 @@ Authoritative working backlog. Tasks are ordered by dependency, testability and 
 - [ ] expert numerical view
 - [ ] verified battery topology visualization only when supported
 
+## P1 — Diagnostic Knowledge Base / Czech UI
+
+- [ ] central `InfoTooltip` component for diagnostic metrics
+- [ ] `?` tooltip on every non-obvious metric, status and evaluated result
+- [ ] Czech tooltip content with what/why/source/interpretation/verification
+- [ ] Czech user-facing error messages with stable internal error codes
+- [ ] tooltip text sourced centrally, not duplicated per screen
+- [ ] tooltip content scope-aware for vehicle/firmware/evidence profile
+- [ ] show `NOT_AVAILABLE`, `NOT_TESTED`, `UNASSESSED`, `ERROR` with explanatory tooltips
+- [ ] verified OEM/community/engineering source separation
+- [ ] verified OEM URL storage
+- [ ] Tesla explanation links where official sources are available
+- [ ] troubleshooting and service references where legitimately public
+- [ ] broken-link / `needs_review` state
+- [ ] finding → explanation → source → related measurements navigation
+- [ ] show source and verification level next to every repair explanation
+- [ ] never invent a repair procedure when no verified source exists
+
 ## P1 — ICE / Hybrid diagnostics
 
 - [ ] generic OBD-II DTC + freeze-frame
@@ -112,18 +145,6 @@ Authoritative working backlog. Tasks are ordered by dependency, testability and 
 - [ ] requested vs actual boost pressure
 - [ ] requested vs actual common-rail pressure
 - [ ] thermal context and live-data replay
-
-## P1 — Diagnostic Knowledge Base
-
-- [ ] DTC/alert knowledge schema
-- [ ] OEM/community/engineering source separation
-- [ ] verified OEM URL storage
-- [ ] Tesla explanation links where official sources are available
-- [ ] troubleshooting and service references where legitimately public
-- [ ] broken-link / `needs_review` state
-- [ ] finding → explanation → source → related measurements navigation
-- [ ] show source and verification level next to every repair explanation
-- [ ] never invent a repair procedure when no verified source exists
 
 ## P1 — Bus health / auto-electrician tools
 
@@ -140,10 +161,14 @@ Authoritative working backlog. Tasks are ordered by dependency, testability and 
 ## P2 — Automation / AUTO TEST
 
 - [ ] one-tap `AUTO TEST` / profile-driven “Sexy Button”
+- [ ] one-tap `PRE-PURCHASE TEST` profile including forensic stages
 - [ ] pre-test data-quality and safety gate
 - [ ] automatic phase/session boundaries
 - [ ] automatic analysis after each phase
 - [ ] unsupported stages shown as `NOT_AVAILABLE`, not failed
+- [ ] evidence coverage summary
+- [ ] deterministic forensic finding IDs
+- [ ] report with raw evidence references and SHA-256 evidence manifest
 - [ ] rule engine with JSON/YAML representation
 - [ ] replay dry-run for rules
 - [ ] audit log for rule execution
@@ -153,17 +178,6 @@ Authoritative working backlog. Tasks are ordered by dependency, testability and 
 - [ ] Home Assistant integration
 - [ ] scheduled read-only remote telemetry
 - [ ] stale-data detection
-
-## P2 — additional vehicles
-
-- [ ] Generic OBD-II profile
-- [ ] VAG framework
-- [ ] VW/Škoda/SEAT/Audi profiles as evidence permits
-- [ ] Hyundai/Kia
-- [ ] BMW
-- [ ] Mercedes
-- [ ] Renault/Nissan
-- [ ] Mitsubishi
 
 ## P3 — experimental control
 
