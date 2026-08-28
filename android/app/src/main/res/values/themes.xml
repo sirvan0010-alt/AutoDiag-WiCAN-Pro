@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.AutoDiag" parent="android:style/Theme.Material.Light.NoActionBar" />
+</resources>
