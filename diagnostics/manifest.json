@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "catalog_version": "0.1.0",
+  "default_packs": ["generic_obd"],
+  "packs": [
+    {
+      "id": "generic_obd",
+      "name_cs": "Generic OBD-II",
+      "version": "0.1.0",
+      "size_hint_mb": 2,
+      "verification": "verified",
+      "path": "core/generic_obd.json"
+    },
+    {
+      "id": "tesla",
+      "name_cs": "Tesla",
+      "version": "0.1.0",
+      "size_hint_mb": 18,
+      "verification": "unverified",
+      "path": "manufacturers/tesla/dtc.json"
+    },
+    {
+      "id": "vag_meb",
+      "name_cs": "Škoda / Volkswagen / Audi MEB",
+      "version": "0.1.0",
+      "size_hint_mb": 9,
+      "verification": "unverified",
+      "path": "manufacturers/vag/dtc.json"
+    }
+  ]
+}
