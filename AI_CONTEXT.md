@@ -19,6 +19,20 @@ The project is intentionally developed as a documented, testable platform rather
 - Automation and custom actions where protocol and safety are verified
 - OEM-linked diagnostic explanations and service-procedure references
 
+## Authoritative project documents
+
+Before architectural implementation, read:
+
+1. `README.md`
+2. `ROADMAP.md`
+3. `docs/ARCHITECTURE_OVERVIEW.md`
+4. `docs/CAPABILITY_DISCOVERY.md`
+5. `docs/AUTOMATION_ENGINE.md`
+6. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
+7. relevant battery/HV documents
+
+`docs/IMPLEMENTATION_TASKS.md` is the active implementation backlog.
+
 ## Transport assumptions
 
 WiCAN PRO is the primary hardware interface.
@@ -35,27 +49,30 @@ Do not assume an undocumented protocol. Verify behavior against the current WiCA
 
 ## Rules for AI contributors
 
-1. Read `README.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `SAFETY.md`, and this file before making architectural changes.
-2. Read `docs/ARCHITECTURE_OVERVIEW.md` before changing diagnostic architecture.
-3. Never invent CAN IDs, bit layouts, PID meanings, ECU addresses, or Tesla-specific signals.
-4. Every reverse-engineered signal must record its source and verification status.
-5. Use explicit statuses such as `unverified`, `partially_verified`, and `verified`.
-6. READ operations have priority over WRITE operations.
-7. WRITE/CAN-control functionality must be isolated, explicitly marked experimental, disabled by default, and protected by deliberate user confirmation.
-8. Never silently turn an unverified value into a confirmed diagnostic result.
-9. Do not replace working code without a concrete reason and regression tests.
-10. Significant changes require tests and relevant documentation updates.
-11. Preserve backward compatibility of the transport and core APIs whenever practical.
-12. Prefer small, reviewable commits.
-13. When real vehicle data is unavailable, use the simulator and recorded captures instead of guessing.
-14. Never hardcode a battery/Riso threshold merely because a community post reports it.
-15. Every production diagnostic threshold requires an evidence record and defined vehicle/test scope.
-16. Distinguish measured vehicle data, OEM-reported status, physical test results, AutoDiag calculations and AutoDiag inferences.
-17. A missing OEM explanation must remain missing; do not replace it with generated text that looks authoritative.
-18. OEM repair/service links must be verified before being stored or exposed as official procedures.
-19. Safety-critical HV procedures must defer to the complete OEM safety/service documentation.
-20. A single low cell voltage during acceleration is not, by itself, proof of a weak or defective cell.
-21. Cell-level charging analysis must preserve time, current, temperature, SOC and cell/module identity where available.
+1. Read the authoritative project documents before making architectural changes.
+2. Never invent CAN IDs, bit layouts, PID meanings, ECU addresses, or Tesla-specific signals.
+3. Every reverse-engineered signal must record its source and verification status.
+4. Use explicit statuses such as `unverified`, `partially_verified`, and `verified`.
+5. READ operations have priority over WRITE operations.
+6. WRITE/CAN-control functionality must be isolated, explicitly marked experimental, disabled by default, and protected by deliberate user confirmation.
+7. Never silently turn an unverified value into a confirmed diagnostic result.
+8. Do not replace working code without a concrete reason and regression tests.
+9. Significant changes require tests and relevant documentation updates.
+10. Preserve backward compatibility of the transport and core APIs whenever practical.
+11. Prefer small, reviewable commits.
+12. When real vehicle data is unavailable, use the simulator and recorded captures instead of guessing.
+13. Never hardcode a battery/Riso threshold merely because a community post reports it.
+14. Every production diagnostic threshold requires an evidence record and defined vehicle/test scope.
+15. Distinguish measured vehicle data, OEM-reported status, physical test results, AutoDiag calculations and AutoDiag inferences.
+16. A missing OEM explanation must remain missing; do not replace it with generated text that looks authoritative.
+17. OEM repair/service links must be verified before being stored or exposed as official procedures.
+18. Safety-critical HV procedures must defer to the complete OEM safety/service documentation.
+19. A single low cell voltage during acceleration is not, by itself, proof of a weak or defective cell.
+20. Cell-level charging analysis must preserve time, current, temperature, SOC and cell/module identity where available.
+21. Capability Discovery must distinguish unavailable data from failed communication and unknown decoding.
+22. Capability cache scope must include VIN and relevant software/firmware identity where available.
+23. Automation rules must be data-driven, exportable and replayable; notification actions have rate limits and audit logs.
+24. Unsupported automatic-test stages are `NOT_AVAILABLE`, not `PASS` or `FAIL`.
 
 ## Diagnostic Knowledge Base
 
@@ -76,6 +93,20 @@ Cell-level monitoring should support both driving/load tests and AC/DC charging 
 Isolation is a safety-critical subsystem. Distinguish vehicle-reported numerical isolation, vehicle-reported status, physical insulation-test results and raw/undecoded data.
 
 Never derive an MΩ value from an OK/fault status. Never replace manufacturer safety procedures with simplified instructions.
+
+## Capability Discovery
+
+Discovery is the gatekeeper for diagnostic UI and Automatic Health Check. It must be granular enough to say, for example, that cell voltage is available while cell temperature is only partially available. Market/region warnings, such as a US-market indicator, require reliable vehicle-derived evidence and must not be guessed from user location or connector type.
+
+## Automation
+
+Automation has three action classes:
+
+- `READ_LOG_ANALYZE`
+- `NOTIFY_ALERT`
+- `WRITE_COMMAND`
+
+The first two can be developed in the initial project. `WRITE_COMMAND` is isolated and disabled by default. Rules are stored as data and must support replay/dry-run before activation.
 
 ## Testing philosophy
 
