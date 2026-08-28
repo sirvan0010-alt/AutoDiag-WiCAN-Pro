@@ -2,9 +2,7 @@
 
 ## Purpose
 
-AutoDiag should not stop at reporting `DTC = xxx`. For supported vehicles it should connect a diagnostic observation to trustworthy technical information: what the code means, what systems are affected, what should be checked, and where the manufacturer service procedure is documented.
-
-The Knowledge Base is therefore a provenance layer, not a collection of AI-generated repair guesses.
+The Diagnostic Knowledge Base (DKB) connects a recognized DTC, alert, warning or diagnostic observation with transparent explanations and trustworthy technical sources. It is a provenance layer, not a collection of AI-generated repair guesses.
 
 ## Source priority
 
@@ -18,43 +16,29 @@ Lower-level sources must never be displayed as OEM instructions.
 
 ## Knowledge entry
 
-```json
-{
-  "id": "tesla.bms.example",
-  "vehicle_scope": {
-    "make": "Tesla",
-    "model": "Model Y",
-    "years": [2022, 2023]
-  },
-  "ecu": "BMS",
-  "code": "EXAMPLE",
-  "type": "DTC",
-  "severity": "SAFETY_RELEVANT",
-  "official_description": null,
-  "meaning": null,
-  "possible_causes": [],
-  "recommended_checks": [],
-  "procedures": [],
-  "sources": [],
-  "verification": "unverified",
-  "last_reviewed": null
-}
-```
+Each entry should support:
 
-`null` and empty arrays are intentional. They mean the project has not established the information yet.
+```text
+code / alert ID
+vehicle scope
+ECU / subsystem
+official description
+severity
+symptoms / effects
+possible causes
+related measurements
+recommended checks
+OEM troubleshooting procedure
+OEM service / repair reference
+community references
+source URLs
+verification state
+last reviewed
+```
 
 ## DTC / Alert distinction
 
-The decoder must distinguish:
-
-- manufacturer DTC
-- vehicle alert
-- generic OBD-II diagnostic trouble code
-- raw diagnostic response
-- AutoDiag observation
-- AutoDiag inference
-
-A calculated observation is never silently converted into an OEM DTC.
+The decoder must distinguish manufacturer DTCs, vehicle alerts, generic OBD-II DTCs, raw diagnostic responses, AutoDiag observations and AutoDiag inferences. A calculated observation is never silently converted into an OEM DTC.
 
 ## UI behavior
 
@@ -65,11 +49,11 @@ BMS / CODE
 
 🔴 SAFETY RELEVANT
 
-What does it mean?       >
-What can be affected?    >
-What should be checked?  >
+What does it mean?        >
+What can be affected?     >
+What should be checked?   >
 
-Official documentation   >
+Official documentation    >
 Troubleshooting procedure >
 Repair/service procedure  >
 
@@ -77,17 +61,7 @@ Source: OEM
 Verification: VERIFIED
 ```
 
-If an official explanation does not exist in the database:
-
-```text
-Official documentation
-Not indexed yet
-
-Community references
-Available (separate section)
-```
-
-The app must not fill the missing OEM explanation with an AI hallucination.
+If an official explanation is not in the database, the UI says so and can show separately labeled community/engineering references. It must not fill the missing OEM explanation with an AI hallucination.
 
 ## OEM links
 
@@ -95,38 +69,28 @@ A knowledge entry may contain several references:
 
 ```json
 {
-  "procedures": [
-    {
-      "kind": "troubleshooting",
-      "title": "OEM troubleshooting procedure",
-      "url": "https://...",
-      "source_type": "oem",
-      "verification": "verified"
-    },
-    {
-      "kind": "repair",
-      "title": "OEM service procedure",
-      "url": "https://...",
-      "source_type": "oem",
-      "verification": "verified"
-    }
-  ]
+  "kind": "troubleshooting",
+  "title": "OEM troubleshooting procedure",
+  "url": "https://...",
+  "source_type": "oem",
+  "verification": "verified",
+  "last_verified": "ISO8601"
 }
 ```
 
-URLs must be stored only when the destination has been actually checked. Do not generate URLs from guessed naming conventions.
+URLs must be stored only when the destination has actually been checked. Do not generate URLs from guessed naming conventions. OEM links are reviewed because manufacturers can move or remove service pages.
+
+For Tesla, prefer official Tesla owner/support material for explanations and official Tesla service information where legitimately available. If a repair procedure is not publicly accessible, the app says so rather than pretending a community guide is an OEM procedure.
 
 ## Tesla implementation
 
-Tesla documentation should be treated as vehicle-generation-specific. A Model Y procedure must not automatically be shown for every Tesla merely because the DTC text looks similar.
+Tesla documentation is vehicle-generation-specific. A Model Y procedure must not automatically be shown for every Tesla because the DTC text looks similar. The knowledge entry therefore carries model/year/ECU scope and verification status.
 
-Where the Tesla Service Manual provides a troubleshooting or service procedure, AutoDiag should link to the specific relevant procedure. The UI should clearly identify the source as Tesla/OEM.
-
-For safety-critical HV work, the application should show a safety warning and defer to the complete OEM procedure. It must not replace the OEM procedure with a simplified DIY instruction.
+When a matching official source is verified, AutoDiag should expose a direct **Tesla explanation** or **Tesla service information** action. The link is a navigation aid; AutoDiag does not claim that an external page is available unless it has been verified.
 
 ## Community knowledge
 
-Community sources are useful for reverse-engineering CAN signals and discovering practical symptoms. They are stored separately:
+Community sources are useful for reverse-engineering CAN signals and discovering practical symptoms, but are stored separately:
 
 ```text
 OEM
@@ -143,16 +107,7 @@ A community statement such as "this usually means a weak cell" is not sufficient
 
 ## Evidence for thresholds
 
-Thresholds use the same evidence model as battery diagnostics. Each threshold has:
-
-- source
-- source type
-- vehicle scope
-- test conditions
-- confidence
-- resolution state
-
-No hardcoded production threshold may be introduced solely because it appeared in a forum post.
+Thresholds use the same evidence model as battery diagnostics. Each threshold records source, source type, vehicle scope, test conditions, confidence and resolution state. No production threshold may be hardcoded solely because it appeared in a forum post.
 
 ## Safety-critical classification
 
@@ -163,6 +118,7 @@ At minimum:
 - `WARNING`
 - `SAFETY_RELEVANT`
 - `CRITICAL`
+- `UNKNOWN`
 
 Safety classification itself requires a source. When unknown, use `UNKNOWN` rather than guessing.
 
@@ -186,14 +142,4 @@ Not allowed:
 
 ## Knowledge-base maintenance
 
-Every entry should record:
-
-- `source_url`
-- `source_title`
-- `source_type`
-- `vehicle_scope`
-- `verification`
-- `last_reviewed`
-- optional `notes`
-
-When an OEM website changes or removes a procedure, the entry should become `needs_review` rather than silently pointing to an unverified replacement.
+Every entry should record `source_url`, `source_title`, `source_type`, `vehicle_scope`, `verification`, `last_reviewed`, and optional notes. When an OEM website changes or removes a procedure, the entry becomes `needs_review` rather than silently pointing to an unverified replacement.
