@@ -1,18 +1,18 @@
 # AutoDiag — EV Diagnostics Architecture Overview
 
-This document is the entry point for `docs/`. Read it before implementing or reviewing diagnostic logic.
+This is the entry point for `docs/`. Read it before implementing or reviewing diagnostic logic.
 
 ## Current authority
 
-The project is documentation-first. The repository currently contains the initial battery-analysis and UI-tooltip specifications; additional architecture modules are being introduced incrementally. A document is authoritative only when explicitly marked so.
+The project is documentation-first. Current authoritative architecture modules include:
 
-### Rules
+- `docs/CAPABILITY_DISCOVERY.md` — what the vehicle/interface actually exposes
+- `docs/AUTOMATION_ENGINE.md` — sessions, rules, notifications, remote telemetry and AUTO TEST
+- `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md` — DTC/alert explanations and source-linked OEM information
+- `docs/IMPLEMENTATION_TASKS.md` — active implementation backlog
+- battery/HV revision documents — evidence-based battery and Riso logic
 
-- `AI_CONTEXT.md` defines project-wide AI/development rules.
-- `README.md` defines the public project purpose and high-level architecture.
-- Battery diagnostic logic must remain evidence-based and context-aware.
-- Historical/draft numbers must never silently become production thresholds.
-- Vehicle-specific claims require a source and verification state.
+Historical/draft numbers must never silently become production thresholds.
 
 ## Unified principle
 
@@ -31,6 +31,10 @@ Transport
         |
         v
 CAN / OBD framing
+        |
+        v
+Capability Discovery
+  vehicle + ECU + firmware scope
         |
         v
 Vehicle decoder
@@ -53,192 +57,128 @@ Live data                     DTC / Alerts
      Battery/HV              Knowledge Base
      Health tests             OEM procedures
           |                   explanations
-          v                       |
-       History <------------------+
+          +---------+             |
+                    v             |
+                  History <-------+
+                    |
+                    v
+              Automation Engine
+          READ / NOTIFY / WRITE*
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+      Remote telemetry     AUTO TEST
+      MQTT / HA            report + replay
+
+* WRITE is isolated, disabled by default and outside initial milestones.
 ```
+
+## Capability-first behavior
+
+The application first discovers capabilities before exposing detailed diagnostic claims. Discovery is granular and scoped to VIN + relevant software/firmware where available.
+
+Example:
+
+```text
+Battery
+  Cell voltage          ✓ available
+  Cell temperature      ~ partial
+  Riso numeric          ? unknown
+  Riso status           ✓ available
+```
+
+A failed probe is not automatically an unavailable capability. Timeouts, malformed responses, unsupported services and unknown decoders remain distinct states.
 
 ## Battery test model
 
-Battery analysis is not based on a single universal mV threshold.
+Battery analysis is not based on a single universal mV threshold. Samples retain timestamp, SOC, temperature, pack voltage, current, power, phase and available cell/module identity.
 
-Samples must retain context such as:
+The engine distinguishes:
 
-- timestamp
-- SOC
-- battery temperature
-- pack voltage
-- battery current
-- power where available
-- test phase (`REST`, `LOAD`, `RECOVERY`, `AC_CHARGE`, `DC_CHARGE`)
-- cell/module measurements where available
-- source and verification state
-
-The engine should distinguish:
-
-1. **STATIC** — rest/low-load observations.
-2. **LOAD** — response under acceleration or another controlled load.
-3. **RECOVERY** — how the system returns after load is removed.
-4. **TREND** — repeated measurements of the same vehicle.
-5. **CONFIDENCE** — completeness and quality of evidence.
+1. STATIC
+2. LOAD
+3. RECOVERY
+4. TREND
+5. CONFIDENCE
 
 Peak cell-voltage difference during acceleration must not automatically identify the lowest-voltage cell as a failed/weak cell. Load response and recovery are separate observations.
 
-## Charging analysis
+## Charging analysis and replay
 
-If cell-level data are available, AutoDiag should record and replay individual cell/module behavior during both:
-
-- AC charging
-- DC fast charging
-
-The UI should be able to show:
-
-- live minimum/maximum cell voltage
-- delta between cells
-- cell/module identity
-- temperature and temperature delta
-- current and pack voltage
-- charging power
-- evolution over time
-- replay of the complete capture
-
-At high SOC, the application should be able to identify which cell/module first develops a persistent deviation, without automatically declaring it defective.
-
-## Battery visualization
-
-Two views are required conceptually:
-
-### Driver view
-
-Simple language and restrained visual status:
+If cell-level data are available, AutoDiag records and replays individual cell/module behavior during both AC and DC charging. The expert replay view must allow the user to scrub time and inspect the exact available cell at that timestamp.
 
 ```text
-Battery health observation
+Pack → Module/Brick → Cell → timestamp
 
-🟢 No persistent abnormality observed
-
-Cell balance       12 mV
-Temperature delta   3.1 °C
-Load response       recorded
-Recovery            normal observation
-Confidence           82%
+Cell 137
+4.103 V ── 4.151 V ── 4.168 V ── 4.189 V
+             ^ user can inspect this sample
 ```
 
-### Expert / Replay view
-
-Detailed numerical analysis:
-
-- pack topology where known
-- modules/bricks
-- individual cells/groups where actually available
-- voltage and temperature traces
-- current/power trace
-- event markers
-- synchronized replay
-- exact timestamps
-- raw values
-
-The visual battery map must be driven by a verified topology profile. It must not invent physical cell positions when the topology is unknown.
+The replay engine uses a timestamp index/binary search so large captures remain responsive.
 
 ## Riso / HV isolation
 
-Isolation is a separate safety-critical subsystem.
-
-The application distinguishes:
-
-- `vehicle_reported_value`
-- `vehicle_reported_status`
-- `physical_test_result`
-- `raw_undecoded`
-
-AutoDiag must never fabricate an MΩ value from a fault status or from generic assumptions. A vehicle-specific decoder may expose a numerical isolation value, a categorical status, or only a raw diagnostic response.
-
-Physical HV insulation testing is not treated as equivalent to a CAN-reported value. Procedures involving HV test equipment must defer to the vehicle manufacturer's safety and service documentation.
+Isolation is a separate safety-critical subsystem. The application distinguishes vehicle-reported numerical isolation, vehicle-reported status, physical test results and raw/undecoded data. AutoDiag never fabricates an MΩ value from a status or generic assumption.
 
 ## Diagnostic Knowledge Base
 
-Every supported DTC/alert can have a structured knowledge entry:
+A finding can navigate directly through:
+
+`finding → meaning → affected system → sourced checks → official explanation → official troubleshooting/service reference → related measurements`
+
+OEM material is visibly separated from engineering and community sources. An unavailable OEM repair procedure remains unavailable rather than being replaced by generated instructions.
+
+## Automatic Health Check / Sexy Button
+
+The long-term one-tap `AUTO TEST` is profile-driven:
 
 ```text
-code
-  -> vehicle / ECU scope
-  -> official description
-  -> severity
-  -> symptoms / effects
-  -> diagnostic conditions
-  -> possible causes (only sourced)
-  -> related measurements
-  -> OEM troubleshooting procedure
-  -> OEM repair procedure
-  -> source URL/reference
-  -> verification state
-  -> last reviewed date
+Capability Discovery
+  → identification
+  → communication check
+  → DTC / alert read
+  → battery snapshot
+  → cell/module snapshot if available
+  → Riso/isolation if available
+  → thermal data
+  → charging data
+  → drive-unit data
+  → optional controlled road capture
+  → analysis
+  → report + replay
 ```
 
-The UI should expose this through `What does it mean?`, `What should be checked?`, and `Service procedure` actions.
-
-No source = no authoritative explanation. Community information may be shown separately and must never be presented as OEM guidance.
-
-## Automatic Health Check
-
-The long-term automatic test consists of safe read-only stages:
-
-```text
-Connection
-  -> vehicle identification
-  -> ECU communication
-  -> DTC / alert scan
-  -> battery snapshot
-  -> cell/module snapshot
-  -> HV isolation data (if exposed)
-  -> thermal system
-  -> charging data
-  -> drive-unit data
-  -> controlled road-test capture where appropriate
-  -> analysis
-  -> report + replay
-```
-
-The exact test sequence is vehicle-profile dependent. Unsupported stages become `NOT_AVAILABLE`, not `PASS`.
+Unsupported stages become `NOT_AVAILABLE`, not `PASS` or `FAIL`.
 
 ## Automation / remote telemetry
 
-AutoDiag should eventually support:
-
-- scheduled read-only telemetry
-- Wi-Fi/home-network monitoring
-- MQTT/Home Assistant integration
-- event-based notifications
-- user-defined read-only rules
-
-Automation must not silently execute CAN writes.
+The automation layer supports scheduled read-only telemetry, local/home Wi-Fi monitoring, MQTT/Home Assistant, notifications and user-defined rules. Notification actions have rate limits and audit logs. Rules are exportable and replayable in dry-run mode.
 
 ## Verification states
 
-Every vehicle-specific signal, threshold, decoder and procedure should use:
+Every vehicle-specific signal, threshold, decoder and procedure uses:
 
 - `unverified`
 - `partially_verified`
 - `verified`
 
-Verification is scoped to the exact vehicle generation, hardware, software and test conditions where practical.
-
-## Historical specifications
-
-Older drafts may contain community numbers or provisional thresholds. They are useful research material but are not production truth unless an evidence record resolves them.
-
-This prevents a community observation such as a particular mV value from becoming a hidden universal diagnostic rule.
+Verification is scoped to vehicle generation, hardware, software and test conditions where practical.
 
 ## Implementation order
 
 1. Data model and provenance/evidence model.
 2. Transport abstraction and simulator.
 3. CAN/OBD parsers and replay.
-4. Vehicle decoder framework.
-5. Battery STATIC/LOAD/RECOVERY/TREND engine.
-6. Battery fingerprint/history.
-7. Riso/HV isolation model.
-8. Diagnostic Knowledge Base.
-9. Automatic Health Check orchestration.
-10. Android UI and expert replay visualization.
-11. Vehicle-specific profiles and evidence-backed thresholds.
-12. Additional manufacturers.
+4. Capability Discovery.
+5. Vehicle decoder framework.
+6. Battery STATIC/LOAD/RECOVERY/TREND engine.
+7. Battery fingerprint/history.
+8. Riso/HV isolation model.
+9. Diagnostic Knowledge Base.
+10. Automatic Health Check orchestration.
+11. Android UI and expert replay visualization.
+12. Automation/remote telemetry.
+13. Vehicle-specific profiles and evidence-backed thresholds.
+14. Additional manufacturers.
