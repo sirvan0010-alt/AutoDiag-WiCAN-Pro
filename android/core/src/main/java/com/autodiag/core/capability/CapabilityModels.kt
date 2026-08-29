@@ -26,6 +26,10 @@ data class CapabilitySnapshot(
 
 object CapabilityIds {
     const val COMMUNICATION = "system.communication"
+    const val OBD_PROTOCOL = "obd.protocol"
+    const val OBD_VIN = "obd.vin"
+    const val OBD_DTC = "obd.dtc"
+    const val OBD_LIVE_DATA = "obd.live_data"
     const val OBD_MODE_01 = "obd.mode01"
     const val OBD_MODE_03 = "obd.mode03"
     const val BATTERY_CELLS = "battery.cells"
