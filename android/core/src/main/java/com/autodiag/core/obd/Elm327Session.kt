@@ -1,9 +1,13 @@
 package com.autodiag.core.obd
 
 import com.autodiag.core.transport.WiCanTransport
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import java.nio.charset.Charset
 
@@ -18,6 +22,8 @@ class Elm327Session(private val transport: WiCanTransport) {
     @Volatile
     private var initialized: Boolean = false
 
+    private val commandMutex = Mutex()
+
     val isInitialized: Boolean get() = initialized
 
     suspend fun initialize(): Result<Unit> = runCatching {
@@ -31,34 +37,46 @@ class Elm327Session(private val transport: WiCanTransport) {
         initialized = false
     }
 
-    suspend fun command(command: String, timeoutMs: Long = 3_000): String {
+    suspend fun command(command: String, timeoutMs: Long): String = commandMutex.withLock {
         require(command.isNotBlank())
-        return withTimeout(timeoutMs) {
+
+        withTimeout(timeoutMs) {
+            val ascii = Charset.forName("US-ASCII")
+            val acc = StringBuilder()
+
+            // The predicate appends every emitted TCP chunk to the same
+            // buffer. takeWhile stops only after the chunk containing '>'.
+            val reader = transport.observeIncoming().takeWhile { chunk ->
+                acc.append(chunk.toString(ascii))
+                acc.indexOf('>') < 0
+            }
+
             coroutineScope {
-                // Subscribe before TX so a fast ELM response cannot be lost.
-                val response = async {
-                    val ascii = Charset.forName("US-ASCII")
-                    val acc = StringBuilder()
-                    transport.observeIncoming().first { chunk ->
-                        acc.append(chunk.toString(ascii))
-                        acc.indexOf('>') >= 0
-                    }
-                    val text = acc.toString()
-                    val idx = text.indexOf('>')
-                    text.substring(0, idx)
-                        .replace("\r", "\n")
-                        .lines()
-                        .map { it.trim() }
-                        .filter { it.isNotEmpty() }
-                        .joinToString("\n")
-                        .trim()
+                // UNDISTPATCHED starts collection before TX, preventing a
+                // fast ELM response from racing ahead of the subscription.
+                val collectJob = async(start = CoroutineStart.UNDISPATCHED) {
+                    reader.collect { }
                 }
 
                 transport.send((command.trim() + "\r").toByteArray(Charsets.US_ASCII)).getOrThrow()
-                response.await()
+                collectJob.await()
             }
+
+            val text = acc.toString()
+            val idx = text.indexOf('>')
+            require(idx >= 0) { "ELM327 prompt not received" }
+
+            text.substring(0, idx)
+                .replace("\r", "\n")
+                .lines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .joinToString("\n")
+                .trim()
         }
     }
+
+    suspend fun command(command: String): String = command(command, 3_000)
 
     suspend fun close() {
         initialized = false
