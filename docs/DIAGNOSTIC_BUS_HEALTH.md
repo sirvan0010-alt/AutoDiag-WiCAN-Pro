@@ -48,3 +48,9 @@ All fields carry provenance: interface-measured, vehicle-reported, decoded, or i
 ## Scope
 
 This module supports troubleshooting of wiring, termination, noise and bus configuration while remaining separate from DTC interpretation. It does not automatically issue diagnostic or control commands to recover a bus.
+
+## See also
+
+Detailed design for adaptive sampling (AUTO TEST / PRE-PURCHASE) and CAN error-frame / TEC-REC handling:
+
+- [`docs/ADAPTIVE_SAMPLING_AND_BUS_HEALTH.md`](ADAPTIVE_SAMPLING_AND_BUS_HEALTH.md)
