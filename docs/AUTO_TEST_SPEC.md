@@ -148,3 +148,10 @@ A user can therefore answer questions such as: "What voltage did cell 137 have a
 ## Automation safety
 
 `AUTO TEST` is read-only. Notifications and MQTT publication are separate actions. WRITE/COMMAND functionality is never implicitly enabled by this test.
+
+## Related design
+
+Adaptive sampling rates (SLOW/MEDIUM/FAST/BURST), REST→LOAD→RECOVERY state machine, effectiveHz UI indicator, and bus-error handling that keeps `NOT_AVAILABLE reason: bus_error` separate from `vehicle_did_not_provide`:
+
+- [`docs/ADAPTIVE_SAMPLING_AND_BUS_HEALTH.md`](ADAPTIVE_SAMPLING_AND_BUS_HEALTH.md)
+- [`docs/DIAGNOSTIC_BUS_HEALTH.md`](DIAGNOSTIC_BUS_HEALTH.md)
