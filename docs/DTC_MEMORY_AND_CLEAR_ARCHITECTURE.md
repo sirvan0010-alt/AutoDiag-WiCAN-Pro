@@ -11,7 +11,8 @@ AutoDiag-WiCAN-Pro must be able to work with diagnostic trouble codes stored in 
 5. preserve the raw response as diagnostic evidence;
 6. show the code, ECU, memory type and verification status;
 7. offer **Clear DTCs** only as an explicit state-changing operation;
-8. after a successful clear, read DTC memory again to verify the result.
+8. after a successful clear, read DTC memory again to verify the result;
+9. update local DTC history from the complete timestamped scan.
 
 ## OBD-II foundation
 
@@ -28,9 +29,33 @@ The implementation is transport-neutral: it creates diagnostic operations, while
 
 ## ECU-native UDS memory
 
-OBD Mode 03/04 is not sufficient for every ECU. A later vehicle-profile/UDS layer must add UDS service `0x19 ReadDTCInformation` and `0x14 ClearDiagnosticInformation`, including subfunctions, status masks, snapshot/extended data and ECU-specific addressing.
+OBD Mode 03/04 is not sufficient for every ECU. The UDS foundation adds service `0x19 ReadDTCInformation` and `0x14 ClearDiagnosticInformation`, including status masks and ECU-native three-byte DTC identifiers. Snapshot and extended-data decoding remain vehicle/ECU-specific extensions.
+
+UDS DTC identifiers are retained as `DTC` + six hexadecimal digits in the generic model. They must not be falsely converted to the four-character OBD P/C/B/U representation.
 
 Do not translate a UDS ECU into a generic OBD operation unless the vehicle/ECU profile proves that mapping is valid.
+
+## Local DTC history
+
+The ECU reports its current diagnostic state; it does not provide a universal application-level timestamp for when AutoDiag first saw or last saw a DTC. AutoDiag therefore maintains a separate local history keyed by:
+
+`(ECU address, DTC memory, DTC code)`
+
+`DtcHistoryStore` tracks:
+
+- `ACTIVE` vs `RESOLVED`;
+- `firstSeenAt`;
+- `lastSeenAt`;
+- `resolvedAt`;
+- `timesObserved`;
+- `reoccurrenceCount` for ACTIVE → RESOLVED → ACTIVE returns;
+- `ABSENT_ON_RESCAN` vs `CLEARED_BY_USER` resolution reason.
+
+A resolved record is retained in history rather than removed. `STORED`, `PENDING` and `PERMANENT` memories are tracked independently, so clearing one memory does not implicitly resolve another.
+
+**Ingestion safety:** `ingestScan()` must receive a complete scan for exactly one `(ECU, memory)` scope. A partial, filtered or failed scan must not be interpreted as absence, because that would create a false "resolved" event.
+
+The core history store intentionally has no destructive `clearHistory()` operation. If storage retention/deletion is introduced later, it belongs to an explicit persistence/privacy policy layer.
 
 ## Clear safety
 
@@ -43,6 +68,7 @@ Clearing DTC memory is a **write/state-changing operation**. It can erase diagno
 - show that stored diagnostic evidence may be lost;
 - never silently clear as part of a scan;
 - perform a post-clear read-back;
+- call local history `recordExplicitClear()` only after the protocol layer confirms a successful clear;
 - record request, response and result in diagnostic evidence/audit data.
 
 A failed or unsupported clear operation must not be reported as successful.
