@@ -7,7 +7,6 @@ data class UdsRequest(
 ) {
     init {
         require(service != UdsService.UNKNOWN) { "Unknown UDS service cannot be executed" }
-        require(payload.all { true }) { "Invalid UDS payload" }
     }
 
     val serviceId: Int
