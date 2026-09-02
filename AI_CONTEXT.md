@@ -29,9 +29,28 @@ Before architectural implementation, read:
 4. `docs/CAPABILITY_DISCOVERY.md`
 5. `docs/AUTOMATION_ENGINE.md`
 6. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
-7. relevant battery/HV documents
+7. `docs/LONG_TERM_FEATURE_PRESERVATION.md`
+8. relevant battery/HV documents
 
 `docs/IMPLEMENTATION_TASKS.md` is the active implementation backlog.
+
+## Permanent feature-preservation rule
+
+The complete target capability set must survive across future AI and human developers. A feature must NOT be deleted merely because it cannot be implemented today.
+
+Use `BLOCKED: <reason>` and preserve the target in the catalog/roadmap. Valid capability states include `AVAILABLE`, `AVAILABLE_WITH_PREREQUISITES`, `REQUIRES_OEM_SECURITY`, `REQUIRES_ADDITIONAL_HARDWARE`, `NOT_SUPPORTED`, `UNKNOWN` and `BLOCKED: <reason>`.
+
+Before changing a capability, cross-check hardware, firmware/API, transport, protocol, vehicle/ECU, VIN/model/year/region/software scope, OEM security, additional hardware, safety, simulator/replay coverage, tests and evidence/provenance.
+
+A capability is not `VERIFIED` merely because code exists.
+
+Vehicle-specific implementations must preserve compatibility scope such as VIN/make/model/generation/year/region/powertrain/ECU/HW/SW/protocol/firmware. Do not generalize a verified result beyond its evidence scope.
+
+Future VAG functionality may include outcomes comparable to established diagnostic tools, including measuring values, basic settings, adaptations, service functions, gateway topology and coding/long coding, but proprietary VCDS code/data/binaries must not be copied. Implement interoperable behavior using legitimate protocols, public/documented information, licensed data or independently verified engineering work.
+
+All planned service/coding functions remain visible even if currently blocked by protocol, security, hardware or missing evidence. High-risk WRITE functions remain isolated, default-off and gated by exact scope, backup/recovery, simulator/replay validation and explicit confirmation.
+
+See `docs/LONG_TERM_FEATURE_PRESERVATION.md` for the permanent developer contract.
 
 ## Transport assumptions
 
@@ -73,6 +92,9 @@ Do not assume an undocumented protocol. Verify behavior against the current WiCA
 22. Capability cache scope must include VIN and relevant software/firmware identity where available.
 23. Automation rules must be data-driven, exportable and replayable; notification actions have rate limits and audit logs.
 24. Unsupported automatic-test stages are `NOT_AVAILABLE`, not `PASS` or `FAIL`.
+25. Never remove a planned capability because it is currently blocked; document the blocker and keep the target visible.
+26. Before declaring a new capability supported, perform the project audit/cross-check and record evidence and scope.
+27. Hardware-dependent features must be explicitly separated from Android-only features.
 
 ## Diagnostic Knowledge Base
 
