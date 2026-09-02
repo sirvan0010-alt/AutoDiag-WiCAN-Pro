@@ -3,6 +3,7 @@
 > Master specification: `docs/TODAY_MASTER_PLAN_2026-09-02.md`
 > Repair/estimate architecture: `docs/REPAIR_KNOWLEDGE_ESTIMATE_ARCHITECTURE.md`
 > Oscilloscope architecture: `docs/OSCILLOSCOPE_ARCHITECTURE.md`
+> DTC memory architecture: `docs/DTC_MEMORY_AND_CLEAR_ARCHITECTURE.md`
 
 ## Phase 0 — Foundation
 
@@ -42,9 +43,14 @@
 - [x] UDS risk classification
 - [x] UDS capability gate foundation
 - [x] Registry-driven Mode 01 PID decoder
+- [x] OBD stored/pending/permanent DTC decoder foundation
+- [x] OBD Mode 04 clear-request model with state-changing classification
 - [ ] ISO-TP transmit / flow-control
 - [ ] Generic OBD-II PID/sensor coverage
 - [ ] DTC/freeze-frame/readiness pipeline
+- [ ] UDS 0x19 ReadDTCInformation
+- [ ] UDS 0x14 ClearDiagnosticInformation
+- [ ] DTC clear executor + post-clear verification
 - [ ] Mode 06 TID/CID/scaling/unit model
 
 ## Phase 4 — ECU discovery and vehicle identification
@@ -162,6 +168,7 @@
 
 - [x] UDS service risk classification
 - [x] Capability gate foundation
+- [x] OBD DTC clear classified as state-changing
 - [ ] UDS service execution framework
 - [ ] Diagnostic Session Control 0x10
 - [ ] Controlled Security Access 0x27
