@@ -38,11 +38,13 @@ The goal is **not** to make a cosmetic WiCAN controller. WiCAN PRO remains the h
 
 ## Documentation entry point
 
-Before changing diagnostic architecture, read [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md).
+Before changing diagnostic architecture, read `docs/ARCHITECTURE_OVERVIEW.md`.
 
-For DTC/alert explanations, OEM procedures and source provenance, read [`docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`](docs/DIAGNOSTIC_KNOWLEDGE_BASE.md).
+For DTC/alert explanations, OEM procedures and source provenance, read `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`.
 
-For permanent AI/developer rules and feature preservation, read [`AI_CONTEXT.md`](AI_CONTEXT.md) and [`docs/LONG_TERM_FEATURE_PRESERVATION.md`](docs/LONG_TERM_FEATURE_PRESERVATION.md).
+For permanent AI/developer rules and feature preservation, read `AI_CONTEXT.md` and `docs/LONG_TERM_FEATURE_PRESERVATION.md`.
+
+For the physical WiCAN PRO LED/activity target, read `docs/WICAN_LED_ACTIVITY_INDICATOR.md`.
 
 ## Architecture
 
@@ -202,14 +204,20 @@ The project aims for long-term maintainability across future Android releases. N
 
 ## Hardware activity LED
 
-WiCAN PRO hardware documentation identifies the blue LED on GPIO7, and recent WiCAN PRO firmware release notes document an LED command with blink support. Therefore an adapter activity indication is a realistic future target, but AutoDiag cannot control the physical LED by itself unless the installed firmware exposes a compatible control path. Exact behavior must be verified per firmware version before enabling it.
+WiCAN PRO hardware documentation identifies the blue LED on GPIO7, and recent WiCAN PRO firmware release notes document an LED command with blink support. Therefore an adapter activity indication is a realistic future target, but AutoDiag cannot control the physical LED by itself unless the installed firmware exposes a compatible control path.
+
+There is an important distinction between **LED command control** and an **automatic communication-activity state machine**. Recent firmware evidence establishes the command/blink primitive, but the project does not assume that firmware already exposes a stable automatic CAN/ELM327 activity mode.
 
 Desired behavior:
 
 - steady blue = powered/idle
-- blink/pulse = active communication
-- optional faster activity = high traffic
-- separate fault indication if the hardware/firmware supports it
+- slow pulse = connected
+- short pulse = diagnostic/CAN communication
+- faster bounded pulse = sustained high traffic
+- separate fault pattern = firmware-defined fault state
+- separate update pattern = firmware-defined update state
+
+The implementation must prioritize fault/update states and must never send one LED command per CAN frame from Android. See `docs/WICAN_LED_ACTIVITY_INDICATOR.md` and GitHub Issue #5 for the verification and implementation plan.
 
 ## Roadmap
 
