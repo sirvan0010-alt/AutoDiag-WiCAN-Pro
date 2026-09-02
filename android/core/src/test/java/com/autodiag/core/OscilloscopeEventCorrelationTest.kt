@@ -17,7 +17,7 @@ class OscilloscopeEventCorrelationTest {
             OscilloscopeSample(2_000L, 1.0),
             OscilloscopeSample(3_000L, 0.0),
         ),
-        sampleRateHz = 1_000_000.0,
+        sampleRateHz = 1_000_000L,
         trigger = null,
     )
 
