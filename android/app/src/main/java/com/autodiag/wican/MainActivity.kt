@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.autodiag.core.capability.Capability
 import com.autodiag.core.capability.CapabilityStatus
+import com.autodiag.core.capability.VinAudit
 import com.autodiag.core.discovery.WiCanMdnsDiscovery
 import com.autodiag.core.transport.TransportMode
 import com.autodiag.wican.ui.components.InfoTooltip
@@ -145,7 +146,7 @@ private fun DiscoveryScreen(
                         Column(Modifier.padding(16.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("Zařízení nebylo nalezeno", style = MaterialTheme.typography.titleMedium)
-                                InfoTooltip("Prázdný výsledek neznamená, že WiCAN není v dosahu. Častou příčinou je AP/Client Isolation. Telefon a WiCAN musí být ve stejné síti bez izolace klientů.")
+                                InfoTooltip("Prázdný výsledek neznamená, že WiCAN není v dosahu. Častou příčinou je AP/Client Isolation. Telefon a WiCAN musí být ve stejné síti bez izolace.")
                             }
                             Spacer(Modifier.height(8.dp))
                             Text("Zkuste ruční IP, vypnutí izolace Wi-Fi nebo režim Access Point WiCAN.")
@@ -231,7 +232,11 @@ private fun ConnectionResultScreen(state: ConnectionUiState, onDisconnect: () ->
                             Text("SIMULÁTOR – syntetická data, ne data z vozidla", style = MaterialTheme.typography.labelLarge)
                             Spacer(Modifier.height(8.dp))
                         }
-                        state.snapshot?.vehicleIdentity?.vin?.let { Text("VIN: $it") }
+                        state.snapshot?.vehicleIdentity?.vin?.let { vin ->
+                            Text("VIN vozidla", style = MaterialTheme.typography.labelMedium)
+                            Text(vin, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        state.snapshot?.vinAudit?.let { VinAuditCard(it) }
                         Spacer(Modifier.height(8.dp))
                         LazyColumn(Modifier.weight(1f, fill = true), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(caps, key = { it.id }) { CapabilityCard(it) }
@@ -241,6 +246,41 @@ private fun ConnectionResultScreen(state: ConnectionUiState, onDisconnect: () ->
                     OutlinedButton(onClick = onDisconnect, Modifier.fillMaxWidth()) { Text("Odpojit") }
                 }
                 ConnectionPhase.IDLE -> Unit
+            }
+        }
+    }
+}
+
+@Composable
+private fun VinAuditCard(audit: VinAudit) {
+    if (audit.ecuRecords.isEmpty()) return
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Kontrola VIN v řídicích jednotkách", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                InfoTooltip("AutoDiag porovnává VIN z odpovědí Mode 09 PID 02. Pokud ELM327 vrátí CAN hlavičky, zobrazí také adresu ECU. Rozdílné VIN může být důkazem výměny nebo nesouladu jednotky, ale samo o sobě neurčuje příčinu.")
+            }
+            Spacer(Modifier.height(6.dp))
+            if (audit.hasMismatch) {
+                Text("⚠ NESHODA VIN", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                Text("VIN vozidla: ${audit.referenceVin ?: "—"}")
+                Spacer(Modifier.height(6.dp))
+                audit.ecuRecords.forEach { record ->
+                    val isMismatch = audit.referenceVin != null && record.vin != audit.referenceVin
+                    Text(
+                        "${record.displayEcu}: ${record.vin}${if (isMismatch) "  ← ODLIŠNÉ VIN" else ""}",
+                        color = if (isMismatch) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Pozor: rozdílné VIN v ECU je nález k prověření. Neznamená automaticky havárii ani manipulaci s vozidlem.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                Text("✓ VIN je konzistentní ve všech rozpoznaných ECU odpovědích", color = MaterialTheme.colorScheme.primary)
+                audit.ecuRecords.forEach { record -> Text("${record.displayEcu}: ${record.vin}", style = MaterialTheme.typography.bodySmall) }
             }
         }
     }
