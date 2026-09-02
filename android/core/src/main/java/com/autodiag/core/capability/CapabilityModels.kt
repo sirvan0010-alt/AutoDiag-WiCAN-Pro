@@ -26,6 +26,7 @@ data class Capability(
 data class CapabilitySnapshot(
     val vehicleIdentity: VehicleIdentity?,
     val capabilities: Map<String, Capability>,
+    val vinAudit: VinAudit = VinAudit(),
     val discoveredAtEpochMs: Long = System.currentTimeMillis(),
     val scopeKey: String = "session"
 )
