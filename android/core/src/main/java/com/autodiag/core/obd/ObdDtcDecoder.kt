@@ -46,16 +46,16 @@ object ObdDtcDecoder {
         return result
     }
 
-    private fun decodeCode(a: Int, b: Int): String? {
+    private fun decodeCode(a: Int, b: Int): String {
         val system = when ((a ushr 6) and 0x03) {
             0 -> 'P'
             1 -> 'C'
             2 -> 'B'
-            3 -> 'U'
-            else -> return null
+            else -> 'U'
         }
         val digit1 = (a ushr 4) and 0x03
-        return "$system$digit1${hex((a ushr 4) and 0x0F).takeLast(1)}${hex(b ushr 4)}${hex(b and 0x0F)}"
+        val digit2 = a and 0x0F
+        return "$system$digit1${hex(digit2)}${hex(b ushr 4)}${hex(b and 0x0F)}"
     }
 
     private fun hex(value: Int): String = value.toString(16).uppercase()
