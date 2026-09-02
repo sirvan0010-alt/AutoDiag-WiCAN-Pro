@@ -194,7 +194,7 @@
 - [ ] Direct DiagnosticEventStream adapter
 - [x] CSV export
 - [x] Replay format
-- [ ] Multi-channel synchronization
+- [x] Multi-channel synchronization
 - [ ] Verified WiCAN-compatible measurement hardware path
 - [ ] Probe/input electrical-limit enforcement
 - [ ] Automotive-safe isolation/protection hardware profile
