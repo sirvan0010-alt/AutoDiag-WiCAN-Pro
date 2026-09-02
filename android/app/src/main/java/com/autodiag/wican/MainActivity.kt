@@ -40,6 +40,7 @@ import com.autodiag.core.capability.VinAudit
 import com.autodiag.core.discovery.WiCanMdnsDiscovery
 import com.autodiag.core.transport.TransportMode
 import com.autodiag.wican.ui.components.InfoTooltip
+import com.autodiag.wican.ui.components.WiCanProtocolCard
 import com.autodiag.wican.ui.theme.AutoDiagTheme
 import com.autodiag.wican.viewmodel.ConnectionPhase
 import com.autodiag.wican.viewmodel.ConnectionUiState
@@ -135,6 +136,33 @@ private fun DiscoveryScreen(
                         }
                     }
                 }
+            }
+            item {
+                WiCanProtocolCard(
+                    onSelect = { mode ->
+                        when (mode) {
+                            TransportMode.ELM327 -> {
+                                val device = devices.firstOrNull()
+                                if (device != null) {
+                                    val (host, port) = device.suggestedElm327Endpoint()
+                                    onConnectElm(host, port)
+                                } else if (manualIp.isNotBlank()) {
+                                    onConnectElm(manualIp.trim(), 3333)
+                                }
+                            }
+                            TransportMode.SLCAN_RAW -> {
+                                val device = devices.firstOrNull()
+                                if (device != null) {
+                                    val (host, port) = device.suggestedSlcanEndpoint()
+                                    onConnectSlcan(host, port)
+                                } else if (manualIp.isNotBlank()) {
+                                    onConnectSlcan(manualIp.trim(), 23)
+                                }
+                            }
+                            TransportMode.SIMULATOR -> onConnectSimulator()
+                        }
+                    }
+                )
             }
             item {
                 Text("Stav: ${state.toUiText()}")
