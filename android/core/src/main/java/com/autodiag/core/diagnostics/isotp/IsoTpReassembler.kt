@@ -29,27 +29,32 @@ class IsoTpReassembler {
                 reset()
                 expectedLength = decoded.totalLength
                 nextSequence = 1
+                require(decoded.payload.size < decoded.totalLength) {
+                    "ISO-TP first frame already contains the complete payload"
+                }
                 buffer = decoded.payload.copyOf()
-                if (buffer.size >= decoded.totalLength) finish() else null
+                null
             }
             is IsoTpConsecutiveFrame -> {
                 val expected = expectedLength ?: error("Consecutive frame without first frame")
                 require(decoded.sequenceNumber == nextSequence) {
                     "Unexpected ISO-TP sequence ${decoded.sequenceNumber}, expected $nextSequence"
                 }
-                buffer += decoded.payload
+                val remaining = expected - buffer.size
+                require(remaining > 0) { "ISO-TP payload is already complete" }
+                val bytesToAppend = minOf(remaining, decoded.payload.size)
+                buffer += decoded.payload.copyOf(bytesToAppend)
                 nextSequence = (nextSequence + 1) and 0x0F
-                if (buffer.size >= expected) finish() else null
+                if (buffer.size == expected) finish() else null
             }
             is IsoTpFlowControlFrame -> null
-            else -> error("Unsupported ISO-TP frame type")
         }
     }
 
     private fun finish(): ByteArray {
         val length = expectedLength ?: error("No expected ISO-TP length")
-        require(buffer.size >= length) { "Incomplete ISO-TP payload" }
-        val result = buffer.copyOf(length)
+        require(buffer.size == length) { "Incomplete ISO-TP payload" }
+        val result = buffer.copyOf()
         reset()
         return result
     }
