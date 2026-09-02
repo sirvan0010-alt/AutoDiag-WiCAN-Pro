@@ -17,10 +17,10 @@ data class ObdPidDefinition(
 object ObdMode01Registry {
     val definitions: Map<Int, ObdPidDefinition> = listOf(
         ObdPidDefinition(0x05, "Engine coolant temperature", "°C", -40.0, 215.0) { bytes ->
-            bytes.firstOrNull()?.toInt()?.minus(40)?.toDouble()
+            bytes.firstOrNull()?.toInt()?.and(0xFF)?.minus(40)?.toDouble()
         },
         ObdPidDefinition(0x0B, "Intake manifold absolute pressure", "kPa", 0.0, 255.0) { bytes ->
-            bytes.firstOrNull()?.toInt()?.toDouble()
+            bytes.firstOrNull()?.toInt()?.and(0xFF)?.toDouble()
         },
         ObdPidDefinition(0x0C, "Engine RPM", "rpm", 0.0, 16383.75) { bytes ->
             if (bytes.size < 2) null else ((bytes[0].toInt() and 0xFF) * 256 + (bytes[1].toInt() and 0xFF)) / 4.0
@@ -33,13 +33,14 @@ object ObdMode01Registry {
     fun definition(pid: Int): ObdPidDefinition? = definitions[pid and 0xFF]
 }
 
-/** Four-byte supported-PID bitmap (PIDs 01-20, 21-40, ...). */
+/**
+ * Four-byte supported-PID bitmap for one standard 01-20 range.
+ * The caller selects the appropriate 0x20 PID range before decoding it.
+ */
 object ObdSupportedPidBitmap {
     fun isSupported(bitmap: ByteArray, pid: Int): Boolean {
-        if (pid !in 1..0xE0) return false
-        val blockStart = ((pid - 1) / 0x20) * 0x20 + 1
-        val index = pid - blockStart
-        if (bitmap.size < 4 || index !in 0..31) return false
+        if (bitmap.size < 4 || pid !in 1..0x20) return false
+        val index = pid - 1
         val byteIndex = index / 8
         val bit = 7 - (index % 8)
         return ((bitmap[byteIndex].toInt() and 0xFF) and (1 shl bit)) != 0
