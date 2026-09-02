@@ -51,12 +51,13 @@ object DtcClearPolicy {
     fun evaluate(
         exactVehicleAndEcuMatch: Boolean,
         explicitlySupported: Boolean,
+        securityRequired: Boolean,
         securityEstablished: Boolean,
         userConfirmed: Boolean
     ): DtcClearDecision = when {
         !exactVehicleAndEcuMatch -> DtcClearDecision.REQUIRES_EXACT_SCOPE
         !explicitlySupported -> DtcClearDecision.UNKNOWN
-        !securityEstablished && !userConfirmed -> DtcClearDecision.REQUIRES_SECURITY
+        securityRequired && !securityEstablished -> DtcClearDecision.REQUIRES_SECURITY
         !userConfirmed -> DtcClearDecision.ALLOWED_WITH_CONFIRMATION
         else -> DtcClearDecision.ALLOWED_WITH_CONFIRMATION
     }
