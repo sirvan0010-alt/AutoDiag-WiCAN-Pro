@@ -38,7 +38,7 @@ class OscilloscopeCaptureEngineTest {
         val completed = assertNotNull(result)
         assertTrue(engine.isTriggered())
         assertTrue(engine.isComplete())
-        assertEquals(listOf(1L, 2L, 3L, 4L, 5L), completed.capture.samples.map { it.timestampNanos })
+        assertEquals(listOf(1L, 2L, 3L, 4L, 5L, 6L), completed.capture.samples.map { it.timestampNanos })
         assertEquals(2, completed.triggerSampleIndex)
     }
 
