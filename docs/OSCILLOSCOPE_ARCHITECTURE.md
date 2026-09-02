@@ -28,9 +28,23 @@ The current WiCAN PRO CAN interface must **not** be marketed as a built-in analo
 7. **Correlation** — align analog signals with CAN frames, DTCs and diagnostic events.
 8. **Replay/export** — deterministic replay and CSV export for analysis and regression tests.
 
+## Viewer foundation
+
+The core layer now includes a hardware-neutral viewer configuration:
+
+- `timeDivNanos` for horizontal time/div,
+- `voltsDiv` for vertical volts/div,
+- horizontal and vertical offsets,
+- configurable X/Y grid divisions,
+- two measurement cursors,
+- delta-time and delta-voltage calculation,
+- cursor-derived frequency when the time delta is valid.
+
+Android UI code can map this physical configuration to pixels without changing the capture engine or hardware protocol.
+
 ## Trigger model
 
-The first generic trigger implementation supports rising/falling threshold crossings with optional hysteresis. Future versions can add pulse-width, window, runt-pulse, external/event trigger and CAN/UDS-correlated triggers.
+The generic trigger implementation supports rising/falling threshold crossings with optional hysteresis. Future versions can add pulse-width, window, runt-pulse, external/event trigger and CAN/UDS-correlated triggers.
 
 ## Automotive use cases
 
@@ -62,14 +76,18 @@ This deliberately complements, rather than replaces, the existing CAN/OBD/ISO-TP
 
 ## Current implementation
 
-The repository now contains hardware-neutral Kotlin models for:
+The repository contains hardware-neutral Kotlin foundations for:
 
 - oscilloscope capability and channel limits,
 - timestamped samples,
 - captures and basic measurements,
-- rising/falling edge trigger detection.
+- rising/falling edge trigger detection,
+- streaming capture and ring-buffer pre/post-trigger operation,
+- RMS, frequency, period and duty-cycle calculations,
+- waveform viewer scale/offset configuration,
+- cursor delta measurements.
 
-This is the software foundation only. A real integrated oscilloscope requires a verified sampling front end, firmware/data transport, electrical protection and corresponding hardware capability advertisement.
+This is still the software foundation only. A real integrated oscilloscope requires a verified sampling front end, firmware/data transport, electrical protection and corresponding hardware capability advertisement.
 
 ## Roadmap
 
@@ -77,10 +95,12 @@ This is the software foundation only. A real integrated oscilloscope requires a 
 - [x] Timestamped sample/capture model
 - [x] Basic measurements
 - [x] Basic trigger detector
-- [ ] Streaming capture engine
-- [ ] Ring buffer + pre/post-trigger capture
-- [ ] Frequency/duty/RMS measurement algorithms with sampling validation
-- [ ] Android waveform viewer
+- [x] Streaming capture engine
+- [x] Ring buffer + pre/post-trigger capture
+- [x] Frequency/duty/RMS measurement algorithms
+- [x] Waveform viewer scale/offset model
+- [x] Cursor measurement model
+- [ ] Android waveform renderer
 - [ ] CAN/UDS event correlation
 - [ ] CSV/replay format
 - [ ] Verified WiCAN-compatible measurement hardware path
