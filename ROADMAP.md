@@ -45,12 +45,14 @@
 - [x] Registry-driven Mode 01 PID decoder
 - [x] OBD stored/pending/permanent DTC decoder foundation
 - [x] OBD Mode 04 clear-request model with state-changing classification
+- [x] UDS 0x19 ReadDTCInformation request/response foundation
+- [x] UDS 0x14 ClearDiagnosticInformation request/response foundation
+- [x] Local DTC history lifecycle model
 - [ ] ISO-TP transmit / flow-control
 - [ ] Generic OBD-II PID/sensor coverage
 - [ ] DTC/freeze-frame/readiness pipeline
-- [ ] UDS 0x19 ReadDTCInformation
-- [ ] UDS 0x14 ClearDiagnosticInformation
 - [ ] DTC clear executor + post-clear verification
+- [ ] DTC diagnostic evidence persistence integration
 - [ ] Mode 06 TID/CID/scaling/unit model
 
 ## Phase 4 — ECU discovery and vehicle identification
