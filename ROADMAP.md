@@ -6,6 +6,7 @@ The complete set of architecture decisions, requirements and implementation stag
 
 - `docs/TODAY_MASTER_PLAN_2026-09-02.md`
 - `docs/REPAIR_KNOWLEDGE_ESTIMATE_ARCHITECTURE.md`
+- `docs/OSCILLOSCOPE_ARCHITECTURE.md`
 
 The master plan is the detailed source of truth; this roadmap is the execution checklist.
 
@@ -25,10 +26,10 @@ The master plan is the detailed source of truth; this roadmap is the execution c
 - [ ] Safety policy
 - [ ] Android project skeleton hardening
 - [ ] CI build/test pipeline
-- [ ] Vehicle identity/scope model
-- [ ] ECU identity/capability model
-- [ ] Typed measurement/evidence model
-- [ ] Diagnostic Event Stream
+- [x] Vehicle identity/scope model
+- [x] ECU identity/capability model foundation
+- [x] Typed measurement/evidence model foundation
+- [x] Diagnostic Event Stream
 
 ## Phase 1 — WiCAN connectivity
 
@@ -46,21 +47,24 @@ The master plan is the detailed source of truth; this roadmap is the execution c
 ## Phase 2 — Simulator and CAN tools
 
 - [ ] WiCAN TCP mock
+- [x] CAN frame model
+- [x] CAN ID filtering foundation
+- [x] CAN frame/bus statistics foundation
 - [ ] CAN frame simulator
 - [ ] Capture replay
-- [ ] CAN ID statistics
-- [ ] Filtering
-- [ ] Bus/error/drop statistics where available
+- [ ] CAN ID statistics UI
 - [ ] Export
 - [ ] Replay safety isolation
 
 ## Phase 3 — Protocol stack and Generic OBD-II
 
 - [ ] Typed ELM327 response layer
-- [ ] ISO-TP segmentation/reassembly
-- [ ] Negative response parsing
+- [x] ISO-TP frame classification/reassembly foundation
+- [x] UDS positive/negative response foundation
+- [x] UDS service risk classification
+- [x] UDS capability gate foundation
 - [ ] Multi-ECU response handling
-- [ ] Registry-driven Mode 01 PIDs
+- [x] Registry-driven Mode 01 PIDs
 - [ ] Supported-PID discovery
 - [ ] Mode 02 freeze frame
 - [ ] Mode 03 DTC reading
@@ -208,17 +212,42 @@ The master plan is the detailed source of truth; this roadmap is the execution c
 
 ## Phase 12 — Isolated WRITE / service framework
 
-- [ ] UDS service framework
+- [x] UDS service risk classification
+- [x] Capability gate foundation
+- [ ] UDS service execution framework
 - [ ] Diagnostic Session Control 0x10
 - [ ] Controlled Security Access 0x27
 - [ ] Read Data By Identifier 0x22
 - [ ] Write Data By Identifier 0x2E in isolated layer only
 - [ ] Routine Control 0x31 in isolated layer only
+- [ ] VAG coding / Long Coding / adaptations with exact-scope evidence
 - [ ] Explicit confirmation UI
 - [ ] Per-vehicle capability matrix
 - [ ] Safety review
 - [ ] Dry-run/simulator first
 - [ ] No unverified CAN control commands
+
+## Phase 13 — Integrated automotive oscilloscope
+
+- [x] Oscilloscope capability model
+- [x] Timestamped sample/capture model
+- [x] Basic measurements: min/max/peak-to-peak/mean
+- [x] Rising/falling threshold trigger foundation
+- [ ] Streaming capture engine
+- [ ] Ring buffer + pre/post-trigger capture
+- [ ] Frequency/period measurement
+- [ ] Duty-cycle measurement
+- [ ] RMS measurement with sampling validation
+- [ ] Android waveform viewer
+- [ ] Time/div and volts/div controls
+- [ ] Zoom/pan/cursors/freeze
+- [ ] CSV export
+- [ ] Replay format
+- [ ] CAN/UDS/DTC event correlation
+- [ ] Multi-channel synchronization
+- [ ] Verified WiCAN-compatible measurement hardware path
+- [ ] Probe/input electrical-limit enforcement
+- [ ] Automotive-safe isolation/protection hardware profile
 
 ## Long-term compatibility
 
