@@ -189,7 +189,7 @@
 - [x] Waveform viewer scale/offset model
 - [x] Cursor measurement model
 - [x] Android waveform renderer
-- [ ] Zoom/pan/freeze interaction
+- [x] Zoom/pan/freeze interaction state model
 - [x] CAN/UDS/DTC event correlation foundation
 - [ ] Direct DiagnosticEventStream adapter
 - [x] CSV export
