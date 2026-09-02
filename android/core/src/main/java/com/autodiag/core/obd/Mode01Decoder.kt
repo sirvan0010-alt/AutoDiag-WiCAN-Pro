@@ -49,15 +49,28 @@ object Mode01Decoder {
         }
     }
 
-    /** Pull hex data bytes from ELM response; ignores SEARCHING..., headers if ATH1. */
+    /**
+     * Pull hex data bytes from ELM response; ignores SEARCHING..., headers if ATH1.
+     * Explicitly rejects NO DATA / bus errors — does not rely on token-length alone.
+     */
     fun extractDataBytes(response: String): List<Int>? {
         val upper = response.uppercase()
             .replace("SEARCHING...", "")
-            .lines()
+            .trim()
+        if (upper.isEmpty()) return null
+        // Align with CapabilityDiscovery.looksLikeNoData — explicit, not accidental
+        if (upper.contains("NO DATA") || upper.contains("NODATA") ||
+            upper.contains("UNABLE TO CONNECT") || upper.contains("NOT CONNECTED") ||
+            (upper.contains("BUS INIT") && upper.contains("ERROR")) ||
+            (upper.contains("?") && upper.replace(Regex("[^0-9A-F?]"), "").length < 8)
+        ) {
+            return null
+        }
+        val lines = upper.lines()
             .map { it.trim() }
             .filter { it.isNotEmpty() && !it.startsWith(">") }
-        val line = upper.firstOrNull { it.replace(" ", "").startsWith("41") }
-            ?: upper.lastOrNull()
+        val line = lines.firstOrNull { it.replace(" ", "").startsWith("41") }
+            ?: lines.lastOrNull()
             ?: return null
         val hex = line.replace(Regex("[^0-9A-F]"), " ")
             .trim()
