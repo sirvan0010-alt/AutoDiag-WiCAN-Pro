@@ -1,83 +1,51 @@
 # AutoDiag-WiCAN-Pro Roadmap
 
-## Master specification
-
-The complete set of architecture decisions, requirements and implementation stages agreed on 2026-09-02 is preserved in:
-
-- `docs/TODAY_MASTER_PLAN_2026-09-02.md`
-- `docs/REPAIR_KNOWLEDGE_ESTIMATE_ARCHITECTURE.md`
-- `docs/OSCILLOSCOPE_ARCHITECTURE.md`
-
-The master plan is the detailed source of truth; this roadmap is the execution checklist.
+> Master specification: `docs/TODAY_MASTER_PLAN_2026-09-02.md`
+> Repair/estimate architecture: `docs/REPAIR_KNOWLEDGE_ESTIMATE_ARCHITECTURE.md`
+> Oscilloscope architecture: `docs/OSCILLOSCOPE_ARCHITECTURE.md`
 
 ## Phase 0 — Foundation
 
-- [x] Repository created
-- [x] AI project context
-- [x] Architecture overview
-- [x] Diagnostic knowledge-base architecture
-- [x] Repair knowledge / parts / labor / price architecture
-- [x] Tesla public DIY source captured
-- [x] Tesla market/region identification specification
-- [x] Capability Discovery specification
-- [x] Automation Engine specification
-- [x] Implementation task backlog
-- [x] Master plan for 2026-09-02 requirements
-- [ ] Safety policy
-- [ ] Android project skeleton hardening
-- [ ] CI build/test pipeline
-- [x] Vehicle identity/scope model
-- [x] ECU identity/capability model foundation
-- [x] Typed measurement/evidence model foundation
-- [x] Diagnostic Event Stream
+- [x] Vehicle-scope model
+- [x] ECU capability model
+- [x] Typed diagnostic evidence model
+- [x] Diagnostic event stream foundation
+- [x] Safety policy / capability-state vocabulary
+- [ ] Android skeleton hardening
+- [ ] CI build/test baseline
 
 ## Phase 1 — WiCAN connectivity
 
-- [ ] WiCAN mDNS discovery
-- [ ] Manual IP fallback
-- [ ] TCP ELM327 transport (:3333)
-- [ ] TCP SLCAN/raw CAN transport (:23)
-- [ ] WebSocket/UDP/BLE paths where verified for the target firmware
-- [ ] Connection state and reconnect handling
-- [ ] Raw TX/RX logging
-- [ ] Communication latency/sampling metrics
-- [ ] AUTO protocol detection
-- [ ] Manual protocol selection
+- [ ] TCP/ELM327 transport hardening
+- [ ] SLCAN/raw-CAN transport hardening
+- [ ] Automatic protocol detection
+- [ ] Transport health metrics
+- [ ] RX/TX counters and latency
+- [ ] Adaptive polling
+- [ ] Wi-Fi/BLE transport where verified
 
-## Phase 2 — Simulator and CAN tools
+## Phase 2 — CAN foundation
 
-- [ ] WiCAN TCP mock
 - [x] CAN frame model
-- [x] CAN ID filtering foundation
-- [x] CAN frame/bus statistics foundation
-- [ ] CAN frame simulator
-- [ ] Capture replay
-- [ ] CAN ID statistics UI
-- [ ] Export
-- [ ] Replay safety isolation
+- [x] CAN ID/mask/extended filters
+- [x] CAN bus statistics
+- [ ] Raw CAN monitor UI
+- [ ] Capture/export
+- [ ] Replay/simulator
+- [ ] Bus-load/error/drop visualization
 
-## Phase 3 — Protocol stack and Generic OBD-II
+## Phase 3 — ISO-TP / UDS / OBD
 
-- [ ] Typed ELM327 response layer
-- [x] ISO-TP frame classification/reassembly foundation
-- [x] UDS positive/negative response foundation
-- [x] UDS service risk classification
+- [x] ISO-TP frame classification
+- [x] ISO-TP receive reassembly
+- [x] UDS positive/negative response parsing
+- [x] UDS risk classification
 - [x] UDS capability gate foundation
-- [ ] Multi-ECU response handling
-- [x] Registry-driven Mode 01 PIDs
-- [ ] Supported-PID discovery
-- [ ] Mode 02 freeze frame
-- [ ] Mode 03 DTC reading
-- [ ] Mode 04 clear DTC (explicitly gated)
-- [ ] Mode 05 oxygen sensor monitoring
-- [ ] Mode 06 non-continuous monitor/test-result decoding
-- [ ] Mode 07 pending DTC
-- [ ] Mode 09 VIN/CALID/CVN
-- [ ] Mode 0A permanent DTC
-- [ ] Readiness
-- [ ] Live Data scheduler
-- [ ] Adaptive sampling 10/20/50 Hz/MAX/AUTO
+- [x] Registry-driven Mode 01 PID decoder
+- [ ] ISO-TP transmit / flow-control
 - [ ] Generic OBD-II PID/sensor coverage
+- [ ] DTC/freeze-frame/readiness pipeline
+- [ ] Mode 06 TID/CID/scaling/unit model
 
 ## Phase 4 — ECU discovery and vehicle identification
 
@@ -123,35 +91,15 @@ The master plan is the detailed source of truth; this roadmap is the execution c
 ## Phase 7 — Automated EV health test
 
 - [ ] Data-quality checks
-- [ ] Battery health analysis engine
-- [ ] STATIC / LOAD / RECOVERY / TREND / CONFIDENCE pipeline
-- [ ] Context-aware cell imbalance analysis
-- [ ] Battery Fingerprint / vehicle self-history
-- [ ] Acceleration/load test
-- [ ] AC charging test
-- [ ] DC fast-charging test
-- [ ] Cell/module tracking during charging
-- [ ] Temperature and thermal-gradient analysis
-- [ ] HV isolation/Riso analysis with source provenance
-- [ ] Drive-unit checks
-- [ ] Diagnostic score with confidence level
-- [ ] Replayable test log
-- [ ] Timestamp-indexed replay scrubber
-- [ ] Click-through Pack → Module/Brick → Cell inspection
-- [ ] Simple human-readable results
-- [ ] Expert battery/module/cell visualization
-- [ ] Exportable report
+- [ ] STATIC test
+- [ ] LOAD test
+- [ ] RECOVERY test
+- [ ] TREND test
+- [ ] CONFIDENCE scoring
+- [ ] Battery health report
 
-## Phase 8 — Diagnostic Knowledge + Repair Intelligence
+## Phase 8 — Repair intelligence / estimates
 
-- [ ] DTC/vehicle-alert normalization
-- [ ] OEM description mapping
-- [ ] Verified OEM explanation links
-- [ ] OEM troubleshooting links
-- [ ] OEM service/repair links where legitimately public
-- [ ] Source and verification display
-- [ ] Vehicle-generation-specific procedure matching
-- [ ] Community references kept separate from OEM procedures
 - [ ] `needs_review` handling for changed/removed OEM links
 - [ ] RepairSource model
 - [ ] RepairProcedure model
@@ -240,9 +188,10 @@ The master plan is the detailed source of truth; this roadmap is the execution c
 - [x] RMS measurement foundation
 - [x] Waveform viewer scale/offset model
 - [x] Cursor measurement model
-- [ ] Android waveform renderer
+- [x] Android waveform renderer
 - [ ] Zoom/pan/freeze interaction
-- [ ] CAN/UDS/DTC event correlation
+- [x] CAN/UDS/DTC event correlation foundation
+- [ ] Direct DiagnosticEventStream adapter
 - [ ] CSV export
 - [ ] Replay format
 - [ ] Multi-channel synchronization
@@ -253,10 +202,6 @@ The master plan is the detailed source of truth; this roadmap is the execution c
 ## Long-term compatibility
 
 - [ ] Current Android target SDK maintenance
-- [ ] Automated compatibility/build testing
-- [ ] Dependency update policy
-- [ ] Migration tests for future Android releases
-
-## Definition of done
-
-A feature is not considered complete merely because the code compiles. Vehicle-specific features require reproducible tests and, where applicable, validation against real vehicle data. The implementation must preserve evidence, source, vehicle/ECU scope, uncertainty and safety state.
+- [ ] Expanded protocol coverage as verified
+- [ ] Community vehicle profiles
+- [ ] Reusable WiCAN adapter ecosystem
