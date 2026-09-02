@@ -1,18 +1,34 @@
 # AutoDiag-WiCAN-Pro Roadmap
 
+## Master specification
+
+The complete set of architecture decisions, requirements and implementation stages agreed on 2026-09-02 is preserved in:
+
+- `docs/TODAY_MASTER_PLAN_2026-09-02.md`
+- `docs/REPAIR_KNOWLEDGE_ESTIMATE_ARCHITECTURE.md`
+
+The master plan is the detailed source of truth; this roadmap is the execution checklist.
+
 ## Phase 0 — Foundation
 
 - [x] Repository created
 - [x] AI project context
 - [x] Architecture overview
 - [x] Diagnostic knowledge-base architecture
+- [x] Repair knowledge / parts / labor / price architecture
+- [x] Tesla public DIY source captured
 - [x] Tesla market/region identification specification
 - [x] Capability Discovery specification
 - [x] Automation Engine specification
 - [x] Implementation task backlog
+- [x] Master plan for 2026-09-02 requirements
 - [ ] Safety policy
-- [ ] Android project skeleton
+- [ ] Android project skeleton hardening
 - [ ] CI build/test pipeline
+- [ ] Vehicle identity/scope model
+- [ ] ECU identity/capability model
+- [ ] Typed measurement/evidence model
+- [ ] Diagnostic Event Stream
 
 ## Phase 1 — WiCAN connectivity
 
@@ -20,8 +36,12 @@
 - [ ] Manual IP fallback
 - [ ] TCP ELM327 transport (:3333)
 - [ ] TCP SLCAN/raw CAN transport (:23)
+- [ ] WebSocket/UDP/BLE paths where verified for the target firmware
 - [ ] Connection state and reconnect handling
 - [ ] Raw TX/RX logging
+- [ ] Communication latency/sampling metrics
+- [ ] AUTO protocol detection
+- [ ] Manual protocol selection
 
 ## Phase 2 — Simulator and CAN tools
 
@@ -30,23 +50,58 @@
 - [ ] Capture replay
 - [ ] CAN ID statistics
 - [ ] Filtering
+- [ ] Bus/error/drop statistics where available
 - [ ] Export
+- [ ] Replay safety isolation
 
-## Phase 3 — Generic OBD-II
+## Phase 3 — Protocol stack and Generic OBD-II
 
-- [ ] Standard OBD-II PIDs
-- [ ] DTC reading
-- [ ] Live data dashboard
-- [ ] ELM327 compatibility layer
+- [ ] Typed ELM327 response layer
+- [ ] ISO-TP segmentation/reassembly
+- [ ] Negative response parsing
+- [ ] Multi-ECU response handling
+- [ ] Registry-driven Mode 01 PIDs
+- [ ] Supported-PID discovery
+- [ ] Mode 02 freeze frame
+- [ ] Mode 03 DTC reading
+- [ ] Mode 04 clear DTC (explicitly gated)
+- [ ] Mode 05 oxygen sensor monitoring
+- [ ] Mode 06 non-continuous monitor/test-result decoding
+- [ ] Mode 07 pending DTC
+- [ ] Mode 09 VIN/CALID/CVN
+- [ ] Mode 0A permanent DTC
+- [ ] Readiness
+- [ ] Live Data scheduler
+- [ ] Adaptive sampling 10/20/50 Hz/MAX/AUTO
+- [ ] Generic OBD-II PID/sensor coverage
 
-## Phase 4 — Vehicle identification and Tesla READ diagnostics
+## Phase 4 — ECU discovery and vehicle identification
 
-- [ ] Capability Discovery implementation
-- [ ] Capability cache keyed by VIN + software/firmware scope where available
+- [ ] Functional ECU scan
+- [ ] Physical ECU discovery
+- [ ] ECU identification
+- [ ] Software/hardware/calibration identification
+- [ ] Capability cache keyed by exact vehicle/ECU scope
 - [ ] Vehicle make/model/year identification
 - [ ] Tesla market/region identification with explicit source
 - [ ] US-market warning when reliably identified
-- [ ] Vehicle profile: trim, drive unit, battery variant, supplier and chemistry where verifiable
+- [ ] Vehicle profile resolver
+- [ ] Vehicle-specific capability matrix
+
+## Phase 5 — Live Data / Dashboard / HUD
+
+- [ ] 1–16 selectable live values
+- [ ] Stacked time-series graphs
+- [ ] Rolling buffer
+- [ ] Landscape phone layout
+- [ ] Dashboard gauges
+- [ ] Mirrored HUD mode
+- [ ] Communication speed/latency/sampling display
+- [ ] Measurement quality/verification indicators
+
+## Phase 6 — Tesla READ diagnostics
+
+- [ ] Exact vehicle/profile matching
 - [ ] Verified CAN signal database
 - [ ] Model 3/Y identification where possible
 - [ ] Battery telemetry
@@ -59,8 +114,9 @@
 - [ ] HV isolation/Riso data where exposed
 - [ ] Contactor/HV state data where safely available
 - [ ] DTC/status information where safely available
+- [ ] Public Tesla service/DIY source metadata
 
-## Phase 5 — Automated EV health test
+## Phase 7 — Automated EV health test
 
 - [ ] Data-quality checks
 - [ ] Battery health analysis engine
@@ -82,7 +138,7 @@
 - [ ] Expert battery/module/cell visualization
 - [ ] Exportable report
 
-## Phase 6 — Diagnostic Knowledge Base
+## Phase 8 — Diagnostic Knowledge + Repair Intelligence
 
 - [ ] DTC/vehicle-alert normalization
 - [ ] OEM description mapping
@@ -93,8 +149,30 @@
 - [ ] Vehicle-generation-specific procedure matching
 - [ ] Community references kept separate from OEM procedures
 - [ ] `needs_review` handling for changed/removed OEM links
+- [ ] RepairSource model
+- [ ] RepairProcedure model
+- [ ] RepairPart model
+- [ ] LaborEstimate model
+- [ ] PriceEstimate model
+- [ ] RepairEstimateEngine
+- [ ] Exact vehicle/ECU matching
+- [ ] DTC → possible causes → diagnostic checks → repair references
+- [ ] Parts and OEM part-number provenance
+- [ ] Labor and parts cost ranges
+- [ ] DIY / service UI modes
+- [ ] Licensed provider integration boundary
 
-## Phase 7 — Remote monitoring and automation
+## Phase 9 — Pre-purchase automation/reporting
+
+- [ ] CONNECT → IDENTIFY → DISCOVER → DTC → FREEZE FRAME → READINESS → LIVE DATA → MONITORS → EV TESTS → ANALYZE → REPAIR ESTIMATE → REPORT state machine
+- [ ] Evidence aggregation
+- [ ] Report model
+- [ ] PASS/FAIL only where supported
+- [ ] Repair-cost summary
+- [ ] Parts/labor/procedure references
+- [ ] Vehicle-scope and confidence display
+
+## Phase 10 — Remote monitoring and automation
 
 - [ ] Background monitoring
 - [ ] Local Wi-Fi operation
@@ -109,20 +187,13 @@
 - [ ] User-defined dashboard/widgets
 - [ ] Automation triggers based on verified telemetry
 - [ ] One-tap profile-driven AUTO TEST / "Sexy Button"
+- [ ] Charge-cost analysis
+- [ ] Vampire-drain analysis
+- [ ] Geofencing
 
-## Phase 8 — Custom actions
+## Phase 11 — Other vehicles
 
-- [ ] Action framework
-- [ ] Explicit confirmation UI
-- [ ] Per-vehicle capability matrix
-- [ ] Safe, verified actions only
-- [ ] Experimental write operations isolated from READ core
-- [ ] No unverified CAN control commands
-
-## Phase 9 — Other vehicles
-
-- [ ] Generic OBD-II expansion
-- [ ] VAG profiles
+- [ ] VAG profiles: VW / Audi / Škoda / SEAT / CUPRA
 - [ ] UDS layer
 - [ ] KWP2000 layer
 - [ ] K-Line-capable transport where required
@@ -132,7 +203,22 @@
 - [ ] Renault/Dacia profiles
 - [ ] Nissan profiles
 - [ ] Mitsubishi profiles
+- [ ] Toyota/Ford/GM/Stellantis/Volvo/Polestar profiles
 - [ ] Additional manufacturers
+
+## Phase 12 — Isolated WRITE / service framework
+
+- [ ] UDS service framework
+- [ ] Diagnostic Session Control 0x10
+- [ ] Controlled Security Access 0x27
+- [ ] Read Data By Identifier 0x22
+- [ ] Write Data By Identifier 0x2E in isolated layer only
+- [ ] Routine Control 0x31 in isolated layer only
+- [ ] Explicit confirmation UI
+- [ ] Per-vehicle capability matrix
+- [ ] Safety review
+- [ ] Dry-run/simulator first
+- [ ] No unverified CAN control commands
 
 ## Long-term compatibility
 
@@ -141,6 +227,6 @@
 - [ ] Dependency update policy
 - [ ] Migration tests for future Android releases
 
-## Development principle
+## Definition of done
 
-A feature is not considered complete merely because the code compiles. For vehicle-specific diagnostics, completion requires reproducible tests and, where applicable, validation against real vehicle data.
+A feature is not considered complete merely because the code compiles. Vehicle-specific features require reproducible tests and, where applicable, validation against real vehicle data. The implementation must preserve evidence, source, vehicle/ECU scope, uncertainty and safety state.
