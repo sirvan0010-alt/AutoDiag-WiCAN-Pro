@@ -1,8 +1,8 @@
 package com.autodiag.core.diagnostics
 
 /**
- * Transparent estimate calculator. It intentionally returns a range and never invents
- * missing part/labor prices. Callers may provide user-configured rates when permitted.
+ * Transparent estimate calculator. It never invents missing part/labor prices.
+ * A result is produced only when every required cost is known or user-configured.
  */
 object RepairEstimateEngine {
     fun calculate(
@@ -11,37 +11,23 @@ object RepairEstimateEngine {
         currency: String = "EUR",
         fallbackHourlyRate: Double? = null
     ): RepairEstimate? {
-        val knownParts = parts.mapNotNull { part ->
-            part.price?.takeIf { it >= 0.0 }?.let { it * part.quantity }
+        val partTotals = parts.map { part ->
+            val price = part.price?.takeIf { it >= 0.0 } ?: return null
+            price * part.quantity
         }
-        val knownLabor = labor.mapNotNull { item ->
-            item.hourlyRate?.takeIf { it >= 0.0 }?.let { it * item.hours }
-                ?: fallbackHourlyRate?.takeIf { it >= 0.0 }?.let { it * item.hours }
+        val laborTotals = labor.map { item ->
+            val rate = item.hourlyRate?.takeIf { it >= 0.0 }
+                ?: fallbackHourlyRate?.takeIf { it >= 0.0 }
+                ?: return null
+            rate * item.hours
         }
-
-        if (knownParts.isEmpty() && knownLabor.isEmpty()) return null
-
-        val knownTotal = knownParts.sum() + knownLabor.sum()
-        val unknownPartCount = parts.count { it.price == null }
-        val unknownLaborCount = labor.count {
-            it.hourlyRate == null && fallbackHourlyRate == null
-        }
-
-        // Unknown values widen the estimate only as a transparent lower/upper range.
-        // No guessed automotive prices are inserted into the model.
-        val minimum = knownTotal
-        val maximum = if (unknownPartCount == 0 && unknownLaborCount == 0) {
-            knownTotal
-        } else {
-            Double.POSITIVE_INFINITY
-        }
-
+        val total = partTotals.sum() + laborTotals.sum()
         return RepairEstimate(
             parts = parts,
             labor = labor,
             currency = currency,
-            totalMin = minimum,
-            totalMax = maximum
+            totalMin = total,
+            totalMax = total
         )
     }
 }
