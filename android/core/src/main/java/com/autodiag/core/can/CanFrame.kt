@@ -1,6 +1,6 @@
 package com.autodiag.core.can
 
-/** Immutable classic CAN 2.0 frame used by the read-only diagnostic pipeline. */
+/** Immutable classic CAN 2.0 frame used by the diagnostic and analysis pipeline. */
 data class CanFrame(
     val id: Long,
     val data: ByteArray = byteArrayOf(),
