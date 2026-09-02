@@ -4,19 +4,72 @@ Open, modular Android automotive diagnostics and automation platform built aroun
 
 > **Status: early development (v0.1-dev).** Real-vehicle support is not yet considered validated unless explicitly marked as verified in the project documentation.
 
-## Why WiCAN PRO + AutoDiag?
+## 🚗 Why buy WiCAN PRO instead of a vehicle-specific clone?
 
-The idea is simple: **buy the reusable diagnostic interface once and keep the software growing with your cars.**
+**Buy the interface once. Keep the software growing with your cars.**
 
-A vehicle-specific clone cable and cloned proprietary software can be useful for one manufacturer, but its value can drop sharply when the owner changes vehicles. AutoDiag takes the opposite approach: WiCAN PRO is the physical interface, while the open Android software is the long-term diagnostic layer that can gain verified support for multiple manufacturers and protocols.
+That is the core idea behind AutoDiag-WiCAN-Pro.
 
-For example, an owner can start with a VAG vehicle and later move to Tesla, BMW, Hyundai/Kia, Mercedes, Renault/Dacia, Nissan or another supported vehicle family without automatically replacing the diagnostic interface. The exact functions always depend on the vehicle, ECU, protocol, security, WiCAN firmware/hardware and verified implementation — **there is no claim of universal compatibility**.
+A cheap clone cable bundled with cloned manufacturer software may look attractive when you own one specific car. But a diagnostic interface tied to one ecosystem can become nearly useless when the car is replaced. If you drive a Škoda/VW today and buy a Tesla, BMW, Hyundai/Kia, Mercedes, Renault/Dacia, Nissan or another brand five years later, the old vehicle-specific cable may no longer be the tool you want.
 
-The project also aims to implement diagnostic outcomes comparable to established manufacturer-specific tools where the underlying protocol, procedure, data and legal/licensing basis can be independently verified. That includes future VAG functions such as measuring values, basic settings, adaptations, service functions, gateway/topology work and coding/long coding. We will build interoperability, not copy proprietary VCDS binaries, source code or protected databases.
+With **WiCAN PRO**, the physical interface is intended to remain useful while the open software evolves. Instead of buying another cable every time you change vehicles, the goal is to keep one reusable automotive interface and add verified vehicle support, protocols, decoders, tests and workflows in software.
 
-The long-term target is deliberately larger than today's implementation. A feature that is currently blocked by hardware, OEM security, missing documentation, missing vehicle data or lack of verification remains in the project as a documented future capability rather than being deleted.
+### The long-term value proposition
 
-See `docs/LONG_TERM_FEATURE_PRESERVATION.md` for the permanent developer/AI contract.
+| Vehicle-specific clone approach | WiCAN PRO + AutoDiag-WiCAN-Pro |
+|---|---|
+| Optimized around one vehicle family | Designed as a multi-vehicle platform |
+| Clone cable + cloned software | Reusable hardware + evolving open software |
+| Change car → tool may lose its value | Change car → keep the interface and expand software support |
+| Closed/proprietary ecosystem | Open project with community contribution |
+| Limited by the cloned tool's original scope | New protocols, profiles and diagnostics can be developed over time |
+| Buying again can be necessary after a vehicle change | **Buy the reusable interface once; keep developing the software** |
+
+This is **not** a claim that WiCAN PRO supports every car or every workshop function today. Compatibility is always tied to the actual vehicle, ECU, protocol, hardware/firmware, security requirements and verified implementation. The promise of the project is different: **the hardware is reusable, while the software can keep growing instead of becoming obsolete with the owner's next car.**
+
+### A practical example
+
+Imagine this path:
+
+**Škoda/VAG → Tesla → BMW → Hyundai/Kia → Mercedes → Renault/Dacia → Nissan**
+
+With a vehicle-specific clone, every change can mean researching and buying another interface/software package. With AutoDiag-WiCAN-Pro, the goal is to keep the same WiCAN PRO interface and let the software grow through vehicle profiles and verified protocol implementations.
+
+For developers, this creates another advantage: **every contribution can have a longer life.** A new transport layer, CAN decoder, ISO-TP implementation, UDS reader, DTC knowledge source, battery-health algorithm or vehicle profile can become part of a growing multi-brand platform rather than a one-car utility.
+
+> **One adapter. One open project. Many vehicles over time.**
+
+## 🌱 Why this project is worth contributing to
+
+AutoDiag-WiCAN-Pro is intended to become a community-built diagnostic platform, not a disposable APK for one car.
+
+Contributors can work on clearly separated layers:
+
+- WiCAN transport and connectivity
+- raw CAN and capture/replay
+- ELM327 / OBD-II
+- ISO-TP / UDS / KWP foundations
+- vehicle and ECU discovery
+- generic OBD-II live data and DTCs
+- Tesla read-only diagnostics
+- VAG and other manufacturer profiles
+- EV battery, charging and thermal analysis
+- diagnostic tests and pre-purchase checks
+- DTC → diagnosis → repair knowledge
+- source/provenance and verification tooling
+- MQTT / Home Assistant / remote telemetry
+- simulator and deterministic replay tests
+- Android UI and dashboards
+
+The architecture is deliberately **documentation-first and evidence-first**. If a protocol, CAN ID, signal, service procedure or repair conclusion is not verified, it must be marked accordingly instead of being presented as fact.
+
+### Built for developers, useful for drivers
+
+The project should ultimately serve two audiences at once:
+
+**For the driver:** connect WiCAN PRO, identify the vehicle, read faults, understand what they mean, monitor live data and receive useful evidence-based health information.
+
+**For the developer:** use a modular open codebase, simulator/replay data, typed diagnostic models, vehicle scopes and verification metadata to add new capabilities without rewriting the entire application.
 
 ## Vision
 
