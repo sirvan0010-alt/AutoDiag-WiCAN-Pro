@@ -1,6 +1,6 @@
 # AutoDiag-WiCAN-Pro — Help/Tooltip Content Schema
 
-C entrální zdroj pravdy pro popisky a nápovědu. Žádné hardcoded stringy v UI.
+Centrální zdroj pravdy pro popisky a nápovědu. Žádné hardcoded stringy v UI.
 
 ## Princip
 
@@ -35,7 +35,7 @@ C entrální zdroj pravdy pro popisky a nápovědu. Žádné hardcoded stringy v
   short_tooltip: "Rozsah zatím neznámý, proto ho nelze upravit."
   extended:
     description: >
-      Meze až po Capability Discovery / Sampling Calibration Test.
+      Meze až po Capability Discovery / Sampling Calibration Test (maxStableHz).
       Horní hranice nikdy nepřekročí ověřený limit.
   verification: "verified"
   a11y_label: "Ruční nastavení frekvence je momentálně nedostupné"
@@ -57,31 +57,30 @@ C entrální zdroj pravdy pro popisky a nápovědu. Žádné hardcoded stringy v
 - id: "action_sampling_calibration_test"
   category: "diagnostic_action"
   name: "Kalibrace rychlosti komunikace"
-  short_tooltip: "Změří, jak rychle appka reálně umí číst data z tvého auta."
+  short_tooltip: "Změří stabilní frekvenci čtení pro celý řetězec auto–WiCAN–síť."
   extended:
     description: >
-      Aktivní test dosažitelné frekvence pro vozidlo + WiCAN + síť.
-      Výsledek určí meze ručního vzorkování (A7/A9).
+      Nejvyšší frekvence, při které komunikace ještě zůstává spolehlivá
+      (maximum stable Hz), ne maximum, kde ještě něco přišlo.
+      Záleží na vozidle, ECU, protokolu, WiCAN, Wi-Fi a počtu současných
+      signálů — ne na „rychlosti auta“.
     duration_estimate: "desítky sekund až pár minut"
     prerequisites:
       - "WiCAN připojený"
     what_it_does:
-      - "Postupně zvyšuje frekvenci a sleduje spolehlivost"
+      - "Postupně zvyšuje frekvenci; sleduje timeout, latenci, jitter, dropped samples"
       - "Foreground service s notifikací"
-      - "Stop při chybě CAN sběrnice"
-      - "Uloží výsledek per vozidlo + WiCAN FW"
-    safety_note: "Pouze čtení. Zátěž roste postupně, ne skokem."
+      - "Stop při ERROR_PASSIVE / bus chybě"
+      - "Uloží maxStableHz per vozidlo + WiCAN FW"
+    safety_note: >
+      Pouze čtení. Zátěž roste postupně, s hysterezí pod bodem selhání.
   verification: "verified"
-  a11y_label: "Spustit kalibrační test rychlosti komunikace"
+  a11y_label: "Spustit kalibrační test maximální stabilní frekvence komunikace"
 ```
-
-Další příklady (PID, DTC, readiness, KB) zůstávají v historii / lze doplnit
-do `docs/help_content/` jako YAML soubory. CI validace proti JSON Schema
-a `HelpContentRepository` — viz předchozí verze dokumentu.
 
 ## Pravidla
 
 1. Žádné vymyšlené prahy / CAN ID jako fakt.
 2. HV / drive unit / Riso: jen co vozidlo poskytne.
-3. Sampling: cílová vs. `effectiveHz`.
+3. Sampling: cílová vs. `effectiveHz`; kalibrace = max **stable** Hz.
 4. Kalibrace: jen READ, foreground, stop při bus chybě.
