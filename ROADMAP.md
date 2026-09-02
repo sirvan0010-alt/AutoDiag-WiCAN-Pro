@@ -233,17 +233,18 @@ The master plan is the detailed source of truth; this roadmap is the execution c
 - [x] Timestamped sample/capture model
 - [x] Basic measurements: min/max/peak-to-peak/mean
 - [x] Rising/falling threshold trigger foundation
-- [ ] Streaming capture engine
-- [ ] Ring buffer + pre/post-trigger capture
-- [ ] Frequency/period measurement
-- [ ] Duty-cycle measurement
-- [ ] RMS measurement with sampling validation
-- [ ] Android waveform viewer
-- [ ] Time/div and volts/div controls
-- [ ] Zoom/pan/cursors/freeze
+- [x] Streaming capture engine
+- [x] Ring buffer + pre/post-trigger capture
+- [x] Frequency/period measurement
+- [x] Duty-cycle measurement
+- [x] RMS measurement foundation
+- [x] Waveform viewer scale/offset model
+- [x] Cursor measurement model
+- [ ] Android waveform renderer
+- [ ] Zoom/pan/freeze interaction
+- [ ] CAN/UDS/DTC event correlation
 - [ ] CSV export
 - [ ] Replay format
-- [ ] CAN/UDS/DTC event correlation
 - [ ] Multi-channel synchronization
 - [ ] Verified WiCAN-compatible measurement hardware path
 - [ ] Probe/input electrical-limit enforcement
