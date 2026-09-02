@@ -4,6 +4,20 @@ Open, modular Android automotive diagnostics and automation platform built aroun
 
 > **Status: early development (v0.1-dev).** Real-vehicle support is not yet considered validated unless explicitly marked as verified in the project documentation.
 
+## Why WiCAN PRO + AutoDiag?
+
+The idea is simple: **buy the reusable diagnostic interface once and keep the software growing with your cars.**
+
+A vehicle-specific clone cable and cloned proprietary software can be useful for one manufacturer, but its value can drop sharply when the owner changes vehicles. AutoDiag takes the opposite approach: WiCAN PRO is the physical interface, while the open Android software is the long-term diagnostic layer that can gain verified support for multiple manufacturers and protocols.
+
+For example, an owner can start with a VAG vehicle and later move to Tesla, BMW, Hyundai/Kia, Mercedes, Renault/Dacia, Nissan or another supported vehicle family without automatically replacing the diagnostic interface. The exact functions always depend on the vehicle, ECU, protocol, security, WiCAN firmware/hardware and verified implementation — **there is no claim of universal compatibility**.
+
+The project also aims to implement diagnostic outcomes comparable to established manufacturer-specific tools where the underlying protocol, procedure, data and legal/licensing basis can be independently verified. That includes future VAG functions such as measuring values, basic settings, adaptations, service functions, gateway/topology work and coding/long coding. We will build interoperability, not copy proprietary VCDS binaries, source code or protected databases.
+
+The long-term target is deliberately larger than today's implementation. A feature that is currently blocked by hardware, OEM security, missing documentation, missing vehicle data or lack of verification remains in the project as a documented future capability rather than being deleted.
+
+See `docs/LONG_TERM_FEATURE_PRESERVATION.md` for the permanent developer/AI contract.
+
 ## Vision
 
 Create a long-lived Android application that can use WiCAN PRO over Wi-Fi for:
@@ -18,6 +32,7 @@ Create a long-lived Android application that can use WiCAN PRO over Wi-Fi for:
 - future VAG and other manufacturer-specific diagnostics
 - carefully controlled custom actions where the required protocol and behavior are verified
 - DTC/alert explanations linked to verified OEM documentation and service procedures
+- future coding, adaptation and service functions when technically, legally and safely supportable
 
 The goal is **not** to make a cosmetic WiCAN controller. WiCAN PRO remains the hardware/interface and firmware platform; AutoDiag provides the Android UI, diagnostic core, vehicle profiles and automation layer.
 
@@ -27,7 +42,7 @@ Before changing diagnostic architecture, read [`docs/ARCHITECTURE_OVERVIEW.md`](
 
 For DTC/alert explanations, OEM procedures and source provenance, read [`docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`](docs/DIAGNOSTIC_KNOWLEDGE_BASE.md).
 
-For AI/development rules, read [`AI_CONTEXT.md`](AI_CONTEXT.md).
+For permanent AI/developer rules and feature preservation, read [`AI_CONTEXT.md`](AI_CONTEXT.md) and [`docs/LONG_TERM_FEATURE_PRESERVATION.md`](docs/LONG_TERM_FEATURE_PRESERVATION.md).
 
 ## Architecture
 
@@ -129,6 +144,7 @@ When AutoDiag recognizes a supported DTC or alert, the result can expose:
 - recommended checks,
 - official troubleshooting procedure,
 - official service/repair procedure,
+- parts and labor information where legally/licensed data is available,
 - and the source/verification status.
 
 OEM information is kept separate from community reverse engineering. Missing documentation is shown as missing; the app must not invent a repair procedure.
@@ -184,6 +200,17 @@ Planned baseline:
 
 The project aims for long-term maintainability across future Android releases. No software project can guarantee unchanged behavior for a fixed five-year period, so compatibility will be maintained through current APIs, automated builds/tests and regular dependency updates.
 
+## Hardware activity LED
+
+WiCAN PRO hardware documentation identifies the blue LED on GPIO7, and recent WiCAN PRO firmware release notes document an LED command with blink support. Therefore an adapter activity indication is a realistic future target, but AutoDiag cannot control the physical LED by itself unless the installed firmware exposes a compatible control path. Exact behavior must be verified per firmware version before enabling it.
+
+Desired behavior:
+
+- steady blue = powered/idle
+- blink/pulse = active communication
+- optional faster activity = high traffic
+- separate fault indication if the hardware/firmware supports it
+
 ## Roadmap
 
 See `ROADMAP.md` for the detailed milestone plan.
@@ -205,6 +232,8 @@ Initial milestones:
 13. remote monitoring and automation
 14. carefully verified custom actions
 15. additional vehicle manufacturers
+16. VAG coding/adaptation/service-function research and implementation where verified
+17. WiCAN PRO activity LED firmware integration if supported safely
 
 ## Current status
 
