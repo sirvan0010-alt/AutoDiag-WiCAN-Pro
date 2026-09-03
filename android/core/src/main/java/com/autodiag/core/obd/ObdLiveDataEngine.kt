@@ -101,45 +101,93 @@ class ObdLiveDataEngine(
             )
 
         return try {
-            val response = session.command("01${pid.toString(16).padStart(2, '0')}")
+            val response = session.commandDetailed("01${pid.toString(16).padStart(2, '0')}")
             val timestamp = nowEpochMs()
-            val parsed = Mode01Decoder.decodeDetailed(response)
 
-            if (parsed == null || parsed.pid != pid ||
-                parsed.availability != ObdValueAvailability.AVAILABLE) {
-                ecuMonitor?.onFailure()
-                SensorSample(
-                    pid = pid,
-                    labelCs = definition.labelCs,
-                    value = null,
-                    unit = definition.unit,
-                    rawHex = parsed?.rawHex.orEmpty(),
-                    timestampEpochMs = timestamp,
-                    state = State.UNAVAILABLE
-                )
-            } else {
-                ecuMonitor?.onSuccess()
-                store?.update(
-                    LiveDataSample(
+            when (response.kind) {
+                Elm327ResponseKind.POSITIVE -> {
+                    val parsed = Mode01Decoder.decodeDetailed(response.normalized)
+                    if (parsed == null || parsed.pid != pid ||
+                        parsed.availability != ObdValueAvailability.AVAILABLE) {
+                        ecuMonitor?.onFailure()
+                        SensorSample(
+                            pid = pid,
+                            labelCs = definition.labelCs,
+                            value = null,
+                            unit = definition.unit,
+                            rawHex = parsed?.rawHex ?: response.normalized,
+                            timestampEpochMs = timestamp,
+                            state = State.UNAVAILABLE
+                        )
+                    } else {
+                        ecuMonitor?.onSuccess()
+                        store?.update(
+                            LiveDataSample(
+                                pid = pid,
+                                labelCs = definition.labelCs,
+                                value = parsed.value,
+                                unit = definition.unit,
+                                rawHex = parsed.rawHex,
+                                timestampEpochMs = timestamp,
+                                quality = LiveDataQuality.GOOD,
+                                freshness = freshnessPolicy.evaluate(timestamp, timestamp)
+                            )
+                        )
+                        SensorSample(
+                            pid = pid,
+                            labelCs = definition.labelCs,
+                            value = parsed.value,
+                            unit = definition.unit,
+                            rawHex = parsed.rawHex,
+                            timestampEpochMs = timestamp,
+                            state = State.LIVE
+                        )
+                    }
+                }
+
+                Elm327ResponseKind.NO_DATA -> {
+                    ecuMonitor?.onFailure()
+                    SensorSample(
                         pid = pid,
                         labelCs = definition.labelCs,
-                        value = parsed.value,
+                        value = null,
                         unit = definition.unit,
-                        rawHex = parsed.rawHex,
+                        rawHex = response.normalized,
                         timestampEpochMs = timestamp,
-                        quality = LiveDataQuality.GOOD,
-                        freshness = freshnessPolicy.evaluate(timestamp, timestamp)
+                        state = State.UNAVAILABLE,
+                        error = "ECU/adapter reported NO DATA"
                     )
-                )
-                SensorSample(
-                    pid = pid,
-                    labelCs = definition.labelCs,
-                    value = parsed.value,
-                    unit = definition.unit,
-                    rawHex = parsed.rawHex,
-                    timestampEpochMs = timestamp,
-                    state = State.LIVE
-                )
+                }
+
+                Elm327ResponseKind.NEGATIVE -> {
+                    ecuMonitor?.onFailure()
+                    SensorSample(
+                        pid = pid,
+                        labelCs = definition.labelCs,
+                        value = null,
+                        unit = definition.unit,
+                        rawHex = response.normalized,
+                        timestampEpochMs = timestamp,
+                        state = State.UNAVAILABLE,
+                        error = "Negative diagnostic response"
+                    )
+                }
+
+                Elm327ResponseKind.TIMEOUT,
+                Elm327ResponseKind.ERROR,
+                Elm327ResponseKind.MALFORMED -> {
+                    ecuMonitor?.onFailure()
+                    SensorSample(
+                        pid = pid,
+                        labelCs = definition.labelCs,
+                        value = null,
+                        unit = definition.unit,
+                        rawHex = response.normalized,
+                        timestampEpochMs = timestamp,
+                        state = State.ERROR,
+                        error = response.error ?: response.kind.name
+                    )
+                }
             }
         } catch (t: Throwable) {
             ecuMonitor?.onFailure()
