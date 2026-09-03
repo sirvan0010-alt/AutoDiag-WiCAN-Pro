@@ -1,6 +1,7 @@
 package com.autodiag.core.transport
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED, RECONNECTING, ERROR }
 
@@ -18,6 +19,7 @@ data class TransportConfig(
 interface WiCanTransport {
     val name: String
     val state: ConnectionState
+    val metrics: StateFlow<TransportMetrics>
     suspend fun connect(config: TransportConfig): Result<Unit>
     suspend fun disconnect()
     suspend fun send(data: ByteArray): Result<Unit>
