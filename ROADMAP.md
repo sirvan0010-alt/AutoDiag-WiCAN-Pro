@@ -4,6 +4,9 @@
 > Repair/estimate architecture: `docs/REPAIR_KNOWLEDGE_ESTIMATE_ARCHITECTURE.md`
 > Oscilloscope architecture: `docs/OSCILLOSCOPE_ARCHITECTURE.md`
 > DTC memory architecture: `docs/DTC_MEMORY_AND_CLEAR_ARCHITECTURE.md`
+> Competitor audit: `docs/COMPETITOR_APP_FEATURE_AUDIT.md`
+> Experimental Summon: `docs/EXPERIMENTAL_SUMMON.md`
+> UI tokens: `docs/UI_TESLA_THEME.md`
 
 ## Phase 0 — Foundation
 
@@ -22,7 +25,7 @@
 - [ ] Automatic protocol detection
 - [x] Transport health metrics
 - [x] RX/TX counters and latency foundation
-- [ ] Adaptive polling
+- [x] Adaptive polling foundation (`ObdLiveDataEngine`)
 - [ ] Wi-Fi/BLE transport where verified
 
 ## Phase 2 — CAN foundation
@@ -30,9 +33,9 @@
 - [x] CAN frame model
 - [x] CAN ID/mask/extended filters
 - [x] CAN bus statistics
-- [ ] Raw CAN monitor UI
-- [ ] Capture/export
-- [ ] Replay/simulator
+- [x] Raw CAN monitor UI
+- [x] Capture/export (core CSV)
+- [x] Replay/simulator (core, cancellable)
 - [ ] Bus-load/error/drop visualization
 - [x] SLCAN frame codec with TCP chunk reassembly
 
@@ -49,9 +52,10 @@
 - [x] UDS 0x19 ReadDTCInformation request/response foundation
 - [x] UDS 0x14 ClearDiagnosticInformation request/response foundation
 - [x] Local DTC history lifecycle model
-- [ ] ISO-TP transmit / flow-control
-- [ ] Generic OBD-II PID/sensor coverage
-- [ ] DTC/freeze-frame/readiness pipeline
+- [x] ELM ISO-TP AT command builders (`ATSH`/`ATFCSH`/`ATFCSM`/`ATFCSD`)
+- [ ] ISO-TP transmit / flow-control executor
+- [ ] Generic OBD-II PID/sensor coverage (registry started; UI pending)
+- [ ] DTC/freeze-frame/readiness pipeline UI
 - [ ] DTC clear executor + post-clear verification
 - [ ] DTC diagnostic evidence persistence integration
 - [ ] Mode 06 TID/CID/scaling/unit model
@@ -71,14 +75,15 @@
 
 ## Phase 5 — Live Data / Dashboard / HUD
 
-- [ ] 1–16 selectable live values
+- [ ] 1–16 selectable live values UI (engine exists in core)
 - [ ] Stacked time-series graphs
 - [ ] Rolling buffer
 - [ ] Landscape phone layout
-- [ ] Dashboard gauges
+- [ ] Dashboard gauges (Tesla-like theme, not competitor skins)
 - [ ] Mirrored HUD mode
 - [ ] Communication speed/latency/sampling display
 - [ ] Measurement quality/verification indicators
+- [ ] Material3 light/dark Tesla chrome (`docs/UI_TESLA_THEME.md`)
 
 ## Phase 6 — Tesla READ diagnostics
 
@@ -163,7 +168,7 @@
 - [ ] Mercedes profiles
 - [ ] Renault/Dacia profiles
 - [ ] Nissan profiles
-- [ ] Mitsubishi profiles
+- [ ] Mitsubishi profiles (PHEV capability IDs planned; no copied Watchdog maps)
 - [ ] Toyota/Ford/GM/Stellantis/Volvo/Polestar profiles
 - [ ] Additional manufacturers
 
@@ -172,6 +177,7 @@
 - [x] UDS service risk classification
 - [x] Capability gate foundation
 - [x] OBD DTC clear classified as state-changing
+- [x] Experimental Summon dry-run scaffold (LIVE forbidden, no CAN IDs)
 - [ ] UDS service execution framework
 - [ ] Diagnostic Session Control 0x10
 - [ ] Controlled Security Access 0x27
@@ -184,6 +190,7 @@
 - [ ] Safety review
 - [ ] Dry-run/simulator first
 - [ ] No unverified CAN control commands
+- [ ] Summon LIVE — BLOCKED until verified OEM/cloud binding
 
 ## Phase 13 — Integrated automotive oscilloscope
 
