@@ -1,5 +1,8 @@
 package com.autodiag.core.obd
 
+import com.autodiag.core.diagnostic.DiagnosticEvent
+import com.autodiag.core.diagnostic.DiagnosticEventStream
+import com.autodiag.core.diagnostic.DiagnosticEventType
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -18,7 +21,9 @@ class ObdLiveDataEngine(
     private val nowEpochMs: () -> Long = { System.currentTimeMillis() },
     private val store: LiveDataStore? = null,
     private val ecuMonitor: EcuConnectionMonitor? = null,
-    private val freshnessPolicy: LiveDataFreshnessPolicy = LiveDataFreshnessPolicy()
+    private val freshnessPolicy: LiveDataFreshnessPolicy = LiveDataFreshnessPolicy(),
+    private val eventStream: DiagnosticEventStream? = null,
+    private val sessionId: String? = null
 ) {
     data class SensorSample(
         val pid: Int,
@@ -133,6 +138,21 @@ class ObdLiveDataEngine(
                                 freshness = freshnessPolicy.evaluate(timestamp, timestamp)
                             )
                         )
+                        eventStream?.let { stream ->
+                            val id = sessionId
+                            if (id != null) {
+                                stream.append(
+                                    DiagnosticEvent(
+                                        type = DiagnosticEventType.MEASUREMENT_RECEIVED,
+                                        timestampEpochMs = timestamp,
+                                        sessionId = id,
+                                        message = definition.labelCs,
+                                        evidenceKey = "obd.mode01.pid.%02X".format(pid),
+                                        ecuId = null
+                                    )
+                                )
+                            }
+                        }
                         SensorSample(
                             pid = pid,
                             labelCs = definition.labelCs,
