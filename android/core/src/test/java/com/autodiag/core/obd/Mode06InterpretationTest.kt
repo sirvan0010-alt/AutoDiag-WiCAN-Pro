@@ -11,7 +11,8 @@ class Mode06InterpretationTest {
         val raw = ObdMode06TestResult(0x01, 0x08, 0x0A, 0x1D70, 0x1318, 0x2290, Mode06ResultStatus.UNKNOWN)
         val result = Mode06Interpreter.interpret(raw)
 
-        assertEquals("O2 B1S1", result.labelCs)
+        assertEquals("Max. napětí O2 B1S1", result.labelCs)
+        assertEquals("O2 B1S1", result.monitor!!.labelCs)
         assertEquals("V", result.value!!.unit)
         assertEquals(0x1D70 * 0.000122, result.value.value, 0.000001)
         assertEquals(Mode06ResultStatus.WITHIN_LIMITS, result.status)
@@ -48,6 +49,14 @@ class Mode06InterpretationTest {
         val result = Mode06Interpreter.interpret(raw)
 
         assertNull(result.monitor)
-        assertEquals("MID 0xE0", result.labelCs)
+        assertNull(result.test)
+        assertEquals("MID 0xE0 TID 0x01", result.labelCs)
+    }
+
+    @Test
+    fun exact_mid_tid_uasid_definition_has_priority() {
+        val definition = Mode06TestRegistry.get(0x01, 0x08, 0x0A)
+        assertEquals("Max. napětí O2 B1S1", definition!!.labelCs)
+        assertEquals(0x0A, definition.unitAndScalingId!!)
     }
 }
