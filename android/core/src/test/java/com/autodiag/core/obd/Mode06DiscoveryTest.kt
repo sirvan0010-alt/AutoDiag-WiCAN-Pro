@@ -25,7 +25,7 @@ class Mode06DiscoveryTest {
     @Test
     fun discovery_ignores_elm_echo_and_prompt() {
         val window = Mode06DiscoveryDecoder.decode("06 40\r46 40 00 00 00 08\r>", 0x40)!!
-        assertEquals(listOf(0x5C), window.supportedMids)
+        assertEquals(listOf(0x5D), window.supportedMids)
     }
 
     @Test
