@@ -7,6 +7,7 @@ import com.autodiag.core.diagnostic.EvidenceSource
 import com.autodiag.core.diagnostic.EvidenceVerification
 import com.autodiag.core.diagnostics.uds.CanIsoTpUdsPipeline
 import com.autodiag.core.diagnostics.uds.UdsNegativeResponse
+import com.autodiag.core.diagnostics.uds.UdsPipelineResult
 import com.autodiag.core.diagnostics.uds.UdsPositiveResponse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -24,8 +25,11 @@ class CanIsoTpUdsPipelineTest {
         )
 
         val result = pipeline.accept(CanFrame(0x7E8, byteArrayOf(0x02, 0x50, 0x01), timestampNanos = 2_000_000)).getOrThrow()
-        val complete = result as CanIsoTpUdsPipelineResultAlias
+        val complete = result as UdsPipelineResult.Complete
         assertTrue(complete.response is UdsPositiveResponse)
+        assertEquals(1, store.snapshot().size)
+        assertEquals(EvidenceSource.UDS, store.snapshot().single().provenance.source)
+        assertEquals(EvidenceVerification.PARTIALLY_VERIFIED, store.snapshot().single().verification)
     }
 
     @Test
@@ -34,7 +38,7 @@ class CanIsoTpUdsPipelineTest {
         val pipeline = CanIsoTpUdsPipeline(evidenceStore = store)
 
         val result = pipeline.accept(CanFrame(0x7E8, byteArrayOf(0x03, 0x7F, 0x22, 0x31))).getOrThrow()
-        val complete = result as com.autodiag.core.diagnostics.uds.UdsPipelineResult.Complete
+        val complete = result as UdsPipelineResult.Complete
         val response = complete.response as UdsNegativeResponse
 
         assertEquals(0x22, response.serviceId)
@@ -51,12 +55,12 @@ class CanIsoTpUdsPipelineTest {
         val first = pipeline.accept(
             CanFrame(0x7E8, byteArrayOf(0x10, 0x0A, 0x62, 0xF1.toByte(), 0x90.toByte(), 0x41, 0x42, 0x43))
         ).getOrThrow()
-        assertEquals(com.autodiag.core.diagnostics.uds.UdsPipelineResult.Incomplete, first)
+        assertEquals(UdsPipelineResult.Incomplete, first)
 
         val second = pipeline.accept(
             CanFrame(0x7E8, byteArrayOf(0x21, 0x44, 0x45, 0x46, 0x47))
         ).getOrThrow()
-        val complete = second as com.autodiag.core.diagnostics.uds.UdsPipelineResult.Complete
+        val complete = second as UdsPipelineResult.Complete
         val response = complete.response as UdsPositiveResponse
 
         assertEquals(0x62, response.serviceId)
@@ -69,6 +73,4 @@ class CanIsoTpUdsPipelineTest {
         val result = pipeline.accept(CanFrame(0x7E8, byteArrayOf(0x10)))
         assertTrue(result.isFailure)
     }
-
-    private typealias CanIsoTpUdsPipelineResultAlias = com.autodiag.core.diagnostics.uds.UdsPipelineResult.Complete
 }
