@@ -7,11 +7,11 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 
 /**
- * Read-only Mode 01 live-data polling engine.
+ * Prioritized, read-only Mode 01 live-data polling engine.
  *
- * Only PIDs discovered as supported are requested. One ELM command is sent at
- * a time (Elm327Session already serializes commands), and a failed PID does
- * not terminate the whole live-data stream.
+ * Only PIDs discovered as supported and present in the registry are requested.
+ * Commands remain serialized by Elm327Session. Poll failures are represented
+ * as samples and do not terminate the stream.
  */
 class ObdLiveDataEngine(
     private val session: Elm327Session,
@@ -35,88 +35,114 @@ class ObdLiveDataEngine(
     }
 
     /**
-     * Polls the supplied supported PID set forever until the collector is
-     * cancelled. [intervalMs] is the minimum delay between complete polling
-     * rounds, not between individual commands.
+     * Backward-compatible round polling API. PIDs use the supplied common
+     * interval, while the scheduler-aware overload below provides priority.
      */
     fun stream(
         supportedPids: Set<Int>,
         intervalMs: Long = 500L
+    ): Flow<SensorSample> = stream(
+        supportedPids = supportedPids,
+        plans = supportedPids.map(LiveDataPidPolicy::plan),
+        fallbackIntervalMs = intervalMs
+    )
+
+    /**
+     * Prioritized polling. Each PID gets its own due time, so a slow/low
+     * priority PID cannot postpone a high-priority measurement indefinitely.
+     */
+    fun stream(
+        supportedPids: Set<Int>,
+        plans: List<LiveDataPollPlan>,
+        fallbackIntervalMs: Long = 500L
     ): Flow<SensorSample> = flow {
-        require(intervalMs >= 0) { "intervalMs must be >= 0" }
+        require(fallbackIntervalMs >= 0L) { "fallbackIntervalMs must be >= 0" }
 
-        val pids = supportedPids
+        val allowed = supportedPids
             .filter { it in 0x01..0xE0 && ObdPidRegistry.isSupported(it) }
-            .sorted()
+            .toSet()
 
-        if (pids.isEmpty()) return@flow
+        val activePlans = plans
+            .filter { it.pid in allowed && it.intervalMs >= 0L }
+            .distinctBy { it.pid }
+            .sortedWith(compareBy<LiveDataPollPlan> { it.priority.ordinal }.thenBy { it.pid })
+
+        if (activePlans.isEmpty()) return@flow
+
+        val now = nowEpochMs()
+        val nextDue = activePlans.associate { it.pid to now }.toMutableMap()
 
         while (currentCoroutineContext().isActive) {
-            val roundStarted = nowEpochMs()
+            val current = nowEpochMs()
+            var emitted = false
 
-            for (pid in pids) {
+            for (plan in activePlans) {
                 if (!currentCoroutineContext().isActive) break
+                if (current < (nextDue[plan.pid] ?: current)) continue
 
-                val definition = ObdPidRegistry.get(pid) ?: continue
-                val timestamp = nowEpochMs()
-
-                try {
-                    val response = session.command(
-                        "01${pid.toString(16).padStart(2, '0')}"
-                    )
-                    val parsed = ObdResponseParser.parseMode01(response)
-                        .firstOrNull { it.pid == pid }
-
-                    if (parsed == null || parsed.data.size < definition.minimumBytes) {
-                        emit(
-                            SensorSample(
-                                pid = pid,
-                                labelCs = definition.labelCs,
-                                value = null,
-                                unit = definition.unit,
-                                rawHex = parsed?.data?.toHex() ?: "",
-                                timestampEpochMs = timestamp,
-                                state = State.UNAVAILABLE
-                            )
-                        )
-                    } else {
-                        val bytes = parsed.data.map { it.toInt() and 0xFF }
-                        val value = definition.decodeValue(bytes)
-                        emit(
-                            SensorSample(
-                                pid = pid,
-                                labelCs = definition.labelCs,
-                                value = value,
-                                unit = definition.unit,
-                                rawHex = parsed.data.toHex(),
-                                timestampEpochMs = timestamp,
-                                state = if (value != null) State.LIVE else State.UNAVAILABLE
-                            )
-                        )
-                    }
-                } catch (t: Throwable) {
-                    emit(
-                        SensorSample(
-                            pid = pid,
-                            labelCs = definition.labelCs,
-                            value = null,
-                            unit = definition.unit,
-                            rawHex = "",
-                            timestampEpochMs = timestamp,
-                            state = State.ERROR,
-                            error = t.message ?: t::class.simpleName
-                        )
-                    )
-                }
+                emit(poll(plan.pid))
+                emitted = true
+                val interval = if (plan.intervalMs == 0L) fallbackIntervalMs else plan.intervalMs
+                nextDue[plan.pid] = nowEpochMs() + interval
             }
 
-            val elapsed = nowEpochMs() - roundStarted
-            val remaining = intervalMs - elapsed
-            if (remaining > 0) delay(remaining)
+            if (!emitted) {
+                val next = nextDue.values.minOrNull() ?: nowEpochMs()
+                delay((next - nowEpochMs()).coerceAtLeast(1L))
+            }
         }
     }
 
-    private fun ByteArray.toHex(): String = joinToString(" ") {
-        "%02X".format(it.toInt() and 0xFF)
+    private suspend fun poll(pid: Int): SensorSample {
+        val definition = ObdPidRegistry.get(pid)
+            ?: return SensorSample(
+                pid = pid,
+                labelCs = "PID 0x%02X".format(pid),
+                value = null,
+                unit = null,
+                rawHex = "",
+                timestampEpochMs = nowEpochMs(),
+                state = State.UNAVAILABLE
+            )
+
+        return try {
+            val response = session.command("01${pid.toString(16).padStart(2, '0')}")
+            val timestamp = nowEpochMs()
+            val parsed = Mode01Decoder.decodeDetailed(response)
+
+            if (parsed == null || parsed.pid != pid ||
+                parsed.availability != ObdValueAvailability.AVAILABLE) {
+                SensorSample(
+                    pid = pid,
+                    labelCs = definition.labelCs,
+                    value = null,
+                    unit = definition.unit,
+                    rawHex = parsed?.rawHex.orEmpty(),
+                    timestampEpochMs = timestamp,
+                    state = State.UNAVAILABLE
+                )
+            } else {
+                SensorSample(
+                    pid = pid,
+                    labelCs = definition.labelCs,
+                    value = parsed.value,
+                    unit = definition.unit,
+                    rawHex = parsed.rawHex,
+                    timestampEpochMs = timestamp,
+                    state = State.LIVE
+                )
+            }
+        } catch (t: Throwable) {
+            SensorSample(
+                pid = pid,
+                labelCs = definition.labelCs,
+                value = null,
+                unit = definition.unit,
+                rawHex = "",
+                timestampEpochMs = nowEpochMs(),
+                state = State.ERROR,
+                error = t.message ?: t::class.simpleName
+            )
+        }
     }
 }
