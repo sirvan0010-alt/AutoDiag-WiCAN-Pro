@@ -8,13 +8,13 @@ A Mode 06 request is `06 <OBDMID>` and the positive response starts with `46 <OB
 
 `TID | UASID | Test Value (2 bytes) | Minimum (2 bytes) | Maximum (2 bytes)`
 
-The SAE J1979 material defines the Mode 06 request/response messages and points the standardized OBDMID/TID/UASID definitions to the Digital Annex. citeturn0search34turn0search8
+SAE J1979 defines the Mode 06 request/response messages and delegates standardized OBDMID/TID/UASID definitions to its Digital Annex.
 
 ## Safety boundary
 
 `Mode06Decoder` preserves the raw 16-bit values and UASID. It does **not** guess units, signedness, offsets, resolution, monitor names, or manufacturer-specific meanings. Therefore the initial result status is `UNKNOWN` until an explicit UASID/TID decoder is available.
 
-This is intentional: the same raw value can represent different physical quantities depending on the unit/scaling identifier, and identifiers at or above `0x80` can require signed interpretation. citeturn0search0
+This is intentional: the same raw value can represent different physical quantities depending on the unit/scaling identifier, and identifiers at or above `0x80` can require signed interpretation.
 
 ## Fabia/EGR path
 
