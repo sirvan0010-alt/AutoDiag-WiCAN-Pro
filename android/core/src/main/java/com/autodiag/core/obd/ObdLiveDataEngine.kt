@@ -15,7 +15,10 @@ import kotlinx.coroutines.isActive
  */
 class ObdLiveDataEngine(
     private val session: Elm327Session,
-    private val nowEpochMs: () -> Long = { System.currentTimeMillis() }
+    private val nowEpochMs: () -> Long = { System.currentTimeMillis() },
+    private val store: LiveDataStore? = null,
+    private val ecuMonitor: EcuConnectionMonitor? = null,
+    private val freshnessPolicy: LiveDataFreshnessPolicy = LiveDataFreshnessPolicy()
 ) {
     data class SensorSample(
         val pid: Int,
@@ -34,10 +37,6 @@ class ObdLiveDataEngine(
         ERROR
     }
 
-    /**
-     * Backward-compatible round polling API. PIDs use the supplied common
-     * interval, while the scheduler-aware overload below provides priority.
-     */
     fun stream(
         supportedPids: Set<Int>,
         intervalMs: Long = 500L
@@ -47,10 +46,6 @@ class ObdLiveDataEngine(
         fallbackIntervalMs = intervalMs
     )
 
-    /**
-     * Prioritized polling. Each PID gets its own due time, so a slow/low
-     * priority PID cannot postpone a high-priority measurement indefinitely.
-     */
     fun stream(
         supportedPids: Set<Int>,
         plans: List<LiveDataPollPlan>,
@@ -112,6 +107,7 @@ class ObdLiveDataEngine(
 
             if (parsed == null || parsed.pid != pid ||
                 parsed.availability != ObdValueAvailability.AVAILABLE) {
+                ecuMonitor?.onFailure()
                 SensorSample(
                     pid = pid,
                     labelCs = definition.labelCs,
@@ -122,6 +118,19 @@ class ObdLiveDataEngine(
                     state = State.UNAVAILABLE
                 )
             } else {
+                ecuMonitor?.onSuccess()
+                store?.update(
+                    LiveDataSample(
+                        pid = pid,
+                        labelCs = definition.labelCs,
+                        value = parsed.value,
+                        unit = definition.unit,
+                        rawHex = parsed.rawHex,
+                        timestampEpochMs = timestamp,
+                        quality = LiveDataQuality.GOOD,
+                        freshness = freshnessPolicy.evaluate(timestamp, timestamp)
+                    )
+                )
                 SensorSample(
                     pid = pid,
                     labelCs = definition.labelCs,
@@ -133,6 +142,7 @@ class ObdLiveDataEngine(
                 )
             }
         } catch (t: Throwable) {
+            ecuMonitor?.onFailure()
             SensorSample(
                 pid = pid,
                 labelCs = definition.labelCs,
