@@ -5,6 +5,7 @@ import com.autodiag.core.diagnostic.DiagnosticCaptureRecord
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -22,6 +23,7 @@ class ReplayTransportTest {
         transport.connect(config())
         val values = mutableListOf<ByteArray>()
         val job = launch { repeat(2) { values += transport.observeIncoming().first() } }
+        yield()
         transport.send("010C\r".toByteArray())
         transport.send("010D\r".toByteArray())
         job.join()
