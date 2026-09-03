@@ -46,13 +46,31 @@ The pipeline is deliberately receive-only. It does not emit ISO-TP flow-control 
 
 Evidence provenance is marked as `EvidenceSource.UDS`, while the CAN identifier may be retained as a caller-supplied source identifier. The implementation does not infer that a CAN ID represents engine, ABS, SRS, transmission or another ECU unless the caller supplies that scope.
 
-Replay/unit coverage now exercises single-frame UDS, multi-frame ISO-TP reassembly, negative UDS responses and malformed ISO-TP input.
+Replay/unit coverage exercises single-frame UDS, multi-frame ISO-TP reassembly, negative UDS responses and malformed ISO-TP input.
 
 ## ReadDataByIdentifier foundation
 
-The read-only DID layer adds an explicit `0x22` request model and a strict `0x62` response parser. A caller must provide the requested DID; the parser rejects a response for a different DID. Returned bytes are preserved as raw `UdsDidValue` data rather than being guessed as VIN, software version, serial number or another manufacturer-specific field.
+The read-only DID layer adds an explicit `0x22` request model and a strict `0x62` response parser. A caller must provide the requested DID; the parser rejects a response for a different DID. Returned bytes are preserved as raw `UdsDidValue` data.
 
-This creates the correct boundary for later verified decoders:
+## Standard ECU identification layer
+
+`UdsEcuIdentificationDecoder` adds a second, deliberately narrow semantic layer over the raw DID bytes. It recognizes standardized UDS identification DIDs, including:
+
+- `F190` — VIN
+- `F18A` — system supplier identifier
+- `F18B` — ECU manufacturing date
+- `F18C` — ECU serial number
+- `F188/F189` — vehicle-manufacturer ECU software number/version
+- `F191` — vehicle-manufacturer ECU hardware number
+- `F192/F193` — system-supplier ECU hardware number/version
+- `F194/F195` — system-supplier ECU software number/version
+- `F197` — system name or engine type
+
+The semantic mapping is standardized, but the record format/content can remain ECU- or supplier-specific. Therefore the implementation **always retains the raw DID bytes** and only exposes a text view when the returned bytes are printable ASCII. Dates and other binary/BCD representations are not silently converted to text.
+
+`EcuIdentificationSnapshot` provides convenient VIN, supplier, hardware and software fields while retaining per-field verification status. Manufacturer-specific or unknown DIDs remain unlabeled instead of being guessed.
+
+This is the intended boundary:
 
 ```text
 UDS 0x22 request
@@ -65,10 +83,12 @@ requested DID check
    ↓
 raw DID value
    ↓
-verified ECU/vehicle decoder (later)
+standard DID semantic mapping
+   ↓
+verified ECU identification snapshot
 ```
 
-For example, a DID commonly used for VIN can eventually be decoded as a VIN **only after the exact DID semantics are verified for the applicable ECU/protocol profile**. The generic layer does not assume that meaning.
+This does **not** mean that every ECU implements every standardized DID. An ECU may legitimately return a negative response such as `requestOutOfRange`; that remains an availability result rather than proof of a communication failure.
 
 ## Read and write architecture
 
