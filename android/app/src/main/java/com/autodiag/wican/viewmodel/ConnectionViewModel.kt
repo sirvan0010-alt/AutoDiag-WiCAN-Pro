@@ -3,6 +3,8 @@ package com.autodiag.wican.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.autodiag.core.can.RawCanMonitorState
+import com.autodiag.core.can.SlcanCanFrameStream
 import com.autodiag.core.capability.CapabilityDiscovery
 import com.autodiag.core.capability.CapabilitySnapshot
 import com.autodiag.core.obd.Elm327Session
@@ -43,10 +45,11 @@ data class ConnectionUiState(
     val errorMessage: String? = null,
     val linkOnly: Boolean = false,
     val transportState: ConnectionState? = null,
-    val transportMetrics: TransportMetrics = TransportMetrics()
+    val transportMetrics: TransportMetrics = TransportMetrics(),
+    val rawCanMonitor: RawCanMonitorState = RawCanMonitorState()
 )
 
-/** ELM327 performs discovery; SLCAN establishes only a raw TCP link. */
+/** ELM327 performs discovery; SLCAN establishes a raw TCP link and can feed the live CAN monitor. */
 class ConnectionViewModel(
     private val transportFactory: () -> WiCanTransport = { TcpWiCanTransport() },
     private val discovery: CapabilityDiscovery = CapabilityDiscovery()
@@ -58,10 +61,16 @@ class ConnectionViewModel(
     private var session: Elm327Session? = null
     private var job: Job? = null
     private var metricsJob: Job? = null
+    private var rawCanStream: SlcanCanFrameStream? = null
+    private var rawCanJob: Job? = null
 
     fun connectElm327(host: String, port: Int = 3333) = connect(host, port, TransportMode.ELM327, true)
     fun connectSlcan(host: String, port: Int = 23) = connect(host, port, TransportMode.SLCAN_RAW, false)
     fun connectSimulator() = connect("simulator", 0, TransportMode.SIMULATOR, true)
+
+    fun setRawCanFilter(filter: String) = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(idFilter = filter)) }
+    fun toggleRawCanPause() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(paused = !it.rawCanMonitor.paused)) }
+    fun clearRawCan() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.clear()) }
 
     private fun transportFor(mode: TransportMode): WiCanTransport = when (mode) {
         TransportMode.SIMULATOR -> SimulatorWiCanTransport()
@@ -77,9 +86,28 @@ class ConnectionViewModel(
         }
     }
 
+    private fun startRawCanMonitor(t: WiCanTransport) {
+        rawCanStream?.stop()
+        rawCanJob?.cancel()
+        rawCanStream = SlcanCanFrameStream(t, viewModelScope)
+        rawCanJob = viewModelScope.launch {
+            rawCanStream!!.frames.collect { frame ->
+                _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.onFrame(frame)) }
+            }
+        }
+    }
+
+    private fun stopRawCanMonitor() {
+        rawCanJob?.cancel()
+        rawCanJob = null
+        rawCanStream?.stop()
+        rawCanStream = null
+    }
+
     private fun connect(host: String, port: Int, mode: TransportMode, runDiscovery: Boolean) {
         job?.cancel()
         metricsJob?.cancel()
+        stopRawCanMonitor()
         job = viewModelScope.launch {
             _uiState.value = ConnectionUiState(
                 phase = ConnectionPhase.CONNECTING,
@@ -109,6 +137,7 @@ class ConnectionViewModel(
                 _uiState.update { it.copy(transportState = t.state) }
 
                 if (!runDiscovery) {
+                    startRawCanMonitor(t)
                     _uiState.update {
                         it.copy(
                             phase = ConnectionPhase.READY,
@@ -146,6 +175,7 @@ class ConnectionViewModel(
                         transportState = transport?.state
                     )
                 }
+                stopRawCanMonitor()
                 runCatching { session?.close() }
                 runCatching { transport?.disconnect() }
                 session = null
@@ -158,6 +188,7 @@ class ConnectionViewModel(
     fun disconnect() {
         job?.cancel()
         metricsJob?.cancel()
+        stopRawCanMonitor()
         viewModelScope.launch {
             runCatching { session?.close() }
             runCatching { transport?.disconnect() }
@@ -165,6 +196,11 @@ class ConnectionViewModel(
             transport = null
             _uiState.value = ConnectionUiState()
         }
+    }
+
+    override fun onCleared() {
+        stopRawCanMonitor()
+        super.onCleared()
     }
 
     private fun humanize(t: Throwable): String {
