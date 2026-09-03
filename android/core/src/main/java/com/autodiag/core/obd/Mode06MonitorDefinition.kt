@@ -11,15 +11,10 @@ data class Mode06MonitorDefinition(
     init { require(obdMid in 0..0xFF) }
 }
 
-/**
- * Standard monitor definitions. Manufacturer-defined IDs are intentionally
- * absent; an unknown MID must remain visible as an unknown monitor.
- */
+/** Standard monitor definitions; manufacturer-defined IDs stay unknown. */
 object Mode06MonitorRegistry {
     private val definitions = buildList {
-        for (sensor in 1..4) {
-            add(Mode06MonitorDefinition(sensor, "O2 B1S$sensor", "Kyslíkový senzor – banka 1, senzor $sensor"))
-        }
+        for (sensor in 1..4) add(Mode06MonitorDefinition(sensor, "O2 B1S$sensor", "Kyslíkový senzor – banka 1, senzor $sensor"))
         for (sensor in 1..4) add(Mode06MonitorDefinition(0x04 + sensor, "O2 B2S$sensor", "Kyslíkový senzor – banka 2, senzor $sensor"))
         for (sensor in 1..4) add(Mode06MonitorDefinition(0x08 + sensor, "O2 B3S$sensor", "Kyslíkový senzor – banka 3, senzor $sensor"))
         for (sensor in 1..4) add(Mode06MonitorDefinition(0x0C + sensor, "O2 B4S$sensor", "Kyslíkový senzor – banka 4, senzor $sensor"))
@@ -61,14 +56,13 @@ object Mode06MonitorRegistry {
     }
 
     private val byMid = definitions.associateBy { it.obdMid }
-
     fun get(obdMid: Int): Mode06MonitorDefinition? = byMid[obdMid]
 }
 
-/** Fully interpreted Mode 06 result. Unknown UASID/TID data stays raw. */
 data class Mode06InterpretedResult(
     val raw: ObdMode06TestResult,
     val monitor: Mode06MonitorDefinition?,
+    val test: Mode06TestDefinition?,
     val scaling: Mode06UasDefinition?,
     val value: Mode06ScaledValue?,
     val minimum: Mode06ScaledValue?,
@@ -81,10 +75,11 @@ data class Mode06InterpretedResult(
 object Mode06Interpreter {
     fun interpret(raw: ObdMode06TestResult): Mode06InterpretedResult {
         val monitor = Mode06MonitorRegistry.get(raw.obdMid)
+        val test = Mode06TestRegistry.get(raw.obdMid, raw.testId, raw.unitAndScalingId)
         val scaling = Mode06UasRegistry.get(raw.unitAndScalingId)
+        val label = test?.labelCs ?: monitor?.labelCs ?: "MID 0x%02X TID 0x%02X".format(raw.obdMid, raw.testId)
         if (scaling == null) {
-            return Mode06InterpretedResult(raw, monitor, null, null, null, null, Mode06ResultStatus.UNKNOWN, null,
-                monitor?.labelCs ?: "MID 0x%02X".format(raw.obdMid))
+            return Mode06InterpretedResult(raw, monitor, test, null, null, null, null, Mode06ResultStatus.UNKNOWN, null, label)
         }
         val value = scaling.decode(raw.testValueRaw)
         val min = scaling.decode(raw.minimumRaw)
@@ -94,7 +89,6 @@ object Mode06Interpreter {
         val hi = max.value
         val status = if (v in lo..hi) Mode06ResultStatus.WITHIN_LIMITS else Mode06ResultStatus.OUTSIDE_LIMITS
         val band = if (hi > lo) ((v - lo) / (hi - lo)).coerceIn(0.0, 1.0) else null
-        return Mode06InterpretedResult(raw, monitor, scaling, value, min, max, status, band,
-            monitor?.labelCs ?: "MID 0x%02X".format(raw.obdMid))
+        return Mode06InterpretedResult(raw, monitor, test, scaling, value, min, max, status, band, label)
     }
 }
