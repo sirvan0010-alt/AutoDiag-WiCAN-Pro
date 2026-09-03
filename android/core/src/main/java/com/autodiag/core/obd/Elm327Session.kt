@@ -1,6 +1,7 @@
 package com.autodiag.core.obd
 
 import com.autodiag.core.transport.WiCanTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
@@ -54,6 +55,8 @@ class Elm327Session(private val transport: WiCanTransport) {
                 raw = "",
                 error = e.message ?: "ELM327 command timed out"
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: IllegalArgumentException) {
             Elm327Response(
                 kind = Elm327ResponseKind.MALFORMED,
