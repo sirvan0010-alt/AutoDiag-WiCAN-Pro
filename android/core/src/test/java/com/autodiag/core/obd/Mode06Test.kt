@@ -15,7 +15,7 @@ class Mode06Test {
     @Test
     fun decodes_multiple_fixed_size_test_records_and_preserves_raw() {
         val report = Mode06Decoder.decode(
-            "46 01 07 90 00 0A 00 00 28 00 64 01 8B 12 34 00 20 00 40"
+            "46 01 07 90 00 0A 00 00 28 64 01 8B 12 34 00 20 00 40"
         )
         assertNotNull(report)
         assertEquals(0x01, report!!.obdMid)
@@ -24,15 +24,15 @@ class Mode06Test {
         assertEquals(0x90, report.results[0].unitAndScalingId)
         assertEquals(10, report.results[0].testValueRaw)
         assertEquals(0, report.results[0].minimumRaw)
-        assertEquals(40, report.results[0].maximumRaw)
+        assertEquals(0x2864, report.results[0].maximumRaw)
         assertEquals(0x8B, report.results[1].testId)
         assertEquals(0x1234, report.results[1].testValueRaw)
-        assertEquals("01 07 90 00 0A 00 00 28 00 64 01 8B 12 34 00 20 00 40", report.rawPayload.joinToString(" ") { "%02X".format(it) })
+        assertEquals("01 07 90 00 0A 00 00 28 64 01 8B 12 34 00 20 00 40", report.rawPayload.joinToString(" ") { "%02X".format(it) })
     }
 
     @Test
     fun does_not_guess_physical_scaling_or_pass_fail() {
-        val report = Mode06Decoder.decode("46 01 07 90 00 0A 00 00 28 00 64")
+        val report = Mode06Decoder.decode("46 01 07 90 00 0A 00 00 28 64")
         assertEquals(Mode06ResultStatus.UNKNOWN, report!!.results.single().status)
     }
 
