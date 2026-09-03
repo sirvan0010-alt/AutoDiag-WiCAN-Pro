@@ -9,7 +9,8 @@ object LiveDataEvidenceFactory {
         sample: LiveDataSample,
         verification: EvidenceVerification = EvidenceVerification.UNVERIFIED,
         ecuId: String? = null,
-        sourceId: String? = null
+        sourceId: String? = null,
+        source: EvidenceSource = EvidenceSource.OBD_MODE_01
     ): DiagnosticEvidence<Double> {
         val availability = when (sample.quality) {
             LiveDataQuality.GOOD -> EvidenceAvailability.AVAILABLE
@@ -26,7 +27,7 @@ object LiveDataEvidenceFactory {
             availability = availability,
             verification = verification,
             provenance = EvidenceProvenance(
-                source = EvidenceSource.OBD_MODE_01,
+                source = source,
                 sourceId = sourceId,
                 ecuId = ecuId,
                 rawRepresentation = sample.rawHex
