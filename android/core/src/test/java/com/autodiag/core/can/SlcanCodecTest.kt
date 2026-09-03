@@ -17,7 +17,7 @@ class SlcanCodecTest {
     }
 
     @Test fun decodesExtendedAndRemoteFrames() {
-        val extended = SlcanCodec.decode("T18DAF1108DEADBEA")
+        val extended = SlcanCodec.decode("T18DAF11048DEADBEA")
         requireNotNull(extended)
         assertTrue(extended.isExtended)
         assertEquals(0x18DAF110L, extended.id)
