@@ -25,6 +25,7 @@ enum class EvidenceSource {
     OBD_MODE_01,
     OBD_MODE_02,
     OBD_MODE_03,
+    OBD_MODE_06,
     OBD_MODE_09,
     VEHICLE_PROFILE,
     DERIVED,
