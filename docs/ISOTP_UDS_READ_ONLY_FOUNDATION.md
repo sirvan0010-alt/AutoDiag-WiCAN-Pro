@@ -24,6 +24,30 @@ The current foundation does **not yet** implement the complete transmit side, UD
 
 Those are future capabilities, not permanently forbidden capabilities.
 
+## Read-only evidence pipeline
+
+`CanIsoTpUdsPipeline` now connects the existing protocol layers without coupling them to a vehicle brand:
+
+```text
+CanFrame
+   ↓
+IsoTpReassembler
+   ↓
+UDS byte payload
+   ↓
+UdsResponseParser
+   ↓
+UdsPipelineResult
+   ↓
+DiagnosticEvidence<UdsResponse>
+```
+
+The pipeline is deliberately receive-only. It does not emit ISO-TP flow-control frames or send diagnostic commands. Positive UDS responses become `AVAILABLE` evidence; a valid UDS negative response becomes `UNAVAILABLE` with the NRC preserved instead of being misclassified as a transport failure. Malformed ISO-TP/UDS data remains a failed protocol result.
+
+Evidence provenance is marked as `EvidenceSource.UDS`, while the CAN identifier may be retained as a caller-supplied source identifier. The implementation does not infer that a CAN ID represents engine, ABS, SRS, transmission or another ECU unless the caller supplies that scope.
+
+Replay/unit coverage now exercises single-frame UDS, multi-frame ISO-TP reassembly, negative UDS responses and malformed ISO-TP input.
+
 ## Read and write architecture
 
 AutoDiag is intended to support the full diagnostic lifecycle when a vehicle/ECU capability is positively established:
