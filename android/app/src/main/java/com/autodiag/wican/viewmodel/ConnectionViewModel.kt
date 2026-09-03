@@ -10,6 +10,7 @@ import com.autodiag.core.transport.ConnectionState
 import com.autodiag.core.transport.SimulatorWiCanTransport
 import com.autodiag.core.transport.TcpWiCanTransport
 import com.autodiag.core.transport.TransportConfig
+import com.autodiag.core.transport.TransportMetrics
 import com.autodiag.core.transport.TransportMode
 import com.autodiag.core.transport.WiCanTransport
 import kotlinx.coroutines.Job
@@ -40,7 +41,8 @@ data class ConnectionUiState(
     val snapshot: CapabilitySnapshot? = null,
     val errorMessage: String? = null,
     val linkOnly: Boolean = false,
-    val transportState: ConnectionState? = null
+    val transportState: ConnectionState? = null,
+    val transportMetrics: TransportMetrics = TransportMetrics()
 )
 
 /** ELM327 performs discovery; SLCAN establishes only a raw TCP link. */
@@ -54,6 +56,7 @@ class ConnectionViewModel(
     private var transport: WiCanTransport? = null
     private var session: Elm327Session? = null
     private var job: Job? = null
+    private var metricsJob: Job? = null
 
     fun connectElm327(host: String, port: Int = 3333) = connect(host, port, TransportMode.ELM327, true)
     fun connectSlcan(host: String, port: Int = 23) = connect(host, port, TransportMode.SLCAN_RAW, false)
@@ -64,8 +67,18 @@ class ConnectionViewModel(
         TransportMode.ELM327, TransportMode.SLCAN_RAW -> transportFactory()
     }
 
+    private fun observeMetrics(t: WiCanTransport) {
+        metricsJob?.cancel()
+        metricsJob = viewModelScope.launch {
+            t.metrics.collect { metrics ->
+                _uiState.update { it.copy(transportMetrics = metrics, transportState = t.state) }
+            }
+        }
+    }
+
     private fun connect(host: String, port: Int, mode: TransportMode, runDiscovery: Boolean) {
         job?.cancel()
+        metricsJob?.cancel()
         job = viewModelScope.launch {
             _uiState.value = ConnectionUiState(
                 phase = ConnectionPhase.CONNECTING,
@@ -83,6 +96,7 @@ class ConnectionViewModel(
 
                 val t = transportFor(mode)
                 transport = t
+                observeMetrics(t)
                 t.connect(
                     TransportConfig(
                         host = host,
@@ -135,12 +149,14 @@ class ConnectionViewModel(
                 runCatching { transport?.disconnect() }
                 session = null
                 transport = null
+                metricsJob?.cancel()
             }
         }
     }
 
     fun disconnect() {
         job?.cancel()
+        metricsJob?.cancel()
         viewModelScope.launch {
             runCatching { session?.close() }
             runCatching { transport?.disconnect() }
