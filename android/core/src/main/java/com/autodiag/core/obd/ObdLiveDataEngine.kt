@@ -1,8 +1,10 @@
 package com.autodiag.core.obd
 
+import com.autodiag.core.diagnostic.DiagnosticEvidenceStore
 import com.autodiag.core.diagnostic.DiagnosticEvent
 import com.autodiag.core.diagnostic.DiagnosticEventStream
 import com.autodiag.core.diagnostic.DiagnosticEventType
+import com.autodiag.core.diagnostic.LiveDataEvidenceFactory
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -14,7 +16,8 @@ import kotlinx.coroutines.isActive
  *
  * Only PIDs discovered as supported and present in the registry are requested.
  * Commands remain serialized by Elm327Session. Poll failures are represented
- * as samples and do not terminate the stream.
+ * as samples and do not terminate the stream. When supplied, evidenceStore
+ * records every poll outcome without replacing earlier observations.
  */
 class ObdLiveDataEngine(
     private val session: Elm327Session,
@@ -23,7 +26,11 @@ class ObdLiveDataEngine(
     private val ecuMonitor: EcuConnectionMonitor? = null,
     private val freshnessPolicy: LiveDataFreshnessPolicy = LiveDataFreshnessPolicy(),
     private val eventStream: DiagnosticEventStream? = null,
-    private val sessionId: String? = null
+    private val sessionId: String? = null,
+    private val evidenceStore: DiagnosticEvidenceStore? = null,
+    private val evidenceVerification: com.autodiag.core.diagnostic.EvidenceVerification = com.autodiag.core.diagnostic.EvidenceVerification.UNVERIFIED,
+    private val evidenceEcuId: String? = null,
+    private val evidenceSourceId: String? = null
 ) {
     data class SensorSample(
         val pid: Int,
@@ -103,7 +110,7 @@ class ObdLiveDataEngine(
                 rawHex = "",
                 timestampEpochMs = nowEpochMs(),
                 state = State.UNAVAILABLE
-            )
+            ).also { recordEvidence(it) }
 
         return try {
             val response = session.commandDetailed("01${pid.toString(16).padStart(2, '0')}")
@@ -122,22 +129,22 @@ class ObdLiveDataEngine(
                             unit = definition.unit,
                             rawHex = parsed?.rawHex ?: response.normalized,
                             timestampEpochMs = timestamp,
-                            state = State.UNAVAILABLE
-                        )
+                            state = State.UNAVAILABLE,
+                            error = "PID response was not decodable"
+                        ).also { recordEvidence(it) }
                     } else {
                         ecuMonitor?.onSuccess()
-                        store?.update(
-                            LiveDataSample(
-                                pid = pid,
-                                labelCs = definition.labelCs,
-                                value = parsed.value,
-                                unit = definition.unit,
-                                rawHex = parsed.rawHex,
-                                timestampEpochMs = timestamp,
-                                quality = LiveDataQuality.GOOD,
-                                freshness = freshnessPolicy.evaluate(timestamp, timestamp)
-                            )
+                        val sample = LiveDataSample(
+                            pid = pid,
+                            labelCs = definition.labelCs,
+                            value = parsed.value,
+                            unit = definition.unit,
+                            rawHex = parsed.rawHex,
+                            timestampEpochMs = timestamp,
+                            quality = LiveDataQuality.GOOD,
+                            freshness = freshnessPolicy.evaluate(timestamp, timestamp)
                         )
+                        store?.update(sample)
                         eventStream?.let { stream ->
                             val id = sessionId
                             if (id != null) {
@@ -148,12 +155,12 @@ class ObdLiveDataEngine(
                                         sessionId = id,
                                         message = definition.labelCs,
                                         evidenceKey = "obd.mode01.pid.%02X".format(pid),
-                                        ecuId = null
+                                        ecuId = evidenceEcuId
                                     )
                                 )
                             }
                         }
-                        SensorSample(
+                        val sensor = SensorSample(
                             pid = pid,
                             labelCs = definition.labelCs,
                             value = parsed.value,
@@ -162,6 +169,15 @@ class ObdLiveDataEngine(
                             timestampEpochMs = timestamp,
                             state = State.LIVE
                         )
+                        evidenceStore?.append(
+                            LiveDataEvidenceFactory.fromMode01(
+                                sample = sample,
+                                verification = evidenceVerification,
+                                ecuId = evidenceEcuId,
+                                sourceId = evidenceSourceId
+                            )
+                        )
+                        sensor
                     }
                 }
 
@@ -176,7 +192,7 @@ class ObdLiveDataEngine(
                         timestampEpochMs = timestamp,
                         state = State.UNAVAILABLE,
                         error = "ECU/adapter reported NO DATA"
-                    )
+                    ).also { recordEvidence(it) }
                 }
 
                 Elm327ResponseKind.NEGATIVE -> {
@@ -190,7 +206,7 @@ class ObdLiveDataEngine(
                         timestampEpochMs = timestamp,
                         state = State.UNAVAILABLE,
                         error = "Negative diagnostic response"
-                    )
+                    ).also { recordEvidence(it) }
                 }
 
                 Elm327ResponseKind.TIMEOUT,
@@ -206,7 +222,7 @@ class ObdLiveDataEngine(
                         timestampEpochMs = timestamp,
                         state = State.ERROR,
                         error = response.error ?: response.kind.name
-                    )
+                    ).also { recordEvidence(it) }
                 }
             }
         } catch (t: Throwable) {
@@ -220,7 +236,37 @@ class ObdLiveDataEngine(
                 timestampEpochMs = nowEpochMs(),
                 state = State.ERROR,
                 error = t.message ?: t::class.simpleName
-            )
+            ).also { recordEvidence(it) }
         }
+    }
+
+    private fun recordEvidence(sensor: SensorSample) {
+        val sample = LiveDataSample(
+            pid = sensor.pid,
+            labelCs = sensor.labelCs,
+            value = sensor.value,
+            unit = sensor.unit,
+            rawHex = sensor.rawHex,
+            timestampEpochMs = sensor.timestampEpochMs,
+            quality = when (sensor.state) {
+                State.LIVE -> LiveDataQuality.GOOD
+                State.UNAVAILABLE -> LiveDataQuality.UNAVAILABLE
+                State.ERROR -> LiveDataQuality.ERROR
+            },
+            freshness = if (sensor.state == State.LIVE) {
+                freshnessPolicy.evaluate(sensor.timestampEpochMs, sensor.timestampEpochMs)
+            } else {
+                LiveDataFreshness.STALE
+            },
+            error = sensor.error
+        )
+        evidenceStore?.append(
+            LiveDataEvidenceFactory.fromMode01(
+                sample = sample,
+                verification = evidenceVerification,
+                ecuId = evidenceEcuId,
+                sourceId = evidenceSourceId
+            )
+        )
     }
 }
