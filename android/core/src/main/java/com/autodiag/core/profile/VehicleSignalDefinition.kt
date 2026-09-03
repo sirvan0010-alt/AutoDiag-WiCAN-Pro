@@ -31,7 +31,8 @@ data class VehicleSignalDefinition(
         require(shortName.isNotBlank())
         require(request.isNotBlank())
         require(byteOffset >= 0)
-        require(byteLength in 1..8)
+        // Int-backed decoder currently supports up to 32-bit numeric signals.
+        require(byteLength in 1..4)
         require(scale.isFinite() && offset.isFinite())
         require(bitOffset == null || bitOffset in 0..7)
         require(bitLength == null || bitLength in 1..8)
@@ -51,7 +52,7 @@ data class VehicleSignalSample(
     val value: Double,
 )
 
-/** Strict byte/bit decoder for a single signal definition. */
+/** Strict big-endian byte/bit decoder for a single signal definition. */
 object VehicleSignalDecoder {
     fun decode(definition: VehicleSignalDefinition, payload: ByteArray): Result<VehicleSignalSample> = runCatching {
         require(definition.byteOffset + definition.byteLength <= payload.size) { "Signal payload is too short" }
