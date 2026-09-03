@@ -48,6 +48,28 @@ Evidence provenance is marked as `EvidenceSource.UDS`, while the CAN identifier 
 
 Replay/unit coverage now exercises single-frame UDS, multi-frame ISO-TP reassembly, negative UDS responses and malformed ISO-TP input.
 
+## ReadDataByIdentifier foundation
+
+The read-only DID layer adds an explicit `0x22` request model and a strict `0x62` response parser. A caller must provide the requested DID; the parser rejects a response for a different DID. Returned bytes are preserved as raw `UdsDidValue` data rather than being guessed as VIN, software version, serial number or another manufacturer-specific field.
+
+This creates the correct boundary for later verified decoders:
+
+```text
+UDS 0x22 request
+   ↓
+transport / ISO-TP
+   ↓
+UDS 0x62 response
+   ↓
+requested DID check
+   ↓
+raw DID value
+   ↓
+verified ECU/vehicle decoder (later)
+```
+
+For example, a DID commonly used for VIN can eventually be decoded as a VIN **only after the exact DID semantics are verified for the applicable ECU/protocol profile**. The generic layer does not assume that meaning.
+
 ## Read and write architecture
 
 AutoDiag is intended to support the full diagnostic lifecycle when a vehicle/ECU capability is positively established:
