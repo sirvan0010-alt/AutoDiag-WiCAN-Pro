@@ -18,10 +18,10 @@
 ## Phase 1 — WiCAN connectivity
 
 - [ ] TCP/ELM327 transport hardening
-- [ ] SLCAN/raw-CAN transport hardening
+- [x] SLCAN/raw-CAN transport hardening
 - [ ] Automatic protocol detection
-- [ ] Transport health metrics
-- [ ] RX/TX counters and latency
+- [x] Transport health metrics
+- [x] RX/TX counters and latency foundation
 - [ ] Adaptive polling
 - [ ] Wi-Fi/BLE transport where verified
 
@@ -34,6 +34,7 @@
 - [ ] Capture/export
 - [ ] Replay/simulator
 - [ ] Bus-load/error/drop visualization
+- [x] SLCAN frame codec with TCP chunk reassembly
 
 ## Phase 3 — ISO-TP / UDS / OBD
 
