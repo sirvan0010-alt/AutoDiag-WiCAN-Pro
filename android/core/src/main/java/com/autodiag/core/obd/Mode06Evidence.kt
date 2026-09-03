@@ -29,6 +29,37 @@ object Mode06EvidenceFactory {
         isDerived = false,
         quality = "tests:${report.results.size}"
     )
+
+    fun fromInterpreted(
+        result: Mode06InterpretedResult,
+        timestampEpochMs: Long,
+        verification: EvidenceVerification = EvidenceVerification.UNVERIFIED,
+        ecuId: String? = null,
+        sourceId: String? = null,
+    ): DiagnosticEvidence<Mode06InterpretedResult> = DiagnosticEvidence(
+        key = "obd.mode06.mid.%02X.tid.%02X".format(result.raw.obdMid, result.raw.testId),
+        value = result,
+        unit = result.value?.unit,
+        timestampEpochMs = timestampEpochMs,
+        availability = when {
+            result.value == null -> EvidenceAvailability.UNKNOWN
+            else -> EvidenceAvailability.AVAILABLE
+        },
+        verification = verification,
+        provenance = EvidenceProvenance(
+            source = EvidenceSource.OBD_MODE_06,
+            sourceId = sourceId,
+            ecuId = ecuId,
+            rawRepresentation = listOf(
+                result.raw.obdMid, result.raw.testId, result.raw.unitAndScalingId,
+                result.raw.testValueRaw ushr 8, result.raw.testValueRaw and 0xFF,
+                result.raw.minimumRaw ushr 8, result.raw.minimumRaw and 0xFF,
+                result.raw.maximumRaw ushr 8, result.raw.maximumRaw and 0xFF
+            ).joinToString(" ") { "%02X".format(it) }
+        ),
+        isDerived = true,
+        quality = "status:${result.status.name};band:${result.bandPosition}"
+    )
 }
 
 fun DiagnosticEvidenceStore.appendMode06Report(
