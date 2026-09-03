@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "publisher": "Tesla",
+  "purpose": "Public reference metadata only; source content is not mirrored here.",
+  "sources": [
+    {
+      "sourceId": "tesla-service-home",
+      "title": "Tesla Service",
+      "url": "https://service.tesla.com/",
+      "type": "SERVICE_PORTAL",
+      "access": "PUBLIC_REFERENCE",
+      "redistribution": "DO_NOT_MIRROR"
+    },
+    {
+      "sourceId": "tesla-service-diagnostic-cables",
+      "title": "Diagnostic Cables",
+      "url": "https://service.tesla.com/en-US/diagnostic-cables",
+      "type": "DIAGNOSTIC_CABLES",
+      "access": "PUBLIC_REFERENCE",
+      "redistribution": "DO_NOT_MIRROR"
+    },
+    {
+      "sourceId": "tesla-service-mode",
+      "title": "Service Mode",
+      "url": "https://service.tesla.com/service-mode",
+      "type": "DIAGNOSTICS",
+      "access": "PUBLIC_REFERENCE",
+      "redistribution": "DO_NOT_MIRROR"
+    },
+    {
+      "sourceId": "tesla-parts-tools",
+      "title": "Parts and Tools",
+      "url": "https://service.tesla.com/en-IE/parts-and-tools",
+      "type": "PARTS_TOOLS",
+      "access": "PUBLIC_REFERENCE",
+      "redistribution": "DO_NOT_MIRROR"
+    },
+    {
+      "sourceId": "tesla-model3-service-manual",
+      "title": "Model 3 Service Manual",
+      "url": "https://service.tesla.com/docs/Model3/ServiceManual/en-us/",
+      "type": "SERVICE_MANUAL",
+      "model": "Model 3",
+      "access": "PUBLIC_REFERENCE",
+      "redistribution": "DO_NOT_MIRROR"
+    },
+    {
+      "sourceId": "tesla-modely-service-manual",
+      "title": "Model Y Service Manual",
+      "url": "https://service.tesla.com/docs/ModelY/ServiceManual/en-us/",
+      "type": "SERVICE_MANUAL",
+      "model": "Model Y",
+      "access": "PUBLIC_REFERENCE",
+      "redistribution": "DO_NOT_MIRROR"
+    }
+  ],
+  "privateArchive": {
+    "allowedByProject": true,
+    "condition": "Only retain material the owner is legally entitled to retain under the applicable source terms and jurisdiction.",
+    "storage": "Outside the public Git repository",
+    "integrity": "SHA-256 manifest recommended",
+    "publication": "Never publish the private source files through this repository"
+  }
+}
