@@ -9,53 +9,62 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.autodiag.core.capability.OutlanderResistanceSessionStats
 
 @Composable
 fun OutlanderPhevResistanceCard(
-    isolation: OutlanderResistanceSessionStats?,
-    internalResistance: OutlanderResistanceSessionStats?
+    isolation: OutlanderResistanceSessionStats,
+    internalResistance: OutlanderResistanceSessionStats,
+    expertRawRequest: String?,
+    expertRawResponse: String?,
+    showExpert: Boolean
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("HV baterie – odpor a izolace", style = MaterialTheme.typography.titleMedium)
             ResistanceRow("Izolační odpor HV systému", isolation)
-            ResistanceRow("Vnitřní odpor baterie", internalResistance)
+            Text("Vnitřní odpor baterie", style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Izolační odpor a vnitřní odpor baterie jsou dvě různé fyzikální veličiny a mají rozdílné jednotky.",
+                "NOT AVAILABLE – význam hodnoty byte 38/39 z analyzovaného zdroje není nezávisle potvrzen. Zdroj ji popisuje jako internal resistance v MΩ, což není dostatečný důkaz, že jde o ESR trakční baterie.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "Co se měří: diagnostický ukazatel elektrické izolace HV systému vůči referenci vozidla. Přesná topologie měření (např. HV+ / HV− vůči chassis) není z tohoto zdroje potvrzena.",
                 style = MaterialTheme.typography.bodySmall
             )
             Text(
-                "Izolační odpor: zdroj PHEV Watchdog označuje pole jako ISOLATION_RESISTANCE v datovém bloku 21 01. Význam je zde omezen na elektrickou izolaci HV systému vůči referenci vozidla; přesná topologie měření není z tohoto zdroje potvrzena.",
+                "21 01: proprietární lokální datový request. U analyzovaného Mitsubishi/PHEV Watchdog vzoru odpověď obsahuje dlouhý datový blok; izolace je v tomto zdroji dekódována jako unsigned 16-bit v kΩ. Rozsah raw 0–65 535 kΩ (~0–65,5 MΩ). Rozsah sám o sobě nepotvrzuje fyzický význam ani servisní limit.",
                 style = MaterialTheme.typography.bodySmall
             )
             Text(
-                "Vnitřní odpor baterie z tohoto zdroje není v aplikaci považován za potvrzenou měřenou hodnotu. Dekódování v MΩ je fyzikálně sporné a čeká na nezávislé ověření.",
+                "Aktuální hodnota je source-derived a pouze částečně ověřená. Pro VERIFIED je potřeba skutečný request/response capture a nezávislé potvrzení dekódování a významu.",
                 style = MaterialTheme.typography.bodySmall
             )
-            Text(
-                "Tooltip: 21 01 je proprietární lokální datový request používaný v některých Mitsubishi diagnostických datech. Odpověď může být dlouhý ISO-TP blok; zde je izolace dekódována jako unsigned 16-bit v kΩ. Rozsah je 0–65 535 kΩ (~0–65,5 MΩ). Samotný rozsah ani fyzikální plausibilita nepotvrzují konkrétní topologii měření.",
-                style = MaterialTheme.typography.bodySmall
-            )
+            if (showExpert) {
+                Text("Expert", style = MaterialTheme.typography.labelLarge)
+                Text("REQ: ${expertRawRequest ?: "—"}", style = MaterialTheme.typography.bodySmall)
+                Text("RESP: ${expertRawResponse ?: "—"}", style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
 
 @Composable
-private fun ResistanceRow(label: String, stats: OutlanderResistanceSessionStats?) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+private fun ResistanceRow(label: String, stats: OutlanderResistanceSessionStats) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(label)
-            Text(stats?.verification?.name ?: "UNVERIFIED", style = MaterialTheme.typography.labelSmall)
+            Text(stats.verification.name, style = MaterialTheme.typography.labelSmall)
         }
-        Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
-            Text(stats?.current?.let { formatMeasurement(it, stats.unit) } ?: "—")
-            Text(
-                stats?.let { "MIN ${formatMeasurement(it.minimum, it.unit)} · MAX ${formatMeasurement(it.maximum, it.unit)}" } ?: "bez měření",
-                style = MaterialTheme.typography.labelSmall
-            )
+        Column(horizontalAlignment = Alignment.End) {
+            Text(formatMeasurement(stats.current, stats.unit), style = MaterialTheme.typography.titleMedium)
+            Text("MIN ${formatMeasurement(stats.minimum, stats.unit)}", style = MaterialTheme.typography.labelSmall)
+            Text("MAX ${formatMeasurement(stats.maximum, stats.unit)}", style = MaterialTheme.typography.labelSmall)
+            Text("${stats.sampleCount} vzorků", style = MaterialTheme.typography.labelSmall)
         }
     }
 }
