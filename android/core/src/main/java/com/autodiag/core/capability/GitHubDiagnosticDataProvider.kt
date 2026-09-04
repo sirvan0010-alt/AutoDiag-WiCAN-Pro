@@ -20,19 +20,22 @@ class GitHubDiagnosticDataProvider(
     private var signals = emptyList<SignalDataDefinition>()
     private var dtcs = emptyList<DtcDataDefinition>()
 
-    override suspend fun findVehicle(vin: String): VehicleDataDefinition? {
-        loadIfNeeded(); return vehicles.firstOrNull { it.vin.equals(vin, true) }
+    override suspend fun findVehicle(vin: String): VehicleDataDefinition? = withContext(Dispatchers.IO) {
+        loadIfNeeded(); vehicles.firstOrNull { it.vin.equals(vin, true) }
     }
-    override suspend fun findEcu(identity: EcuDataIdentity): EcuDataDefinition? {
-        loadIfNeeded(); return ecus.firstOrNull { sameEcu(it.identity, identity) }
+
+    override suspend fun findEcu(identity: EcuDataIdentity): EcuDataDefinition? = withContext(Dispatchers.IO) {
+        loadIfNeeded(); ecus.firstOrNull { sameEcu(it.identity, identity) }
     }
-    override suspend fun findSignals(identity: EcuDataIdentity): List<SignalDataDefinition> {
+
+    override suspend fun findSignals(identity: EcuDataIdentity): List<SignalDataDefinition> = withContext(Dispatchers.IO) {
         loadIfNeeded()
-        val ecuKey = ecus.firstOrNull { sameEcu(it.identity, identity) }?.identity?.ecuId ?: return emptyList()
-        return signals.filter { it.id.startsWith("$ecuKey:") }
+        val ecuKey = ecus.firstOrNull { sameEcu(it.identity, identity) }?.identity?.ecuId ?: return@withContext emptyList()
+        signals.filter { it.id.startsWith("$ecuKey:") }
     }
-    override suspend fun findDtc(code: String): DtcDataDefinition? {
-        loadIfNeeded(); return dtcs.firstOrNull { it.code.equals(code, true) }
+
+    override suspend fun findDtc(code: String): DtcDataDefinition? = withContext(Dispatchers.IO) {
+        loadIfNeeded(); dtcs.firstOrNull { it.code.equals(code, true) }
     }
 
     @Synchronized private fun loadIfNeeded() {
@@ -77,6 +80,3 @@ class UrlConnectionDiagnosticDataHttpClient(private val connectTimeoutMs: Int = 
         } finally { c.disconnect() }
     }
 }
-
-/** Execute a provider lookup without blocking the caller thread. */
-suspend fun <T> diagnosticDataIo(block: suspend () -> T): T = withContext(Dispatchers.IO, block)
