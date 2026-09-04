@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.dp
 import com.autodiag.core.capability.OutlanderLiveSamplingSettings
@@ -120,7 +121,7 @@ private fun ResistanceLiveGraph(samples: List<OutlanderResistanceSample>, unit: 
             val y = size.height - ((sample.value - min) / span * size.height).toFloat()
             if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        drawPath(path)
+        drawPath(path, color = Color.Black)
     }
     Text("MIN ${formatMeasurement(min, unit)} · MAX ${formatMeasurement(max, unit)} · poslední ${formatMeasurement(values.last(), unit)}", style = MaterialTheme.typography.labelSmall)
 }
