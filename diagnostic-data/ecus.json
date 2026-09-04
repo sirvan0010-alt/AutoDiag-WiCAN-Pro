@@ -1,1 +1,33 @@
-PLACEHOLDER_ECU
+{
+  "schemaVersion": 1,
+  "ecus": [
+    {
+      "id": "ecu-bmu-mitsubishi-phev",
+      "name": "Battery Management Unit (BMU)",
+      "semantic": "HV battery pack controller",
+      "vehicle_ids": [
+        "veh-mitsubishi-outlander-phev",
+        "veh-mitsubishi-eclipse-cross-phev-my2021"
+      ],
+      "verification": "UNVERIFIED",
+      "provenance": {
+        "source_id": "src-phev-watchdog-lite-1.9.1",
+        "note": "BMU_POWER_SUPPLY field observed; no ECU address verified"
+      }
+    },
+    {
+      "id": "ecu-bms-hyundai-phev",
+      "name": "Battery Management System",
+      "semantic": "HV battery pack controller",
+      "vehicle_ids": [
+        "veh-hyundai-ioniq-phev",
+        "veh-hyundai-santa-fe-phev-my2021",
+        "veh-hyundai-tucson-phev-my2021"
+      ],
+      "verification": "UNVERIFIED",
+      "provenance": {
+        "source_id": "src-phev-watchdog-lite-1.9.1"
+      }
+    }
+  ]
+}
