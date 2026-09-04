@@ -34,7 +34,7 @@ object RepairEstimateEngine {
 
 object RepairIntelligenceResolver {
     fun resolve(
-        dtc: DtcKnowledgeEntry,
+        dtc: com.autodiag.core.capability.DtcDataDefinition,
         vehicleScope: VehicleScope = VehicleScope(),
         sources: List<RepairSource> = emptyList(),
         parts: List<RepairPart> = emptyList(),
@@ -43,9 +43,9 @@ object RepairIntelligenceResolver {
     ): RepairIntelligence = RepairIntelligence(
         dtcCode = dtc.code,
         vehicleScope = vehicleScope,
-        meaning = dtc.explanationCs,
-        possibleCauses = dtc.causesCs,
-        diagnosticChecks = dtc.checksCs,
+        meaning = dtc.description,
+        possibleCauses = emptyList(),
+        diagnosticChecks = emptyList(),
         candidateParts = parts,
         procedures = procedures,
         estimate = estimate,

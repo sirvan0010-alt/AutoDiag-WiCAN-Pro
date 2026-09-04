@@ -46,7 +46,7 @@ object Mode06DiscoveryDecoder {
                 if ((mask and (1 shl bit)) != 0) add(base + (32 - bit))
             }
         }
-        return Mode06DiscoveryWindow(base, supported, (mask and 1) != 0, payload.toByteArray())
+        return Mode06DiscoveryWindow(base, supported, (mask and 1) != 0, payload.map { it.toByte() }.toByteArray())
     }
 
     fun nextBase(window: Mode06DiscoveryWindow): Int? =

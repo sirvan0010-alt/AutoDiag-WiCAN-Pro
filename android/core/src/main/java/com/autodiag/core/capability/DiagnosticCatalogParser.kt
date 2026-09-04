@@ -11,8 +11,8 @@ object DiagnosticCatalogParser {
             val o = arr.getJSONObject(i)
             VehicleDataDefinition(
                 vin = o.optString("vin").ifBlank { "" }, make = o.optStringOrNull("make"), model = o.optStringOrNull("model"),
-                year = o.optIntOrNull("year"), verification = verification(o), provenance = provenance(o), id = o.optStringOrNull("id"),
-                powertrain = o.optStringOrNull("powertrain"), years = years(o)
+                year = o.optIntOrNull("year"), verification = verification(o), provenance = provenance(o),
+                powertrain = o.optStringOrNull("powertrain")
             )
         }
     }
@@ -20,14 +20,14 @@ object DiagnosticCatalogParser {
         val arr = arrayOf(body, "ecus") ?: return emptyList()
         return List(arr.length()) { i ->
             val o = arr.getJSONObject(i)
-            EcuDataDefinition(EcuDataIdentity(o.optStringOrNull("ecuId") ?: o.optStringOrNull("id"), o.optStringOrNull("manufacturer"), o.optStringOrNull("hardwareNumber"), o.optStringOrNull("softwareNumber"), o.optStringOrNull("softwareVersion")), o.optString("displayName").ifBlank { o.optString("name") }, verification(o), provenance(o), stringList(o, "vehicle_ids"))
+            EcuDataDefinition(EcuDataIdentity(o.optStringOrNull("ecuId") ?: o.optStringOrNull("id"), o.optStringOrNull("manufacturer"), o.optStringOrNull("hardwareNumber"), o.optStringOrNull("softwareNumber"), o.optStringOrNull("softwareVersion")), o.optString("displayName").ifBlank { o.optString("name") }, verification(o), provenance(o))
         }
     }
     fun signals(body: String): List<SignalDataDefinition> {
         val arr = arrayOf(body, "signals") ?: return emptyList()
         return List(arr.length()) { i ->
             val o = arr.getJSONObject(i); val req = parseRequest(o.opt("request"))
-            SignalDataDefinition(o.getString("id"), o.optString("label").ifBlank { o.optString("name") }, o.optStringOrNull("unit"), req.elmPayload, o.optDouble("scale", 1.0), o.optDouble("offset", 0.0), verification(o), provenance(o), stringList(o, "vehicle_ids"), req.protocol, req.elmPayload)
+            SignalDataDefinition(o.getString("id"), o.optString("label").ifBlank { o.optString("name") }, o.optStringOrNull("unit"), req.elmPayload, o.optDouble("scale", 1.0), o.optDouble("offset", 0.0), verification(o), provenance(o))
         }
     }
     fun dtcs(body: String): List<DtcDataDefinition> {
@@ -44,7 +44,6 @@ object DiagnosticCatalogParser {
         else -> ParsedRequest(null, null)
     }
     private fun arrayOf(body: String, key: String): JSONArray? { val trimmed = body.trim(); if (trimmed.isEmpty()) return null; if (trimmed.startsWith("[")) return JSONArray(trimmed); return JSONObject(trimmed).optJSONArray(key) }
-    private fun years(o: JSONObject): List<Int> { val direct = o.optJSONArray("years"); if (direct != null) return List(direct.length()) { direct.optInt(it) }.filter { it > 0 }; val gens = o.optJSONArray("generations") ?: return emptyList(); val out = mutableListOf<Int>(); for (i in 0 until gens.length()) { val y = gens.getJSONObject(i).optJSONArray("years") ?: continue; for (j in 0 until y.length()) out += y.optInt(j) }; return out.filter { it > 0 }.distinct() }
     private fun stringList(o: JSONObject, key: String): List<String> { val a = o.optJSONArray(key) ?: return emptyList(); return List(a.length()) { a.optString(it) }.filter { it.isNotBlank() } }
     private fun verification(o: JSONObject) = runCatching { VerificationState.valueOf(o.optString("verification", "UNVERIFIED")) }.getOrDefault(VerificationState.UNVERIFIED)
     private fun provenance(o: JSONObject): String { if (o.has("provenance") && o.get("provenance") is JSONObject) return o.getJSONObject("provenance").optString("source_id", "diagnostic-data"); return o.optString("provenance", "diagnostic-data") }

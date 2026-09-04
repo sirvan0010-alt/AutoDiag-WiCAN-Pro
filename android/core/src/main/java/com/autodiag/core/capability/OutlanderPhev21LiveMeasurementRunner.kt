@@ -38,7 +38,7 @@ class OutlanderPhev21LiveMeasurementRunner(
                 if (response.kind == Elm327ResponseKind.POSITIVE) {
                     val decoded = runCatching {
                         val parsed = OutlanderPhev21ResponseParser.parse(response.normalized)
-                        val iso = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(parsed, startedAt, REQUEST, response.raw)
+                        val iso = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(parsed, startedAt, null, REQUEST, response.raw)
                         val max = OutlanderResistanceMeasurement(
                             kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED,
                             value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(parsed),
