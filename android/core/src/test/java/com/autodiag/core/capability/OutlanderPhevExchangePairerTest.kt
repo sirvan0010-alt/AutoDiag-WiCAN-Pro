@@ -33,17 +33,24 @@ class OutlanderPhevExchangePairerTest {
     }
 
     @Test
-    fun rejectsResponseOutsideWindowAndRetainsNoExpiredRequestAfterFlush() {
+    fun expiresOldRequestAndReportsItOnFlush() {
         val pairer = OutlanderPhevExchangePairer(responseWindowNanos = 100)
         val request = observation("bms", OutlanderPhevExchangePairer.Role.REQUEST, 100, "capture", 0x100, 0x22, 0x12, 0x34)
         pairer.accept(request)
 
-        val result = pairer.accept(observation("bms", OutlanderPhevExchangePairer.Role.RESPONSE, 250, "capture", 0x101, 0x62, 0x12, 0x34))
-        assertTrue(result is OutlanderPhevExchangePairer.Result.UnmatchedResponse)
-
-        val expired = pairer.flush(300)
+        val expired = pairer.flush(201)
         assertEquals(1, expired.size)
         assertEquals(request.frame, expired.single().observation.frame)
+    }
+
+    @Test
+    fun responseOutsideWindowDoesNotPairWithExpiredRequest() {
+        val pairer = OutlanderPhevExchangePairer(responseWindowNanos = 100)
+        pairer.accept(observation("bms", OutlanderPhevExchangePairer.Role.REQUEST, 100, "capture", 0x100, 0x22, 0x12, 0x34))
+
+        val result = pairer.accept(observation("bms", OutlanderPhevExchangePairer.Role.RESPONSE, 250, "capture", 0x101, 0x62, 0x12, 0x34))
+        assertTrue(result is OutlanderPhevExchangePairer.Result.UnmatchedResponse)
+        assertTrue(pairer.flush(300).isEmpty())
     }
 
     @Test
