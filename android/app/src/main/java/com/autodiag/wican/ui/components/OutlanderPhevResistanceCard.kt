@@ -45,7 +45,7 @@ fun OutlanderPhevResistanceCard(
 ) {
     val maxStats = if (internalResistance.kind == OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED) internalResistance else OutlanderResistanceSessionStats(OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED)
     val minStats = if (internalResistance.kind == OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED) internalResistance else OutlanderResistanceSessionStats(OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED)
-    OutlanderPhevResistanceCard(isolation, maxStats, minStats, emptyList(), emptyList(), emptyList(), false, {}, {}, {})
+    OutlanderPhevResistanceCard(isolation, maxStats, minStats, emptyList(), emptyList(), emptyList(), false, {}, {}, {}, expertRawRequest, expertRawResponse)
 }
 
 @Composable
@@ -64,17 +64,7 @@ fun OutlanderPhevResistanceCard(
     expertRawResponse: String? = null
 ) {
     var graphKind by remember { mutableStateOf<OutlanderResistanceKind?>(null) }
-    val stats = mapOf(
-        OutlanderResistanceKind.HV_ISOLATION_RESISTANCE to isolation,
-        OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED to internalMax,
-        OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED to internalMin
-    )
-    val histories = mapOf(
-        OutlanderResistanceKind.HV_ISOLATION_RESISTANCE to isolationHistory,
-        OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED to internalMaxHistory,
-        OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED to internalMinHistory
-    )
-
+    val histories = mapOf(OutlanderResistanceKind.HV_ISOLATION_RESISTANCE to isolationHistory, OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED to internalMaxHistory, OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED to internalMinHistory)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("HV baterie – odpor a izolace", style = MaterialTheme.typography.titleMedium)
@@ -86,36 +76,25 @@ fun OutlanderPhevResistanceCard(
             ResistanceRow(OutlanderResistanceKind.HV_ISOLATION_RESISTANCE, isolation) { graphKind = it }
             ResistanceRow(OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED, internalMax) { graphKind = it }
             ResistanceRow(OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED, internalMin) { graphKind = it }
-            Text("Vzorkování ECU requestu: ${stats.values.first().lastTimestamp?.let { "aktivní" } ?: "čeká"}", style = MaterialTheme.typography.labelSmall)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlanderLiveSamplingSettings.OPTIONS_MS.forEach { option ->
-                    OutlinedButton(onClick = { onSamplingInterval(option) }) { Text("${option} ms") }
-                }
+                OutlanderLiveSamplingSettings.OPTIONS_MS.forEach { option -> OutlinedButton(onClick = { onSamplingInterval(option) }) { Text("${option} ms") } }
             }
-            Text("Interval nyní řídí skutečný 21 01 request/response cyklus. UI už nevyrábí vlastní vzorky.", style = MaterialTheme.typography.bodySmall)
+            Text("Interval řídí skutečný 21 01 request/response cyklus. UI už nevyrábí vlastní vzorky.", style = MaterialTheme.typography.bodySmall)
             Text("MAX/MIN pochází ze zdroje, který je nazývá internal resistance, ale nevíme, co fyzicky znamenají. Nejsou prezentovány jako potvrzený vnitřní odpor (ESR) trakční baterie.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             Text("Izolační odpor: zdroj dekóduje bytes 78–79 jako unsigned 16-bit v kΩ. Přesná topologie měření ani limit výrobce nejsou potvrzeny.", style = MaterialTheme.typography.bodySmall)
-            expertRawResponse?.takeIf { it.isNotBlank() }?.let {
-                Text("Poslední raw response: ${it.take(180)}${if (it.length > 180) "…" else ""}", style = MaterialTheme.typography.labelSmall)
-            }
+            expertRawResponse?.takeIf { it.isNotBlank() }?.let { Text("Poslední raw response: ${it.take(180)}${if (it.length > 180) "…" else ""}", style = MaterialTheme.typography.labelSmall) }
             expertRawRequest?.let { Text("Request: $it", style = MaterialTheme.typography.labelSmall) }
         }
     }
-
     graphKind?.let { kind ->
         val samples = histories[kind].orEmpty()
-        AlertDialog(
-            onDismissRequest = { graphKind = null },
-            confirmButton = { OutlinedButton(onClick = { graphKind = null }) { Text("Zavřít") } },
-            title = { Text(kind.displayNameCs) },
-            text = {
-                Column(Modifier.fillMaxWidth().fillMaxHeight(0.75f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Živý průběh · ${samples.size} vzorků", style = MaterialTheme.typography.labelMedium)
-                    ResistanceLiveGraph(samples, kind.unit, Modifier.weight(1f).fillMaxWidth())
-                    Text(kind.meaningStatusCs, style = MaterialTheme.typography.bodySmall)
-                }
+        AlertDialog(onDismissRequest = { graphKind = null }, confirmButton = { OutlinedButton(onClick = { graphKind = null }) { Text("Zavřít") } }, title = { Text(kind.displayNameCs) }, text = {
+            Column(Modifier.fillMaxWidth().fillMaxHeight(0.75f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Živý průběh · ${samples.size} vzorků", style = MaterialTheme.typography.labelMedium)
+                ResistanceLiveGraph(samples, kind.unit, Modifier.weight(1f).fillMaxWidth())
+                Text(kind.meaningStatusCs, style = MaterialTheme.typography.bodySmall)
             }
-        )
+        })
     }
 }
 
