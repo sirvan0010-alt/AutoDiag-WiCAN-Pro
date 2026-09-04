@@ -1,1 +1,84 @@
-PLACEHOLDER_VEH
+{
+  "schemaVersion": 1,
+  "vehicles": [
+    {
+      "id": "veh-mitsubishi-outlander-phev",
+      "make": "Mitsubishi",
+      "model": "Outlander PHEV",
+      "generations": [
+        {
+          "id": "my2013",
+          "years": [2013, 2014, 2015, 2016],
+          "regions": ["JAP", "AUS", "EU"],
+          "verification": "UNVERIFIED"
+        },
+        {
+          "id": "my2018-2019",
+          "years": [2018, 2019],
+          "regions": ["USCAN", "JAP", "MEX", "EU"],
+          "verification": "UNVERIFIED"
+        },
+        {
+          "id": "my2020-2021",
+          "years": [2020, 2021],
+          "regions": ["AUS", "THAI", "USCAN", "EU"],
+          "verification": "UNVERIFIED"
+        }
+      ],
+      "powertrain": "PHEV",
+      "vin_hints": ["starts with J or M for some JP/MM models; VIN position 6-7 'GL' observed in scaling rules"],
+      "verification": "UNVERIFIED",
+      "provenance": {
+        "source_id": "src-phev-watchdog-lite-1.9.1",
+        "extracted": "model constants MITSUBISHI_OUTLANDER_PHEV_*"
+      }
+    },
+    {
+      "id": "veh-mitsubishi-eclipse-cross-phev-my2021",
+      "make": "Mitsubishi",
+      "model": "Eclipse Cross PHEV",
+      "years": [2021],
+      "powertrain": "PHEV",
+      "verification": "UNVERIFIED",
+      "provenance": {
+        "source_id": "src-phev-watchdog-lite-1.9.1",
+        "extracted": "MITSUBISHI_ECLIPSE_CROSS_PHEV_MY2021"
+      }
+    },
+    {
+      "id": "veh-hyundai-ioniq-phev",
+      "make": "Hyundai",
+      "model": "Ioniq PHEV",
+      "years": [2017, 2018, 2019, 2020],
+      "powertrain": "PHEV",
+      "vin_hints": ["VIN starting with K (Korean) triggers different current scaling in Watchdog"],
+      "verification": "UNVERIFIED",
+      "provenance": {
+        "source_id": "src-phev-watchdog-lite-1.9.1",
+        "extracted": "HYUNDAI_IONIQ_PHEV_MY2017 / MY2020"
+      }
+    },
+    {
+      "id": "veh-hyundai-santa-fe-phev-my2021",
+      "make": "Hyundai",
+      "model": "Santa Fe PHEV",
+      "years": [2021],
+      "powertrain": "PHEV",
+      "verification": "UNVERIFIED",
+      "provenance": {
+        "source_id": "src-phev-watchdog-lite-1.9.1"
+      }
+    },
+    {
+      "id": "veh-hyundai-tucson-phev-my2021",
+      "make": "Hyundai",
+      "model": "Tucson PHEV",
+      "years": [2021],
+      "powertrain": "PHEV",
+      "verification": "UNVERIFIED",
+      "provenance": {
+        "source_id": "src-phev-watchdog-lite-1.9.1"
+      }
+    }
+  ]
+}
