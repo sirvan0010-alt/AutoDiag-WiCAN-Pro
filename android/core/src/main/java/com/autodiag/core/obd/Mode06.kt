@@ -51,7 +51,7 @@ object Mode06Decoder {
             val max = u16(record[7], record[8])
             ObdMode06TestResult(mid, tid, uasid, value, min, max, Mode06ResultStatus.UNKNOWN)
         }
-        return ObdMode06Report(results.first().obdMid, results, payload.map { it.toByte() }.toByteArray())
+        return ObdMode06Report(results.first().obdMid, results, ByteArray(payload.size) { payload[it].toByte() })
     }
 
     private fun u16(high: Int, low: Int): Int = (high shl 8) or low
