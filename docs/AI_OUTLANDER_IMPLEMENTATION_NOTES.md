@@ -56,7 +56,7 @@ Rozsah kódování je tedy 0–65 535 kΩ (~0–65,5 MΩ).
 
 Tento rozsah je pouze vlastnost kódování. Není to automaticky bezpečný provozní rozsah ani limit výrobce.
 
-Vysvětlení pro uživatele může uvést, že jde o elektrickou izolaci HV systému vůči referenci vozidla/karoserie. Přesná fyzická topologie měření a Mitsubishi servisní limit však nejsou z tohoto zdroje potvrzené.
+Vysvětlení pro uživatele může uvést, že jde o elektrickou izolaci HV systému vůči referenci vozidla/karoserii. Přesná fyzická topologie měření a Mitsubishi servisní limit však nejsou z tohoto zdroje potvrzené.
 
 Nikdy neodvozovat výrobní limit z jednoho komunitního příspěvku nebo z rozsahu 16bitového pole.
 
@@ -94,13 +94,13 @@ Graf musí být schopen zobrazit:
 - stav komunikace,
 - verification state.
 
-Lokální UI historie je pouze vizualizace. Dlouhodobě má být zdrojem pravdy VM/session time-series store, aby navigace/rekompozice neztratila měření.
+Lokální UI historie je zakázaná jako zdroj pravdy. Aktuální implementace používá VM/session history a UI pouze kreslí její snapshot. Tím se při rekompozici nemají vytvářet duplicitní nebo falešné vzorky.
 
 ## 7. Vzorkovací interval ≠ rychlost ECU
 
-Volba 100/250/500/1000/2000/5000 ms určuje požadovanou hustotu ukládání/odběru v AutoDiag.
+Volba 100/250/500/1000/2000/5000 ms určuje požadovaný interval skutečného read-only requestu v runneru.
 
-Nesmí být prezentována jako garance, že ECU odpovídá v tomto intervalu.
+Nesmí být prezentována jako garance, že ECU odpovídá přesně v tomto intervalu.
 
 Skutečná rychlost je omezená minimálně:
 
@@ -112,6 +112,8 @@ ECU response time
 + TCP latency/buffering
 + Android scheduling
 ```
+
+Runner nikdy neposílá další request paralelně s předchozím. Interval začíná až po dokončení předchozího requestu/response zpracování.
 
 Pro pozdější adaptive sampling platí:
 
@@ -204,14 +206,14 @@ Cílem je nezávislá implementace kompatibilního diagnostického chování s e
 
 ## 13. Implementovaná hranice aktivního `21 01` měření
 
-Projekt nyní obsahuje explicitní `OutlanderPhev21LiveMeasurementRunner`.
+Projekt obsahuje explicitní `OutlanderPhev21LiveMeasurementRunner`.
 
 Runner:
 
 - je pouze **read-only**,
-- spouští se explicitně,
+- spouští se explicitně tlačítkem uživatele,
 - používá přesně request `21 01`,
-- respektuje pouze předdefinované intervaly 100/250/500/1000/2000/5000 ms,
+- respektuje předdefinované intervaly 100/250/500/1000/2000/5000 ms,
 - čeká na dokončení předchozího ELM příkazu, takže nevytváří paralelní requesty,
 - zachovává raw request a raw response,
 - při `NO DATA`, timeoutu nebo jiné chybě nevyrábí nulovou hodnotu,
@@ -222,6 +224,27 @@ Runner:
 
 Runner **nepředstírá**, že zná správnou Mitsubishi ECU adresaci. Jeho úkolem je použít již nakonfigurovaný ELM/WiCAN diagnostický kanál a provést source-derived request. Konfigurace transportu/adresace zůstává samostatnou evidence vrstvou.
 
-`OutlanderPhev21ResponseParser` navíc zachovává tříznakový CAN header jako jeden token, pokud jej ELM vrátí. Tím se zachovává kompatibilita s indexy analyzovaného Watchdog parseru. Parser proto není obecný „CAN payload decoder“.
+`OutlanderPhev21ResponseParser` zachovává tříznakový CAN header jako jeden token, pokud jej ELM vrátí. Tím se zachovává kompatibilita s indexy analyzovaného Watchdog parseru. Parser proto není obecný „CAN payload decoder“.
+
+## 14. Aktuální vlastnictví živého měření
+
+Tok v aplikaci je nyní explicitně:
+
+```text
+MainActivity
+  → ConnectionViewModel.startOutlanderLiveMeasurement()
+  → OutlanderPhev21LiveMeasurementRunner
+  → Elm327Session.commandDetailed("21 01")
+  → parser + source-derived decoder
+  → ConnectionViewModel.acceptOutlanderLiveResult()
+  → OutlanderResistanceHistory
+  → ConnectionUiState
+  → OutlanderPhevResistanceCard
+  → živý graf
+```
+
+Změna intervalu v UI už nemění jen hustotu kreslení grafu. Pokud měření běží, VM runner restartuje s novým intervalem. UI nevytváří vlastní vzorky.
+
+Při `disconnect`, chybě připojení nebo zániku ViewModelu se runner zastaví.
 
 Toto je záměrná atypická hranice architektury: **request path může být implementován dříve než definitivní fyzická identifikace ECU**, ale výsledek nesmí být povýšen na `VERIFIED`, dokud není pozorován a potvrzen na skutečném vozidle.
