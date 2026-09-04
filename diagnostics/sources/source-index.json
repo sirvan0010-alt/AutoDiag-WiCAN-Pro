@@ -1,6 +1,15 @@
 {
   "schema_version": 1,
-  "sources": [],
+  "sources": [
+    {
+      "id": "src-phev-watchdog-lite-1.9.1",
+      "type": "community_reverse_engineering",
+      "title": "PHEV Watchdog Lite 1.9.1.2023OCT29",
+      "description": "Independent reverse-engineering of vehicle constants and battery/cell DB schema. No proprietary payloads copied.",
+      "verification": "UNVERIFIED",
+      "accessed": "2026-09-04"
+    }
+  ],
   "rules": {
     "oem": "Official manufacturer documentation has highest priority.",
     "engineering": "Vehicle-specific reproducible engineering evidence is stored separately from OEM material.",
