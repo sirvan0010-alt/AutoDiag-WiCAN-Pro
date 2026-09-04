@@ -47,7 +47,7 @@ class OutlanderPhev21LiveMeasurementRunner(
                 val startedAt = System.currentTimeMillis()
                 val response = session.commandDetailed(REQUEST)
                 if (response.kind == Elm327ResponseKind.POSITIVE) {
-                    runCatching {
+                    val decoded = runCatching {
                         val parsed = OutlanderPhev21ResponseParser.parse(response.normalized)
                         val iso = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(
                             response = parsed,
@@ -71,15 +71,18 @@ class OutlanderPhev21LiveMeasurementRunner(
                             rawResponse = response.raw,
                             verification = OutlanderMeasurementVerification.UNVERIFIED
                         )
-                        Result(startedAt, rawResponse = response.raw, iso, max, min, response.kind)
-                    }.onFailure {
-                        Result(
-                            timestampEpochMs = startedAt,
-                            rawResponse = response.raw,
-                            adapterStatus = response.kind,
-                            error = it.message ?: "Outlander 21 01 decode failed"
-                        )
-                    }.also(onResult)
+                        Result(startedAt, response.raw, iso, max, min, response.kind)
+                    }
+                    onResult(
+                        decoded.getOrElse {
+                            Result(
+                                timestampEpochMs = startedAt,
+                                rawResponse = response.raw,
+                                adapterStatus = response.kind,
+                                error = it.message ?: "Outlander 21 01 decode failed"
+                            )
+                        }
+                    )
                 } else {
                     onResult(
                         Result(
