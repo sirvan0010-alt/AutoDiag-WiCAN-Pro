@@ -100,10 +100,9 @@ class ConnectionViewModel(
         }
         outlanderRunner?.stop()
         val runner = OutlanderPhev21LiveMeasurementRunner(activeSession, viewModelScope) { result ->
-            if (result.isolationResistance != null && result.internalResistanceMax != null && result.internalResistanceMin != null) {
-                acceptOutlanderLiveResult(result)
-            } else {
-                _uiState.update { it.copy(outlanderLastMeasurementError = result.error ?: "21 01 neposkytl dekódovatelný výsledek.") }
+            val acceptedAny = acceptOutlanderLiveResult(result)
+            if (!acceptedAny) {
+                _uiState.update { it.copy(outlanderLastMeasurementError = result.error ?: "21 01 neposkytl žádnou dekódovatelnou hodnotu.") }
             }
         }
         outlanderRunner = runner
@@ -117,18 +116,28 @@ class ConnectionViewModel(
         _uiState.update { it.copy(outlanderLiveMeasurementActive = false) }
     }
 
-    private fun acceptOutlanderLiveResult(result: OutlanderPhev21LiveMeasurementRunner.Result) {
-        val isolation = result.isolationResistance ?: return
-        val maxMeasurement = result.internalResistanceMax ?: return
-        val minMeasurement = result.internalResistanceMin ?: return
-        isolationHistory.add(OutlanderResistanceSample(result.timestampEpochMs, isolation.value, isolation.verification))
-        internalMaxHistory.add(OutlanderResistanceSample(result.timestampEpochMs, maxMeasurement.value, maxMeasurement.verification))
-        internalMinHistory.add(OutlanderResistanceSample(result.timestampEpochMs, minMeasurement.value, minMeasurement.verification))
-        _uiState.update {
-            it.copy(
-                outlanderIsolation = it.outlanderIsolation.accept(isolation),
-                outlanderInternalResistanceMax = it.outlanderInternalResistanceMax.accept(maxMeasurement),
-                outlanderInternalResistanceMin = it.outlanderInternalResistanceMin.accept(minMeasurement),
+    /**
+     * Accept each decoded 21 01 signal independently. A missing signal must
+     * not discard other signals decoded from the same response.
+     */
+    private fun acceptOutlanderLiveResult(result: OutlanderPhev21LiveMeasurementRunner.Result): Boolean {
+        val isolation = result.isolationResistance
+        val maxMeasurement = result.internalResistanceMax
+        val minMeasurement = result.internalResistanceMin
+
+        if (isolation == null && maxMeasurement == null && minMeasurement == null) {
+            return false
+        }
+
+        isolation?.let { isolationHistory.add(OutlanderResistanceSample(result.timestampEpochMs, it.value, it.verification)) }
+        maxMeasurement?.let { internalMaxHistory.add(OutlanderResistanceSample(result.timestampEpochMs, it.value, it.verification)) }
+        minMeasurement?.let { internalMinHistory.add(OutlanderResistanceSample(result.timestampEpochMs, it.value, it.verification)) }
+
+        _uiState.update { state ->
+            state.copy(
+                outlanderIsolation = isolation?.let { state.outlanderIsolation.accept(it) } ?: state.outlanderIsolation,
+                outlanderInternalResistanceMax = maxMeasurement?.let { state.outlanderInternalResistanceMax.accept(it) } ?: state.outlanderInternalResistanceMax,
+                outlanderInternalResistanceMin = minMeasurement?.let { state.outlanderInternalResistanceMin.accept(it) } ?: state.outlanderInternalResistanceMin,
                 outlanderIsolationHistory = isolationHistory.snapshot(),
                 outlanderInternalMaxHistory = internalMaxHistory.snapshot(),
                 outlanderInternalMinHistory = internalMinHistory.snapshot(),
@@ -137,6 +146,7 @@ class ConnectionViewModel(
                 outlanderLastMeasurementError = null
             )
         }
+        return true
     }
 
     /**
