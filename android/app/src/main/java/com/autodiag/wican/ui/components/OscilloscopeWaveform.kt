@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -34,8 +35,8 @@ fun OscilloscopeWaveform(
         val width = size.width
         val height = size.height
         val centerY = height / 2f
-        val halfVisibleAmplitude = config.visibleAmplitudeVolts / 2.0
-        val visibleDuration = config.visibleDurationNanos
+        val halfVisibleAmplitude = config.visibleAmplitudeVolts() / 2.0
+        val visibleDuration = config.visibleDurationNanos()
 
         fun xFor(sample: OscilloscopeSample): Float {
             val relative = sample.timestampNanos - config.horizontalOffsetNanos
@@ -52,6 +53,7 @@ fun OscilloscopeWaveform(
         for (i in 0..config.gridDivisionsX) {
             val x = width * i / config.gridDivisionsX
             drawLine(
+                color = Color.Gray,
                 start = Offset(x, 0f),
                 end = Offset(x, height),
                 strokeWidth = gridStroke.width,
@@ -60,6 +62,7 @@ fun OscilloscopeWaveform(
         for (i in 0..config.gridDivisionsY) {
             val y = height * i / config.gridDivisionsY
             drawLine(
+                color = Color.Gray,
                 start = Offset(0f, y),
                 end = Offset(width, y),
                 strokeWidth = gridStroke.width,
@@ -75,6 +78,7 @@ fun OscilloscopeWaveform(
         if (!path.isEmpty) {
             drawPath(
                 path = path,
+                color = Color.Black,
                 style = Stroke(width = 3f, cap = StrokeCap.Round),
             )
         }
