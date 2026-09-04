@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class OutlanderPhevCapabilityResolverTest {
     private val vehicle = VehicleDataDefinition(
-        vin = "JA4TESTOUTLANDERPHEV01",
+        vin = "JA4TESTPHEV123456",
         make = "Mitsubishi",
         model = "Outlander PHEV",
         verification = VerificationState.UNVERIFIED,
