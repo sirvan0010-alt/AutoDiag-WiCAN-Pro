@@ -159,16 +159,49 @@ class ConnectionViewModel(
         ecuIdentity: EcuDataIdentity? = null,
         rawResponse: String? = null
     ) {
-        runCatching {
-            val isolation = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(response, timestampEpochMs, ecuIdentity, "21 01", rawResponse)
-            val maxRaw = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(response)
-            val minRaw = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(response)
-            val maxMeasurement = OutlanderResistanceMeasurement(OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED, maxRaw, timestampEpochMs, ecuIdentity, "21 01", rawResponse, com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED)
-            val minMeasurement = OutlanderResistanceMeasurement(OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED, minRaw, timestampEpochMs, ecuIdentity, "21 01", rawResponse, com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED)
-            isolationHistory.add(OutlanderResistanceSample(timestampEpochMs, isolation.value, isolation.verification))
-            internalMaxHistory.add(OutlanderResistanceSample(timestampEpochMs, maxRaw, com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED))
-            internalMinHistory.add(OutlanderResistanceSample(timestampEpochMs, minRaw, com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED))
-            _uiState.update { it.copy(outlanderIsolation = it.outlanderIsolation.accept(isolation), outlanderInternalResistanceMax = it.outlanderInternalResistanceMax.accept(maxMeasurement), outlanderInternalResistanceMin = it.outlanderInternalResistanceMin.accept(minMeasurement), outlanderIsolationHistory = isolationHistory.snapshot(), outlanderInternalMaxHistory = internalMaxHistory.snapshot(), outlanderInternalMinHistory = internalMinHistory.snapshot(), outlanderExpertRequest = isolation.rawRequest, outlanderExpertResponse = isolation.rawResponse) }
+        val isolation = runCatching {
+            OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(response, timestampEpochMs, ecuIdentity, "21 01", rawResponse)
+        }.getOrNull()
+        val maxMeasurement = runCatching {
+            OutlanderResistanceMeasurement(
+                kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED,
+                value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(response),
+                timestampEpochMs = timestampEpochMs,
+                ecuIdentity = ecuIdentity,
+                rawRequest = "21 01",
+                rawResponse = rawResponse,
+                verification = com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED
+            )
+        }.getOrNull()
+        val minMeasurement = runCatching {
+            OutlanderResistanceMeasurement(
+                kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED,
+                value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(response),
+                timestampEpochMs = timestampEpochMs,
+                ecuIdentity = ecuIdentity,
+                rawRequest = "21 01",
+                rawResponse = rawResponse,
+                verification = com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED
+            )
+        }.getOrNull()
+
+        isolation?.let { isolationHistory.add(OutlanderResistanceSample(timestampEpochMs, it.value, it.verification)) }
+        maxMeasurement?.let { internalMaxHistory.add(OutlanderResistanceSample(timestampEpochMs, it.value, it.verification)) }
+        minMeasurement?.let { internalMinHistory.add(OutlanderResistanceSample(timestampEpochMs, it.value, it.verification)) }
+
+        if (isolation == null && maxMeasurement == null && minMeasurement == null) return
+
+        _uiState.update { state ->
+            state.copy(
+                outlanderIsolation = isolation?.let { state.outlanderIsolation.accept(it) } ?: state.outlanderIsolation,
+                outlanderInternalResistanceMax = maxMeasurement?.let { state.outlanderInternalResistanceMax.accept(it) } ?: state.outlanderInternalResistanceMax,
+                outlanderInternalResistanceMin = minMeasurement?.let { state.outlanderInternalResistanceMin.accept(it) } ?: state.outlanderInternalResistanceMin,
+                outlanderIsolationHistory = isolationHistory.snapshot(),
+                outlanderInternalMaxHistory = internalMaxHistory.snapshot(),
+                outlanderInternalMinHistory = internalMinHistory.snapshot(),
+                outlanderExpertRequest = "21 01",
+                outlanderExpertResponse = rawResponse
+            )
         }
     }
 
