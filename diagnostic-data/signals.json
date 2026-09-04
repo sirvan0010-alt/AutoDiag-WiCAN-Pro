@@ -1,1 +1,187 @@
-PLACEHOLDER
+{
+  "schemaVersion": 1,
+  "signals": [
+    {
+      "id": "sig-battery-soc",
+      "name": "Battery SOC",
+      "unit": "%",
+      "category": "battery_pack",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "BATTERY_SOC", "notes": "DB/UI field from PHEV Watchdog Lite. No transport mapping yet."}
+    },
+    {
+      "id": "sig-battery-soh",
+      "name": "Battery SOH",
+      "unit": "%",
+      "category": "battery_pack",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "BATTERY_SOH"}
+    },
+    {
+      "id": "sig-battery-capacity",
+      "name": "Battery capacity",
+      "unit": "Ah",
+      "category": "battery_pack",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "BATTERY_CAPACITY"}
+    },
+    {
+      "id": "sig-battery-voltage",
+      "name": "Battery pack voltage",
+      "unit": "V",
+      "category": "battery_pack",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "BATTERY_VOLTAGE"}
+    },
+    {
+      "id": "sig-battery-current",
+      "name": "Battery pack current",
+      "unit": "A",
+      "category": "battery_pack",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "BATTERY_CURRENT", "notes": "Korean VIN (K…) may use ÷10 scaling in Watchdog"}
+    },
+    {
+      "id": "sig-battery-max-out-power",
+      "name": "Battery max output power",
+      "unit": "kW",
+      "category": "battery_pack",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "BATTERY_MAX_OUT_POWER"}
+    },
+    {
+      "id": "sig-battery-max-in-power",
+      "name": "Battery max input power",
+      "unit": "kW",
+      "category": "battery_pack",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "BATTERY_MAX_IN_POWER"}
+    },
+    {
+      "id": "sig-cell-voltage-min",
+      "name": "Cell min voltage",
+      "unit": "V",
+      "category": "battery_cell",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "CELL_MIN_VOLTAGE"}
+    },
+    {
+      "id": "sig-cell-voltage-max",
+      "name": "Cell max voltage",
+      "unit": "V",
+      "category": "battery_cell",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "CELL_MAX_VOLTAGE"}
+    },
+    {
+      "id": "sig-cell-voltage-diff-max",
+      "name": "Cell max voltage difference",
+      "unit": "V",
+      "category": "battery_cell",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "CELL_MAX_DIF_VOLT"}
+    },
+    {
+      "id": "sig-cell-voltages-1-80",
+      "name": "Individual cell voltages (1…80)",
+      "unit": "V",
+      "category": "battery_cell",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "cell_count_max": 80,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_names": ["CELL_VOLTAGE_01", "…", "CELL_VOLTAGE_80"], "notes": "Watchdog stores up to 80 cell voltages. Topology unknown."}
+    },
+    {
+      "id": "sig-module-temperatures",
+      "name": "Module temperatures (MODULE_xx_TEMP_yy)",
+      "unit": "°C",
+      "category": "battery_thermal",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "modules_observed": "≥6 modules × ≤5 sensors",
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_names": ["MODULE_01_TEMP_01", "…", "MODULE_06_TEMP_05", "MODULE_MAX_TEMP", "MODULE_MIN_TEMP", "AVG_MODULE_TEMP"]}
+    },
+    {
+      "id": "sig-tot-consumed-kwh",
+      "name": "Total consumed energy",
+      "unit": "kWh",
+      "category": "trip_energy",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "TOT_CONSUMED_KWH"}
+    },
+    {
+      "id": "sig-tot-regenerated-ah",
+      "name": "Total regenerated charge",
+      "unit": "Ah",
+      "category": "trip_energy",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "TOT_REGENERATED_AH"}
+    },
+    {
+      "id": "sig-pct-fuel-level",
+      "name": "Fuel level",
+      "unit": "%",
+      "category": "fuel",
+      "vehicle_ids": ["veh-mitsubishi-outlander-phev", "veh-mitsubishi-eclipse-cross-phev-my2021", "veh-hyundai-ioniq-phev", "veh-hyundai-santa-fe-phev-my2021", "veh-hyundai-tucson-phev-my2021"],
+      "request": null,
+      "decoder": null,
+      "verification": "UNVERIFIED",
+      "capability_state": "UNVERIFIED",
+      "provenance": {"source_id": "src-phev-watchdog-lite-1.9.1", "field_name": "PCT_FUEL_LEVEL"}
+    }
+  ]
+}
