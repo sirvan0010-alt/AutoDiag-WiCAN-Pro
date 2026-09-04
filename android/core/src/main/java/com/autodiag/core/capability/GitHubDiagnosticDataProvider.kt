@@ -1,5 +1,7 @@
 package com.autodiag.core.capability
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -66,10 +68,15 @@ class UrlConnectionDiagnosticDataHttpClient(private val connectTimeoutMs: Int = 
     override fun get(url: String): String {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
-            c.requestMethod = "GET"; c.connectTimeout = connectTimeoutMs; c.readTimeout = readTimeoutMs
+            c.requestMethod = "GET"
+            c.connectTimeout = connectTimeoutMs
+            c.readTimeout = readTimeoutMs
             c.setRequestProperty("Accept", "application/json")
             if (c.responseCode !in 200..299) throw IllegalStateException("Diagnostic data HTTP ${c.responseCode}")
             return BufferedReader(InputStreamReader(c.inputStream, Charsets.UTF_8)).use { it.readText() }
         } finally { c.disconnect() }
     }
 }
+
+/** Execute a provider lookup without blocking the caller thread. */
+suspend fun <T> diagnosticDataIo(block: suspend () -> T): T = withContext(Dispatchers.IO, block)
