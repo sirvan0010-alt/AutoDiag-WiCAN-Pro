@@ -201,3 +201,27 @@ Pokud některá část není ověřitelná, označit ji `BLOCKED` nebo `UNVERIFI
 Primárním zdrojem současných Outlander candidate decoderů je reverse engineering PHEV Watchdog APK uložený v diagnostic-data workflow. Zdrojové názvy a formule se zachovávají jako provenance; proprietární APK/binary se do AutoDiag nekopíruje.
 
 Cílem je nezávislá implementace kompatibilního diagnostického chování s explicitním původem a verification state.
+
+## 13. Implementovaná hranice aktivního `21 01` měření
+
+Projekt nyní obsahuje explicitní `OutlanderPhev21LiveMeasurementRunner`.
+
+Runner:
+
+- je pouze **read-only**,
+- spouští se explicitně,
+- používá přesně request `21 01`,
+- respektuje pouze předdefinované intervaly 100/250/500/1000/2000/5000 ms,
+- čeká na dokončení předchozího ELM příkazu, takže nevytváří paralelní requesty,
+- zachovává raw request a raw response,
+- při `NO DATA`, timeoutu nebo jiné chybě nevyrábí nulovou hodnotu,
+- při krátké/neplatné odpovědi vrací chybu místo falešného měření,
+- nepřidává `ATSH`, ECU adresu ani CAN ID.
+
+### Důležitá hranice
+
+Runner **nepředstírá**, že zná správnou Mitsubishi ECU adresaci. Jeho úkolem je použít již nakonfigurovaný ELM/WiCAN diagnostický kanál a provést source-derived request. Konfigurace transportu/adresace zůstává samostatnou evidence vrstvou.
+
+`OutlanderPhev21ResponseParser` navíc zachovává tříznakový CAN header jako jeden token, pokud jej ELM vrátí. Tím se zachovává kompatibilita s indexy analyzovaného Watchdog parseru. Parser proto není obecný „CAN payload decoder“.
+
+Toto je záměrná atypická hranice architektury: **request path může být implementován dříve než definitivní fyzická identifikace ECU**, ale výsledek nesmí být povýšen na `VERIFIED`, dokud není pozorován a potvrzen na skutečném vozidle.
