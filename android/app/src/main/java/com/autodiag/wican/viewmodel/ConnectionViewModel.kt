@@ -9,6 +9,7 @@ import com.autodiag.core.capability.CapabilityDiscovery
 import com.autodiag.core.capability.CapabilitySnapshot
 import com.autodiag.core.capability.EcuDataIdentity
 import com.autodiag.core.capability.OutlanderLiveSamplingSettings
+import com.autodiag.core.capability.OutlanderPhev21LiveMeasurementRunner
 import com.autodiag.core.capability.OutlanderPhevResistanceDecoder
 import com.autodiag.core.capability.OutlanderResistanceHistory
 import com.autodiag.core.capability.OutlanderResistanceKind
@@ -53,6 +54,8 @@ data class ConnectionUiState(
     val outlanderInternalMaxHistory: List<OutlanderResistanceSample> = emptyList(),
     val outlanderInternalMinHistory: List<OutlanderResistanceSample> = emptyList(),
     val outlanderSamplingSettings: OutlanderLiveSamplingSettings = OutlanderLiveSamplingSettings(),
+    val outlanderLiveMeasurementActive: Boolean = false,
+    val outlanderLastMeasurementError: String? = null,
     val outlanderExpertRequest: String? = null,
     val outlanderExpertResponse: String? = null
 )
@@ -72,6 +75,7 @@ class ConnectionViewModel(
     private var metricsJob: Job? = null
     private var rawCanStream: SlcanCanFrameStream? = null
     private var rawCanJob: Job? = null
+    private var outlanderRunner: OutlanderPhev21LiveMeasurementRunner? = null
 
     fun connectElm327(host: String, port: Int = 3333) = connect(host, port, TransportMode.ELM327, true)
     fun connectSlcan(host: String, port: Int = 23) = connect(host, port, TransportMode.SLCAN_RAW, false)
@@ -82,6 +86,57 @@ class ConnectionViewModel(
     fun setOutlanderSamplingInterval(intervalMs: Long) {
         require(intervalMs in OutlanderLiveSamplingSettings.OPTIONS_MS)
         _uiState.update { it.copy(outlanderSamplingSettings = it.outlanderSamplingSettings.copy(intervalMs = intervalMs)) }
+        if (_uiState.value.outlanderLiveMeasurementActive) startOutlanderLiveMeasurement()
+    }
+
+    fun startOutlanderLiveMeasurement() {
+        val activeSession = session ?: run {
+            _uiState.update { it.copy(outlanderLastMeasurementError = "Aktivní měření vyžaduje připojený ELM327 transport.") }
+            return
+        }
+        if (_uiState.value.mode != TransportMode.ELM327 && _uiState.value.mode != TransportMode.SIMULATOR) {
+            _uiState.update { it.copy(outlanderLastMeasurementError = "Aktivní 21 01 měření je dostupné pouze přes ELM327 transport.") }
+            return
+        }
+        outlanderRunner?.stop()
+        val runner = OutlanderPhev21LiveMeasurementRunner(activeSession, viewModelScope) { result ->
+            if (result.isolationResistance != null && result.internalResistanceMax != null && result.internalResistanceMin != null) {
+                acceptOutlanderLiveResult(result)
+            } else {
+                _uiState.update { it.copy(outlanderLastMeasurementError = result.error ?: "21 01 neposkytl dekódovatelný výsledek.") }
+            }
+        }
+        outlanderRunner = runner
+        _uiState.update { it.copy(outlanderLiveMeasurementActive = true, outlanderLastMeasurementError = null) }
+        runner.start(_uiState.value.outlanderSamplingSettings.intervalMs)
+    }
+
+    fun stopOutlanderLiveMeasurement() {
+        outlanderRunner?.stop()
+        outlanderRunner = null
+        _uiState.update { it.copy(outlanderLiveMeasurementActive = false) }
+    }
+
+    private fun acceptOutlanderLiveResult(result: OutlanderPhev21LiveMeasurementRunner.Result) {
+        val isolation = result.isolationResistance ?: return
+        val maxMeasurement = result.internalResistanceMax ?: return
+        val minMeasurement = result.internalResistanceMin ?: return
+        isolationHistory.add(OutlanderResistanceSample(result.timestampEpochMs, isolation.value, isolation.verification))
+        internalMaxHistory.add(OutlanderResistanceSample(result.timestampEpochMs, maxMeasurement.value, maxMeasurement.verification))
+        internalMinHistory.add(OutlanderResistanceSample(result.timestampEpochMs, minMeasurement.value, minMeasurement.verification))
+        _uiState.update {
+            it.copy(
+                outlanderIsolation = it.outlanderIsolation.accept(isolation),
+                outlanderInternalResistanceMax = it.outlanderInternalResistanceMax.accept(maxMeasurement),
+                outlanderInternalResistanceMin = it.outlanderInternalResistanceMin.accept(minMeasurement),
+                outlanderIsolationHistory = isolationHistory.snapshot(),
+                outlanderInternalMaxHistory = internalMaxHistory.snapshot(),
+                outlanderInternalMinHistory = internalMinHistory.snapshot(),
+                outlanderExpertRequest = result.rawRequest,
+                outlanderExpertResponse = result.rawResponse,
+                outlanderLastMeasurementError = null
+            )
+        }
     }
 
     /**
@@ -95,36 +150,15 @@ class ConnectionViewModel(
         rawResponse: String? = null
     ) {
         runCatching {
-            val isolation = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(
-                response, timestampEpochMs, ecuIdentity, "21 01", rawResponse
-            )
+            val isolation = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(response, timestampEpochMs, ecuIdentity, "21 01", rawResponse)
             val maxRaw = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(response)
             val minRaw = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(response)
-            val maxMeasurement = OutlanderResistanceMeasurement(
-                OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED,
-                maxRaw, timestampEpochMs, ecuIdentity, "21 01", rawResponse,
-                com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED
-            )
-            val minMeasurement = OutlanderResistanceMeasurement(
-                OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED,
-                minRaw, timestampEpochMs, ecuIdentity, "21 01", rawResponse,
-                com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED
-            )
+            val maxMeasurement = OutlanderResistanceMeasurement(OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED, maxRaw, timestampEpochMs, ecuIdentity, "21 01", rawResponse, com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED)
+            val minMeasurement = OutlanderResistanceMeasurement(OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED, minRaw, timestampEpochMs, ecuIdentity, "21 01", rawResponse, com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED)
             isolationHistory.add(OutlanderResistanceSample(timestampEpochMs, isolation.value, isolation.verification))
             internalMaxHistory.add(OutlanderResistanceSample(timestampEpochMs, maxRaw, com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED))
             internalMinHistory.add(OutlanderResistanceSample(timestampEpochMs, minRaw, com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED))
-            _uiState.update {
-                it.copy(
-                    outlanderIsolation = it.outlanderIsolation.accept(isolation),
-                    outlanderInternalResistanceMax = it.outlanderInternalResistanceMax.accept(maxMeasurement),
-                    outlanderInternalResistanceMin = it.outlanderInternalResistanceMin.accept(minMeasurement),
-                    outlanderIsolationHistory = isolationHistory.snapshot(),
-                    outlanderInternalMaxHistory = internalMaxHistory.snapshot(),
-                    outlanderInternalMinHistory = internalMinHistory.snapshot(),
-                    outlanderExpertRequest = isolation.rawRequest,
-                    outlanderExpertResponse = isolation.rawResponse
-                )
-            }
+            _uiState.update { it.copy(outlanderIsolation = it.outlanderIsolation.accept(isolation), outlanderInternalResistanceMax = it.outlanderInternalResistanceMax.accept(maxMeasurement), outlanderInternalResistanceMin = it.outlanderInternalResistanceMin.accept(minMeasurement), outlanderIsolationHistory = isolationHistory.snapshot(), outlanderInternalMaxHistory = internalMaxHistory.snapshot(), outlanderInternalMinHistory = internalMinHistory.snapshot(), outlanderExpertRequest = isolation.rawRequest, outlanderExpertResponse = isolation.rawResponse) }
         }
     }
 
@@ -135,76 +169,53 @@ class ConnectionViewModel(
 
     private fun observeMetrics(t: WiCanTransport) {
         metricsJob?.cancel()
-        metricsJob = viewModelScope.launch {
-            t.metrics.collect { metrics ->
-                _uiState.update { it.copy(transportMetrics = metrics, transportState = t.state) }
-            }
-        }
+        metricsJob = viewModelScope.launch { t.metrics.collect { metrics -> _uiState.update { it.copy(transportMetrics = metrics, transportState = t.state) } } }
     }
 
     private fun startRawCanMonitor(t: WiCanTransport) {
-        rawCanStream?.stop()
-        rawCanJob?.cancel()
-        rawCanStream = SlcanCanFrameStream(t, viewModelScope)
-        rawCanJob = viewModelScope.launch {
-            rawCanStream!!.frames.collect { frame ->
-                _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.onFrame(frame)) }
-            }
-        }
+        rawCanStream?.stop(); rawCanJob?.cancel(); rawCanStream = SlcanCanFrameStream(t, viewModelScope)
+        rawCanJob = viewModelScope.launch { rawCanStream!!.frames.collect { frame -> _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.onFrame(frame)) } } }
     }
 
     private fun stopRawCanMonitor() {
-        rawCanJob?.cancel(); rawCanJob = null
-        rawCanStream?.stop(); rawCanStream = null
+        rawCanJob?.cancel(); rawCanJob = null; rawCanStream?.stop(); rawCanStream = null
     }
 
     private fun connect(host: String, port: Int, mode: TransportMode, runDiscovery: Boolean) {
-        job?.cancel(); metricsJob?.cancel(); stopRawCanMonitor()
+        job?.cancel(); metricsJob?.cancel(); stopRawCanMonitor(); stopOutlanderLiveMeasurement()
         job = viewModelScope.launch {
-            _uiState.value = ConnectionUiState(
-                phase = ConnectionPhase.CONNECTING,
-                mode = mode,
-                host = host,
-                port = port,
-                linkOnly = !runDiscovery
-            )
+            _uiState.value = ConnectionUiState(phase = ConnectionPhase.CONNECTING, mode = mode, host = host, port = port, linkOnly = !runDiscovery)
             runCatching {
                 if (mode != TransportMode.SIMULATOR) require(host.isNotBlank()) { "IP adresa není vyplněna." }
                 runCatching { session?.close() }; runCatching { transport?.disconnect() }
-                val t = transportFor(mode)
-                transport = t
-                observeMetrics(t)
+                val t = transportFor(mode); transport = t; observeMetrics(t)
                 t.connect(TransportConfig(host = host, port = port, mode = mode, autoReconnect = mode != TransportMode.SIMULATOR)).getOrThrow()
                 _uiState.update { it.copy(transportState = t.state) }
                 if (!runDiscovery) {
-                    startRawCanMonitor(t)
-                    _uiState.update { it.copy(phase = ConnectionPhase.READY, errorMessage = null, snapshot = null, linkOnly = true, transportState = t.state) }
-                    return@runCatching
+                    startRawCanMonitor(t); _uiState.update { it.copy(phase = ConnectionPhase.READY, errorMessage = null, snapshot = null, linkOnly = true, transportState = t.state) }; return@runCatching
                 }
                 _uiState.update { it.copy(phase = ConnectionPhase.INITIALIZING_ELM) }
-                val s = Elm327Session(t)
-                session = s
-                s.initialize().getOrThrow()
+                val s = Elm327Session(t); session = s; s.initialize().getOrThrow()
                 _uiState.update { it.copy(phase = ConnectionPhase.DISCOVERING_CAPABILITIES) }
                 val snap = discovery.run(s)
                 _uiState.update { it.copy(phase = ConnectionPhase.READY, snapshot = snap, errorMessage = null, linkOnly = false, transportState = t.state) }
             }.onFailure { err ->
                 _uiState.update { it.copy(phase = ConnectionPhase.ERROR, errorMessage = humanize(err), snapshot = null, transportState = transport?.state) }
-                stopRawCanMonitor(); runCatching { session?.close() }; runCatching { transport?.disconnect() }
+                stopOutlanderLiveMeasurement(); stopRawCanMonitor(); runCatching { session?.close() }; runCatching { transport?.disconnect() }
                 session = null; transport = null; metricsJob?.cancel()
             }
         }
     }
 
     fun disconnect() {
-        job?.cancel(); metricsJob?.cancel(); stopRawCanMonitor()
+        job?.cancel(); metricsJob?.cancel(); stopOutlanderLiveMeasurement(); stopRawCanMonitor()
         viewModelScope.launch {
             runCatching { session?.close() }; runCatching { transport?.disconnect() }
             session = null; transport = null; _uiState.value = ConnectionUiState()
         }
     }
 
-    override fun onCleared() { stopRawCanMonitor(); super.onCleared() }
+    override fun onCleared() { stopOutlanderLiveMeasurement(); stopRawCanMonitor(); super.onCleared() }
 
     private fun humanize(t: Throwable): String {
         val msg = t.message?.lowercase().orEmpty()
@@ -220,8 +231,7 @@ class ConnectionViewModel(
     class Factory : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            require(modelClass.isAssignableFrom(ConnectionViewModel::class.java))
-            return ConnectionViewModel() as T
+            require(modelClass.isAssignableFrom(ConnectionViewModel::class.java)); return ConnectionViewModel() as T
         }
     }
 }
