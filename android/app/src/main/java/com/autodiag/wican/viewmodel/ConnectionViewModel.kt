@@ -7,6 +7,10 @@ import com.autodiag.core.can.RawCanMonitorState
 import com.autodiag.core.can.SlcanCanFrameStream
 import com.autodiag.core.capability.CapabilityDiscovery
 import com.autodiag.core.capability.CapabilitySnapshot
+import com.autodiag.core.capability.OutlanderPhevResistanceDecoder
+import com.autodiag.core.capability.OutlanderResistanceMeasurement
+import com.autodiag.core.capability.OutlanderResistanceSessionStats
+import com.autodiag.core.capability.OutlanderResistanceKind
 import com.autodiag.core.obd.Elm327Session
 import com.autodiag.core.transport.ConnectionState
 import com.autodiag.core.transport.SimulatorWiCanTransport
@@ -46,7 +50,11 @@ data class ConnectionUiState(
     val linkOnly: Boolean = false,
     val transportState: ConnectionState? = null,
     val transportMetrics: TransportMetrics = TransportMetrics(),
-    val rawCanMonitor: RawCanMonitorState = RawCanMonitorState()
+    val rawCanMonitor: RawCanMonitorState = RawCanMonitorState(),
+    val outlanderIsolation: OutlanderResistanceSessionStats = OutlanderResistanceSessionStats(OutlanderResistanceKind.HV_ISOLATION_RESISTANCE),
+    val outlanderInternalResistance: OutlanderResistanceSessionStats = OutlanderResistanceSessionStats(OutlanderResistanceKind.INTERNAL_BATTERY_RESISTANCE),
+    val outlanderExpertRequest: String? = null,
+    val outlanderExpertResponse: String? = null
 )
 
 /** ELM327 performs discovery; SLCAN establishes a raw TCP link and can feed the live CAN monitor. */
@@ -72,6 +80,43 @@ class ConnectionViewModel(
     fun toggleRawCanPause() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(paused = !it.rawCanMonitor.paused)) }
     fun clearRawCan() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.clear()) }
 
+    /** Feed a source-normalized Watchdog-style 21 01 response into the Outlander live-data state. */
+    fun ingestOutlanderBatteryResponse(
+        response: IntArray,
+        timestampEpochMs: Long,
+        ecuIdentity: com.autodiag.core.capability.EcuDataIdentity? = null,
+        rawResponse: String? = null
+    ) {
+        runCatching {
+            val measurement = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(
+                response, timestampEpochMs, ecuIdentity, "21 01", rawResponse
+            )
+            _uiState.update {
+                it.copy(
+                    outlanderIsolation = it.outlanderIsolation.accept(measurement),
+                    outlanderExpertRequest = measurement.rawRequest,
+                    outlanderExpertResponse = measurement.rawResponse
+                )
+            }
+        }
+    }
+
+    fun ingestOutlanderInternalResistance(
+        maximumMegohm: Double,
+        minimumMegohm: Double,
+        timestampEpochMs: Long,
+        ecuIdentity: com.autodiag.core.capability.EcuDataIdentity? = null,
+        rawRequest: String? = "21 01",
+        rawResponse: String? = null
+    ) {
+        val kind = OutlanderResistanceKind.INTERNAL_BATTERY_RESISTANCE
+        _uiState.update {
+            val max = OutlanderResistanceMeasurement(kind, maximumMegohm, timestampEpochMs, ecuIdentity, rawRequest, rawResponse, com.autodiag.core.capability.OutlanderMeasurementVerification.PARTIALLY_VERIFIED)
+            val min = OutlanderResistanceMeasurement(kind, minimumMegohm, timestampEpochMs, ecuIdentity, rawRequest, rawResponse, com.autodiag.core.capability.OutlanderMeasurementVerification.PARTIALLY_VERIFIED)
+            it.copy(outlanderInternalResistance = it.outlanderInternalResistance.accept(max).accept(min))
+        }
+    }
+
     private fun transportFor(mode: TransportMode): WiCanTransport = when (mode) {
         TransportMode.SIMULATOR -> SimulatorWiCanTransport()
         TransportMode.ELM327, TransportMode.SLCAN_RAW -> transportFactory()
@@ -80,128 +125,55 @@ class ConnectionViewModel(
     private fun observeMetrics(t: WiCanTransport) {
         metricsJob?.cancel()
         metricsJob = viewModelScope.launch {
-            t.metrics.collect { metrics ->
-                _uiState.update { it.copy(transportMetrics = metrics, transportState = t.state) }
-            }
+            t.metrics.collect { metrics -> _uiState.update { it.copy(transportMetrics = metrics, transportState = t.state) } }
         }
     }
 
     private fun startRawCanMonitor(t: WiCanTransport) {
-        rawCanStream?.stop()
-        rawCanJob?.cancel()
+        rawCanStream?.stop(); rawCanJob?.cancel()
         rawCanStream = SlcanCanFrameStream(t, viewModelScope)
-        rawCanJob = viewModelScope.launch {
-            rawCanStream!!.frames.collect { frame ->
-                _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.onFrame(frame)) }
-            }
-        }
+        rawCanJob = viewModelScope.launch { rawCanStream!!.frames.collect { frame -> _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.onFrame(frame)) } } }
     }
 
-    private fun stopRawCanMonitor() {
-        rawCanJob?.cancel()
-        rawCanJob = null
-        rawCanStream?.stop()
-        rawCanStream = null
-    }
+    private fun stopRawCanMonitor() { rawCanJob?.cancel(); rawCanJob = null; rawCanStream?.stop(); rawCanStream = null }
 
     private fun connect(host: String, port: Int, mode: TransportMode, runDiscovery: Boolean) {
-        job?.cancel()
-        metricsJob?.cancel()
-        stopRawCanMonitor()
+        job?.cancel(); metricsJob?.cancel(); stopRawCanMonitor()
         job = viewModelScope.launch {
-            _uiState.value = ConnectionUiState(
-                phase = ConnectionPhase.CONNECTING,
-                mode = mode,
-                host = host,
-                port = port,
-                linkOnly = !runDiscovery
-            )
+            _uiState.value = ConnectionUiState(phase = ConnectionPhase.CONNECTING, mode = mode, host = host, port = port, linkOnly = !runDiscovery)
             runCatching {
-                if (mode != TransportMode.SIMULATOR) {
-                    require(host.isNotBlank()) { "IP adresa není vyplněna." }
-                }
-                runCatching { session?.close() }
-                runCatching { transport?.disconnect() }
-
-                val t = transportFor(mode)
-                transport = t
-                observeMetrics(t)
-                t.connect(
-                    TransportConfig(
-                        host = host,
-                        port = port,
-                        mode = mode,
-                        autoReconnect = mode != TransportMode.SIMULATOR
-                    )
-                ).getOrThrow()
+                if (mode != TransportMode.SIMULATOR) require(host.isNotBlank()) { "IP adresa není vyplněna." }
+                runCatching { session?.close() }; runCatching { transport?.disconnect() }
+                val t = transportFor(mode); transport = t; observeMetrics(t)
+                t.connect(TransportConfig(host = host, port = port, mode = mode, autoReconnect = mode != TransportMode.SIMULATOR)).getOrThrow()
                 _uiState.update { it.copy(transportState = t.state) }
-
                 if (!runDiscovery) {
                     startRawCanMonitor(t)
-                    _uiState.update {
-                        it.copy(
-                            phase = ConnectionPhase.READY,
-                            errorMessage = null,
-                            snapshot = null,
-                            linkOnly = true,
-                            transportState = t.state
-                        )
-                    }
+                    _uiState.update { it.copy(phase = ConnectionPhase.READY, errorMessage = null, snapshot = null, linkOnly = true, transportState = t.state) }
                     return@runCatching
                 }
-
                 _uiState.update { it.copy(phase = ConnectionPhase.INITIALIZING_ELM) }
-                val s = Elm327Session(t)
-                session = s
-                s.initialize().getOrThrow()
-
+                val s = Elm327Session(t); session = s; s.initialize().getOrThrow()
                 _uiState.update { it.copy(phase = ConnectionPhase.DISCOVERING_CAPABILITIES) }
                 val snap = discovery.run(s)
-                _uiState.update {
-                    it.copy(
-                        phase = ConnectionPhase.READY,
-                        snapshot = snap,
-                        errorMessage = null,
-                        linkOnly = false,
-                        transportState = t.state
-                    )
-                }
+                _uiState.update { it.copy(phase = ConnectionPhase.READY, snapshot = snap, errorMessage = null, linkOnly = false, transportState = t.state) }
             }.onFailure { err ->
-                _uiState.update {
-                    it.copy(
-                        phase = ConnectionPhase.ERROR,
-                        errorMessage = humanize(err),
-                        snapshot = null,
-                        transportState = transport?.state
-                    )
-                }
-                stopRawCanMonitor()
-                runCatching { session?.close() }
-                runCatching { transport?.disconnect() }
-                session = null
-                transport = null
-                metricsJob?.cancel()
+                _uiState.update { it.copy(phase = ConnectionPhase.ERROR, errorMessage = humanize(err), snapshot = null, transportState = transport?.state) }
+                stopRawCanMonitor(); runCatching { session?.close() }; runCatching { transport?.disconnect() }
+                session = null; transport = null; metricsJob?.cancel()
             }
         }
     }
 
     fun disconnect() {
-        job?.cancel()
-        metricsJob?.cancel()
-        stopRawCanMonitor()
+        job?.cancel(); metricsJob?.cancel(); stopRawCanMonitor()
         viewModelScope.launch {
-            runCatching { session?.close() }
-            runCatching { transport?.disconnect() }
-            session = null
-            transport = null
-            _uiState.value = ConnectionUiState()
+            runCatching { session?.close() }; runCatching { transport?.disconnect() }
+            session = null; transport = null; _uiState.value = ConnectionUiState()
         }
     }
 
-    override fun onCleared() {
-        stopRawCanMonitor()
-        super.onCleared()
-    }
+    override fun onCleared() { stopRawCanMonitor(); super.onCleared() }
 
     private fun humanize(t: Throwable): String {
         val msg = t.message?.lowercase().orEmpty()
