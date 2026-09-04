@@ -13,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autodiag.core.capability.Capability
 import com.autodiag.core.capability.CapabilityStatus
 import com.autodiag.core.capability.VinAudit
@@ -43,7 +42,7 @@ class MainActivity : ComponentActivity() {
                         TransportMode.SLCAN_RAW -> conn.host?.let { connectionViewModel.connectSlcan(it, conn.port ?: 23) }
                         else -> conn.host?.let { connectionViewModel.connectElm327(it, conn.port ?: 3333) }
                     }
-                }, connectionViewModel::setRawCanFilter, connectionViewModel::toggleRawCanPause, connectionViewModel::clearRawCan)
+                }, connectionViewModel::setRawCanFilter, connectionViewModel::toggleRawCanPause, connectionViewModel::clearRawCan, connectionViewModel::startOutlanderLiveMeasurement, connectionViewModel::stopOutlanderLiveMeasurement, connectionViewModel::setOutlanderSamplingInterval)
             }
         }
     }
@@ -69,7 +68,17 @@ private fun DiscoveryScreen(discovery: WiCanMdnsDiscovery, onConnectElm: (String
 }
 
 @Composable
-private fun ConnectionResultScreen(state: ConnectionUiState, onDisconnect: () -> Unit, onRetry: () -> Unit, onRawCanFilter: (String) -> Unit, onRawCanPause: () -> Unit, onRawCanClear: () -> Unit) {
+private fun ConnectionResultScreen(
+    state: ConnectionUiState,
+    onDisconnect: () -> Unit,
+    onRetry: () -> Unit,
+    onRawCanFilter: (String) -> Unit,
+    onRawCanPause: () -> Unit,
+    onRawCanClear: () -> Unit,
+    onStartOutlanderMeasurement: () -> Unit,
+    onStopOutlanderMeasurement: () -> Unit,
+    onOutlanderSamplingInterval: (Long) -> Unit
+) {
     Scaffold { padding -> Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
         Text("Spojení", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         Text("${state.phase.labelCs} · ${state.host ?: "—"}:${state.port ?: "—"} · ${state.mode ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -83,7 +92,21 @@ private fun ConnectionResultScreen(state: ConnectionUiState, onDisconnect: () ->
                 state.snapshot?.vehicleIdentity?.vin?.let { Text("VIN vozidla", style = MaterialTheme.typography.labelMedium); Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
                 state.snapshot?.vinAudit?.let { VinAuditCard(it) }
                 Spacer(Modifier.height(8.dp))
-                OutlanderPhevResistanceCard(state.outlanderIsolation, state.outlanderInternalResistanceMax, state.outlanderInternalResistanceMin)
+                OutlanderPhevResistanceCard(
+                    isolation = state.outlanderIsolation,
+                    internalMax = state.outlanderInternalResistanceMax,
+                    internalMin = state.outlanderInternalResistanceMin,
+                    isolationHistory = state.outlanderIsolationHistory,
+                    internalMaxHistory = state.outlanderInternalMaxHistory,
+                    internalMinHistory = state.outlanderInternalMinHistory,
+                    measurementActive = state.outlanderLiveMeasurementActive,
+                    onStartMeasurement = onStartOutlanderMeasurement,
+                    onStopMeasurement = onStopOutlanderMeasurement,
+                    onSamplingInterval = onOutlanderSamplingInterval,
+                    expertRawRequest = state.outlanderExpertRequest,
+                    expertRawResponse = state.outlanderExpertResponse
+                )
+                state.outlanderLastMeasurementError?.let { Text("Měření: $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 Spacer(Modifier.height(8.dp))
                 val caps = state.snapshot?.capabilities?.values?.toList().orEmpty()
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(caps, key = { it.id }) { CapabilityCard(it) } }
