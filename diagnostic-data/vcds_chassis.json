@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "0.1.0-vcds-autoscan-seed",
+  "source": {
+    "id": "src-vcds-autoscan",
+    "type": "community_derived",
+    "title": "VCDS AutoScan chassis inventory",
+    "file": "incoming/AutoScan.txt",
+    "ds_ver_hint": "375.1",
+    "verification": "UNVERIFIED"
+  },
+  "records": 30,
+  "chassis": [
+    {"id": "chassis-vw-5g", "chassis_code": "5G", "name": "VW Golf/Jetta VII (2013 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-cd", "chassis_code": "CD", "name": "VW Golf VIII (2020 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-e1", "chassis_code": "E1", "name": "VW ID.3 (2020 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-e2", "chassis_code": "E2", "name": "VW ID.4 (2021 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-ed", "chassis_code": "ED", "name": "VW ID.7 (2024 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-eb", "chassis_code": "EB", "name": "VW ID.Buzz (2023 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-3g", "chassis_code": "3G", "name": "VW Passat B8 (2015 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-ad", "chassis_code": "AD", "name": "VW Tiguan (2016 > 2024)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-cr", "chassis_code": "CR", "name": "VW Touareg (2018 > 2023)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-5t", "chassis_code": "5T", "name": "VW Touran (2016 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-vw-sh", "chassis_code": "SH", "name": "VW Transporter/Multivan (2020 >)", "brand": "VW", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-audi-8v", "chassis_code": "8V", "name": "Audi A3/S3/RS3 (2013 > 2020)", "brand": "Audi", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-audi-8y", "chassis_code": "8Y", "name": "Audi A3 (2020 >)", "brand": "Audi", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-audi-8w", "chassis_code": "8W", "name": "Audi A4/S4/RS4 B9 (2016 >)", "brand": "Audi", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-audi-ge", "chassis_code": "GE", "name": "Audi e-tron (2018 >)", "brand": "Audi", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-audi-fz", "chassis_code": "FZ", "name": "Audi Q4 e-tron (2021 >)", "brand": "Audi", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-skoda-5e", "chassis_code": "5E", "name": "Skoda Octavia III (2013 > 2021)", "brand": "Skoda", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-skoda-nx", "chassis_code": "NX", "name": "Skoda Octavia IV (2020 >)", "brand": "Skoda", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-skoda-ny", "chassis_code": "NY", "name": "Skoda Enyaq (2021 >)", "brand": "Skoda", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"},
+    {"id": "chassis-seat-k1", "chassis_code": "K1", "name": "Seat/Cupra Born (2022 >)", "brand": "Seat", "ecu_addresses": ["00"], "scan_mode": "00", "verification": "UNVERIFIED"}
+  ],
+  "notes": "Seed from AutoScan.txt. Full ~300 chassis lines still to import. Address 00 = auto-scan. Does not authorize coding/write."
+}
