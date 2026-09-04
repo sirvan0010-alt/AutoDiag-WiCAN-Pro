@@ -38,30 +38,36 @@ class OutlanderPhev21LiveMeasurementRunner(
                 if (response.kind == Elm327ResponseKind.POSITIVE) {
                     val decoded = runCatching {
                         val parsed = OutlanderPhev21ResponseParser.parse(response.normalized)
-                        val iso = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(
-                            response = parsed,
-                            timestampEpochMs = startedAt,
-                            ecuIdentity = null,
-                            rawRequest = REQUEST,
-                            rawResponse = response.raw
-                        )
-                        val max = OutlanderResistanceMeasurement(
-                            kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED,
-                            value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(parsed),
-                            timestampEpochMs = startedAt,
-                            rawRequest = REQUEST,
-                            rawResponse = response.raw,
-                            verification = OutlanderMeasurementVerification.UNVERIFIED
-                        )
-                        val min = OutlanderResistanceMeasurement(
-                            kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED,
-                            value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(parsed),
-                            timestampEpochMs = startedAt,
-                            rawRequest = REQUEST,
-                            rawResponse = response.raw,
-                            verification = OutlanderMeasurementVerification.UNVERIFIED
-                        )
-                        Result(startedAt, REQUEST, response.raw, iso, max, min, response.kind)
+                        val isolation = runCatching {
+                            OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(
+                                response = parsed,
+                                timestampEpochMs = startedAt,
+                                ecuIdentity = null,
+                                rawRequest = REQUEST,
+                                rawResponse = response.raw
+                            )
+                        }.getOrNull()
+                        val max = runCatching {
+                            OutlanderResistanceMeasurement(
+                                kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED,
+                                value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(parsed),
+                                timestampEpochMs = startedAt,
+                                rawRequest = REQUEST,
+                                rawResponse = response.raw,
+                                verification = OutlanderMeasurementVerification.UNVERIFIED
+                            )
+                        }.getOrNull()
+                        val min = runCatching {
+                            OutlanderResistanceMeasurement(
+                                kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED,
+                                value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(parsed),
+                                timestampEpochMs = startedAt,
+                                rawRequest = REQUEST,
+                                rawResponse = response.raw,
+                                verification = OutlanderMeasurementVerification.UNVERIFIED
+                            )
+                        }.getOrNull()
+                        Result(startedAt, REQUEST, response.raw, isolation, max, min, response.kind)
                     }
                     onResult(decoded.getOrElse { error -> Result(startedAt, REQUEST, response.raw, adapterStatus = response.kind, error = error.message ?: "Outlander 21 01 decode failed") })
                 } else {
