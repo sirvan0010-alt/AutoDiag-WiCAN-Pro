@@ -14,13 +14,19 @@ class OutlanderPhevResistanceDecoderTest {
     }
 
     @Test
-    fun internalResistanceUsesWatchdogBytes38And39InMegohm() {
+    fun sourceLabelledInternalResistanceUsesWatchdogBytes38And39InMegohm() {
         val response = IntArray(40)
         response[38] = 15
         response[39] = 9
 
-        assertEquals(1.5, OutlanderPhevResistanceDecoder.decodeMaximumInternalResistance(response))
-        assertEquals(0.9, OutlanderPhevResistanceDecoder.decodeMinimumInternalResistance(response))
+        assertEquals(
+            1.5,
+            OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(response)
+        )
+        assertEquals(
+            0.9,
+            OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(response)
+        )
     }
 
     @Test
