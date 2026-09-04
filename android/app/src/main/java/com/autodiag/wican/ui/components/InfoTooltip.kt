@@ -24,7 +24,7 @@ fun InfoTooltip(
         state = androidx.compose.material3.rememberTooltipState()
     ) {
         IconButton(onClick = {}, modifier = modifier.size(32.dp)) {
-            Text("?", contentDescription = contentDescription)
+            Text("?")
         }
     }
 }
