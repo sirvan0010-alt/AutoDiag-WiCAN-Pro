@@ -45,8 +45,8 @@ object VehicleProfileMatcher {
         profiles: List<VehicleSignalProfile>,
     ): ProfileMatch? = rank(observed, profiles).firstOrNull()
 
-    private fun score(fields: List<String>): Int = fields.sumOf {
-        when (it) {
+    private fun score(fields: List<String>): Int = fields.fold(0) { acc, item ->
+        acc + when (item) {
             "softwareId" -> 100
             "ecuId" -> 80
             "workshopId" -> 60

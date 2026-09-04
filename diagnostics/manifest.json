@@ -26,6 +26,14 @@
       "size_hint_mb": 9,
       "verification": "unverified",
       "path": "manufacturers/vag/dtc.json"
+    },
+    {
+      "id": "mitsubishi_outlander_phev",
+      "name_cs": "Mitsubishi Outlander PHEV",
+      "version": "0.1.0",
+      "size_hint_mb": 1,
+      "verification": "unverified",
+      "path": "manufacturers/mitsubishi/outlander_phev.json"
     }
   ]
 }

@@ -64,7 +64,9 @@ class SimulatorWiCanTransport : WiCanTransport {
         cmd == "ATRV" -> "12.6V"
         cmd == "ATDP" -> "AUTO, ISO 15765-4 (CAN 11/500)"
         cmd == "ATDPN" -> "A6"
-        cmd == "0902" -> "49 02 01 SIMTEST0AUTODIAG01"
+        // Synthetic 17-character VIN-like value for parser/UI tests only.
+        // It is intentionally not a real vehicle VIN.
+        cmd == "0902" -> "49 02 01 SYNTHX00000000001"
         cmd == "03" -> "43 00"
         cmd == "010C" -> "41 0C 00 00"
         cmd.startsWith("AT") -> "OK"
