@@ -18,7 +18,7 @@ object UdsDtcEvidenceFactory {
         key = "uds.dtc.subfunction.%02X".format(report.subFunction),
         value = report,
         unit = null,
-        timestampEpochMs = timestampEpochMs,
+        timestampEpochMs = timestampEpochMs ?: System.currentTimeMillis(),
         availability = EvidenceAvailability.AVAILABLE,
         verification = verification,
         provenance = EvidenceProvenance(
