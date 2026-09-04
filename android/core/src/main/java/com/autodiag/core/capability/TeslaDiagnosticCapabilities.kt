@@ -56,3 +56,5 @@ object TeslaDiagnosticCapabilities {
 
     fun forDomain(domain: TeslaDiagnosticDomain): List<TeslaDiagnosticFunction> = all.filter { it.domain == domain }
 }
+
+// Explicit enum qualification is intentional: these safety levels are not package-level symbols.
