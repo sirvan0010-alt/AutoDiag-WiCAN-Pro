@@ -42,4 +42,18 @@ object CapabilityIds {
     const val HV_ISOLATION_STATUS = "hv.isolation_status"
     const val HV_ISOLATION_NUMERIC = "hv.isolation_numeric"
     const val DTC_ALERTS = "diagnostics.dtc_alerts"
+
+    // Vehicle-system capability IDs. These describe diagnostic scope; an ID
+    // being present never implies that a write/actuator operation is safe.
+    const val TESLA_POWERTRAIN = "tesla.powertrain"
+    const val TESLA_BRAKE_ELECTRONICS = "tesla.brake_electronics"
+    const val TESLA_BCM = "tesla.bcm"
+    const val TESLA_AIRBAG = "tesla.airbag"
+    const val TESLA_EPB = "tesla.epb"
+    const val TESLA_INSTRUMENT_CLUSTER = "tesla.instrument_cluster"
+    const val TESLA_PARK_ASSIST = "tesla.park_assist"
+    const val TESLA_DOOR_MODULES = "tesla.door_modules"
+    const val TESLA_STEERING = "tesla.steering"
+    const val TESLA_INFOTAINMENT = "tesla.infotainment"
+    const val TESLA_BMS = "tesla.bms"
 }

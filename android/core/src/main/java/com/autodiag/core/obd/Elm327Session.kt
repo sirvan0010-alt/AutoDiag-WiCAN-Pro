@@ -1,7 +1,9 @@
 package com.autodiag.core.obd
 
 import com.autodiag.core.transport.WiCanTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
@@ -37,23 +39,58 @@ class Elm327Session(private val transport: WiCanTransport) {
         initialized = false
     }
 
-    suspend fun command(command: String, timeoutMs: Long): String = commandMutex.withLock {
+    /**
+     * Executes a command and returns a typed adapter-level outcome while
+     * preserving the raw response. This is the preferred API for diagnostic
+     * pipelines that must distinguish NO DATA from transport failure.
+     */
+    suspend fun commandDetailed(command: String, timeoutMs: Long = 3_000): Elm327Response {
+        require(command.isNotBlank())
+        return try {
+            val raw = commandRaw(command, timeoutMs)
+            Elm327ResponseClassifier.classify(raw)
+        } catch (e: TimeoutCancellationException) {
+            Elm327Response(
+                kind = Elm327ResponseKind.TIMEOUT,
+                raw = "",
+                error = e.message ?: "ELM327 command timed out"
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IllegalArgumentException) {
+            Elm327Response(
+                kind = Elm327ResponseKind.MALFORMED,
+                raw = "",
+                error = e.message ?: "Malformed ELM327 response"
+            )
+        } catch (e: Throwable) {
+            Elm327Response(
+                kind = Elm327ResponseKind.ERROR,
+                raw = "",
+                error = e.message ?: e::class.simpleName
+            )
+        }
+    }
+
+    /** Backwards-compatible raw command API. */
+    suspend fun command(command: String, timeoutMs: Long): String =
+        commandRaw(command, timeoutMs)
+
+    suspend fun command(command: String): String = command(command, 3_000)
+
+    private suspend fun commandRaw(command: String, timeoutMs: Long): String = commandMutex.withLock {
         require(command.isNotBlank())
 
         withTimeout(timeoutMs) {
             val ascii = Charset.forName("US-ASCII")
             val acc = StringBuilder()
 
-            // The predicate appends every emitted TCP chunk to the same
-            // buffer. takeWhile stops only after the chunk containing '>'.
             val reader = transport.observeIncoming().takeWhile { chunk ->
                 acc.append(chunk.toString(ascii))
                 acc.indexOf('>') < 0
             }
 
             coroutineScope {
-                // UNDISTPATCHED starts collection before TX, preventing a
-                // fast ELM response from racing ahead of the subscription.
                 val collectJob = async(start = CoroutineStart.UNDISPATCHED) {
                     reader.collect { }
                 }
@@ -75,8 +112,6 @@ class Elm327Session(private val transport: WiCanTransport) {
                 .trim()
         }
     }
-
-    suspend fun command(command: String): String = command(command, 3_000)
 
     suspend fun close() {
         initialized = false

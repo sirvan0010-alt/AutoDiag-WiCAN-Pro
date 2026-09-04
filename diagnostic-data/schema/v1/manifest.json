@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "0.1.0",
+  "generatedAt": null,
+  "sources": [],
+  "records": {
+    "vehicles": 0,
+    "ecus": 0,
+    "signals": 0,
+    "dtcs": 0
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "files": {}
+  }
+}
