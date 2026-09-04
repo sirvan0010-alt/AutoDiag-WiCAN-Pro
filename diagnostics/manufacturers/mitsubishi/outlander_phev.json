@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "pack_id": "mitsubishi_outlander_phev",
+  "version": "0.1.0",
+  "manufacturer": "Mitsubishi",
+  "model": "Outlander PHEV",
+  "scope": {
+    "powertrain": "PHEV",
+    "generation": null,
+    "model_year": null,
+    "region": null
+  },
+  "verification": "unverified",
+  "sources": [
+    {
+      "type": "reverse_engineering_reference",
+      "title": "PHEV Watchdog APK analysis",
+      "verification": "unverified",
+      "note": "Schema/capability inventory only until request/response mapping is validated on a real vehicle."
+    }
+  ],
+  "capabilities": [
+    {"id": "vehicle.vin", "status": "unknown"},
+    {"id": "battery.soc", "status": "unknown"},
+    {"id": "battery.soh", "status": "unknown"},
+    {"id": "battery.capacity", "status": "unknown"},
+    {"id": "battery.pack_voltage", "status": "unknown"},
+    {"id": "battery.pack_current", "status": "unknown"},
+    {"id": "battery.max_charge_power", "status": "unknown"},
+    {"id": "battery.max_discharge_power", "status": "unknown"},
+    {"id": "battery.cell_voltage", "status": "unknown", "granularity": "individual_cell"},
+    {"id": "battery.cell_voltage_min", "status": "unknown"},
+    {"id": "battery.cell_voltage_max", "status": "unknown"},
+    {"id": "battery.cell_voltage_delta", "status": "unknown"},
+    {"id": "battery.cell_voltage_min_id", "status": "unknown"},
+    {"id": "battery.cell_voltage_max_id", "status": "unknown"},
+    {"id": "battery.module_temperature", "status": "unknown", "granularity": "module"},
+    {"id": "battery.cooling_fan_pwm", "status": "unknown"},
+    {"id": "battery.internal_resistance", "status": "unknown"},
+    {"id": "battery.cycle_or_degradation", "status": "unknown"},
+    {"id": "battery.trip_energy", "status": "unknown"},
+    {"id": "battery.target_voltage", "status": "unknown"},
+    {"id": "diagnostics.dtc", "status": "unknown"}
+  ],
+  "signals": [],
+  "rules": {
+    "allow_guessed_can_ids": false,
+    "allow_guessed_pid_or_did": false,
+    "promote_to_available_without_vehicle_evidence": false,
+    "preserve_source_verification": true
+  }
+}
