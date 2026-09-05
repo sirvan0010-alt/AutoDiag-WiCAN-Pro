@@ -19,6 +19,7 @@ class GitHubDiagnosticDataProvider(
     private var ecus = emptyList<EcuDataDefinition>()
     private var signals = emptyList<SignalDataDefinition>()
     private var dtcs = emptyList<DtcDataDefinition>()
+    private var decoderCandidates = emptyList<SignalDecoderDefinition>()
 
     override suspend fun findVehicle(vin: String): VehicleDataDefinition? = withContext(Dispatchers.IO) {
         loadIfNeeded(); vehicles.firstOrNull { it.vin.equals(vin, true) }
@@ -38,6 +39,14 @@ class GitHubDiagnosticDataProvider(
         loadIfNeeded(); dtcs.firstOrNull { it.code.equals(code, true) }
     }
 
+    override suspend fun findDecoderCandidates(request: String, variantId: String?): List<SignalDecoderDefinition> = withContext(Dispatchers.IO) {
+        loadIfNeeded()
+        val normalized = request.replace(" ", "").uppercase()
+        decoderCandidates.filter {
+            it.request.equals(normalized, true) && (variantId == null || it.variantId.equals(variantId, true))
+        }
+    }
+
     @Synchronized private fun loadIfNeeded() {
         if (loaded) return
         val manifest = JSONObject(http.get(url("manifest.json")))
@@ -46,6 +55,10 @@ class GitHubDiagnosticDataProvider(
         if ((r?.optInt("ecus", 0) ?: 0) > 0) ecus = parseEcus(http.get(url("data/ecus.json")))
         if ((r?.optInt("signals", 0) ?: 0) > 0) signals = parseSignals(http.get(url("data/signals.json")))
         if ((r?.optInt("dtc", 0) ?: 0) > 0) dtcs = parseDtcs(http.get(url("data/dtc.json")))
+        if ((r?.optInt("candidates", 0) ?: 0) > 0) {
+            val candidateBody = http.get(url("data/candidates/outlander_phev_watchdog_resistance.json"))
+            decoderCandidates = DiagnosticCatalogParser.decoderCandidates(candidateBody)
+        }
         loaded = true
     }
     private fun url(path: String) = baseUrl.trimEnd('/') + "/" + path
@@ -58,7 +71,7 @@ class GitHubDiagnosticDataProvider(
     private fun parseEcus(body: String) = JSONArray(body).let { a -> List(a.length()) { i -> a.getJSONObject(i).let { o -> EcuDataDefinition(EcuDataIdentity(o.optStringOrNull("ecuId"),o.optStringOrNull("manufacturer"),o.optStringOrNull("hardwareNumber"),o.optStringOrNull("softwareNumber"),o.optStringOrNull("softwareVersion")),o.getString("displayName"),verification(o),o.optString("provenance","diagnostic-data")) } } }
     private fun parseSignals(body: String) = JSONArray(body).let { a -> List(a.length()) { i -> a.getJSONObject(i).let { o -> SignalDataDefinition(o.getString("id"),o.getString("label"),o.optStringOrNull("unit"),o.optStringOrNull("request"),o.optDouble("scale",1.0),o.optDouble("offset",0.0),verification(o),o.optString("provenance","diagnostic-data")) } } }
     private fun parseDtcs(body: String) = JSONArray(body).let { a -> List(a.length()) { i -> a.getJSONObject(i).let { o -> DtcDataDefinition(o.getString("code"),o.optStringOrNull("description"),o.optStringOrNull("system"),verification(o),o.optString("provenance","diagnostic-data")) } } }
-    private fun verification(o: JSONObject) = runCatching { VerificationState.valueOf(o.optString("verification","UNVERIFIED")) }.getOrDefault(VerificationState.UNVERIFIED)
+    private fun verification(o: JSONObject) = runCatching { VerificationState.valueOf(o.optString("verification","UNVERIFIED").uppercase()) }.getOrDefault(VerificationState.UNVERIFIED)
     private fun JSONObject.optStringOrNull(k: String): String? = if (!has(k) || isNull(k)) null else optString(k).takeIf { it.isNotBlank() }
     private fun JSONObject.optIntOrNull(k: String): Int? = if (!has(k) || isNull(k)) null else optInt(k)
 
