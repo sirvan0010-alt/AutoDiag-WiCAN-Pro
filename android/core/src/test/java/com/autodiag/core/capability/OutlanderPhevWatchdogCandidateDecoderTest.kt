@@ -60,4 +60,44 @@ class OutlanderPhevWatchdogCandidateDecoderTest {
             )
         )
     }
+
+    @Test
+    fun decodesWatchdog2105La4VariantAsUnsignedU16BeDividedByTen() {
+        val tokens = IntArray(52)
+        tokens[50] = 0x01
+        tokens[51] = 0xF4
+
+        assertEquals(
+            50.0,
+            DataDrivenDecoder.decode(
+                tokens,
+                DataDecoderSpec(
+                    kind = DataDecoderSpec.Kind.UNSIGNED_U16_BE,
+                    start = 50,
+                    end = 51,
+                    scale = 0.1
+                )
+            )
+        )
+    }
+
+    @Test
+    fun decodesWatchdog2105Lb4VariantAsUnsignedU16BeDividedByTen() {
+        val tokens = IntArray(49)
+        tokens[47] = 0x02
+        tokens[48] = 0x58
+
+        assertEquals(
+            60.0,
+            DataDrivenDecoder.decode(
+                tokens,
+                DataDecoderSpec(
+                    kind = DataDecoderSpec.Kind.UNSIGNED_U16_BE,
+                    start = 47,
+                    end = 48,
+                    scale = 0.1
+                )
+            )
+        )
+    }
 }
