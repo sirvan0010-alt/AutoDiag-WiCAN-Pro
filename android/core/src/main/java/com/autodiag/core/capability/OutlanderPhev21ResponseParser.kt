@@ -1,29 +1,65 @@
 package com.autodiag.core.capability
 
 /**
- * Converts the textual ELM327 response into the same integer-token shape used
- * by the analysed Watchdog decoder.
+ * Converts an ELM327 ISO-TP CAN response into the ordered payload-token shape
+ * used by the analysed Watchdog decoder.
  *
- * A three-character CAN header (for example 7E8) is intentionally retained as
- * one integer token. This is important because the source decoder's indexes
- * are indexes into that normalized token array, not necessarily raw CAN-data
- * byte offsets.
+ * CAN headers, ISO-TP PCI bytes, and the positive-response service/PID bytes are
+ * transport framing and are excluded. Decoder indexes therefore refer to the
+ * actual diagnostic payload bytes (d[0], d[1], ...), matching the source model.
  */
 object OutlanderPhev21ResponseParser {
     fun parse(normalizedResponse: String): IntArray {
-        val tokens = normalizedResponse
+        val lines = normalizedResponse
             .replace('\r', '\n')
             .lines()
-            .flatMap { it.trim().split(Regex("\\s+")) }
-            .filter { it.isNotBlank() }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
 
-        require(tokens.isNotEmpty()) { "Outlander 21 01 response is empty" }
+        require(lines.isNotEmpty()) { "Outlander 21 response is empty" }
 
-        return tokens.map { token ->
-            require(token.matches(Regex("[0-9A-Fa-f]+"))) {
-                "Invalid hexadecimal token in Outlander response: $token"
+        val payload = ArrayList<Int>()
+        var firstFrame = true
+
+        for (line in lines) {
+            val raw = line.split(Regex("\\s+"))
+            require(raw.isNotEmpty()) { "Invalid empty Outlander response line" }
+
+            val start = if (raw.first().length > 2) 1 else 0
+            val bytes = raw.drop(start).map { token ->
+                require(token.matches(Regex("[0-9A-Fa-f]{1,2}"))) {
+                    "Invalid hexadecimal byte in Outlander response: $token"
+                }
+                token.toInt(16)
             }
-            token.toInt(16)
-        }.toIntArray()
+            require(bytes.isNotEmpty()) { "Outlander response frame has no data" }
+
+            val pci = bytes[0]
+            when (pci and 0xF0) {
+                0x10 -> {
+                    require(firstFrame) { "Unexpected ISO-TP first frame" }
+                    require(bytes.size >= 4) { "Incomplete ISO-TP first frame" }
+                    payload.addAll(bytes.drop(3))
+                    firstFrame = false
+                }
+                0x00 -> {
+                    require(firstFrame) { "Unexpected ISO-TP single frame" }
+                    require(bytes.size >= 3) { "Incomplete ISO-TP single frame" }
+                    payload.addAll(bytes.drop(3))
+                    firstFrame = false
+                }
+                0x20 -> {
+                    require(!firstFrame) { "ISO-TP consecutive frame before first frame" }
+                    payload.addAll(bytes.drop(1))
+                }
+                0x30 -> {
+                    // Flow-control frames are adapter/transport traffic, not payload.
+                }
+                else -> throw IllegalArgumentException("Unsupported ISO-TP PCI byte: ${bytes[0].toString(16)}")
+            }
+        }
+
+        require(payload.isNotEmpty()) { "Outlander diagnostic payload is empty" }
+        return payload.toIntArray()
     }
 }
