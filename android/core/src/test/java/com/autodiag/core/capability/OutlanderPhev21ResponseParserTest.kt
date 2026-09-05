@@ -5,28 +5,26 @@ import kotlin.test.assertEquals
 
 class OutlanderPhev21ResponseParserTest {
     @Test
-    fun retainsThreeCharacterCanHeaderAsOneToken() {
-        val response = buildString {
-            append("7E8")
-            repeat(77) { append(" 00") }
-            append(" 01 F4")
-        }
+    fun stripsCanHeaderIsoTpAndPositiveResponsePrefix() {
+        val response = """
+            762 10 37 61 01 82 83 0F 8B
+            762 21 24 0F 88 03 0C 6E 52
+        """.trimIndent()
 
         val parsed = OutlanderPhev21ResponseParser.parse(response)
 
-        assertEquals(80, parsed.size)
-        assertEquals(0x7E8, parsed[0])
-        assertEquals(0x01, parsed[78])
-        assertEquals(0xF4, parsed[79])
-        assertEquals(500.0, OutlanderPhevResistanceDecoder.decodeIsolationResistance(parsed))
+        assertEquals(listOf(0x82, 0x83, 0x0F, 0x8B, 0x24, 0x0F, 0x88, 0x03, 0x0C, 0x6E, 0x52), parsed.toList())
     }
 
     @Test
-    fun acceptsMultilineElmResponse() {
-        val response = "7E8 00 01\n02 03 04"
+    fun acceptsMultilineIsoTpPayload() {
+        val response = """
+            7E8 10 05 61 01 AA BB CC
+            7E8 21 DD
+        """.trimIndent()
 
         val parsed = OutlanderPhev21ResponseParser.parse(response)
 
-        assertEquals(listOf(0x7E8, 0, 1, 2, 3, 4), parsed.toList())
+        assertEquals(listOf(0xAA, 0xBB, 0xCC, 0xDD), parsed.toList())
     }
 }
