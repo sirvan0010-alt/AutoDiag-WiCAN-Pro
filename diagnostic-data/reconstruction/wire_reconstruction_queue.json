@@ -1,0 +1,13 @@
+{
+  "schema":"seobd.wire-reconstruction-queue.v1",
+  "status":"OPEN",
+  "entries":[
+    {"target":"ReqSubscribeVehicleData","semantic_layer":"message","next":"locate generated protobuf descriptor/field metadata","confidence":"SYMBOL_CORRELATED"},
+    {"target":"RespSubscribeVehicleData","semantic_layer":"message","next":"locate response fields and serializer call sites","confidence":"SYMBOL_CORRELATED"},
+    {"target":"PushVehicleDataHolder","semantic_layer":"message","next":"enumerate accessors, optional cases and protobuf numbers","confidence":"DWARF_CORROBORATED"},
+    {"target":"CMessageHelper::GetReqSubscribeVehicleData(bool)","semantic_layer":"builder","next":"trace returned object to serialization boundary","confidence":"SYMBOL_CORRELATED"},
+    {"target":"CBLECommander::slotDataPushReceived(QString const&, QByteArray const&)","semantic_layer":"transport","next":"identify BLE notification source and framing parser","confidence":"SYMBOL_CORRELATED"},
+    {"target":"CBLECommander::ProcessPushVehicleDataHolder(...) ","semantic_layer":"decoder","next":"trace deserialization into typed holder","confidence":"SYMBOL_CORRELATED"}
+  ],
+  "promotion_gate":["protobuf field number proven","serializer/deserializer path proven","transport framing proven","runtime or capture correlation when claiming wire bytes","scaling/unit proven before physical signal promotion"]
+}
