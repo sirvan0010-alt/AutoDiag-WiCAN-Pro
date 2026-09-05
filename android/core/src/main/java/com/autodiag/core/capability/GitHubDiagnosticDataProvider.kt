@@ -59,7 +59,8 @@ class GitHubDiagnosticDataProvider(
             val candidateFiles = listOf(
                 "data/candidates/outlander_phev_watchdog_resistance.json",
                 "data/candidates/outlander_phev_watchdog_cells_and_motor.json",
-                "data/candidates/outlander_phev_watchdog_21_05.json"
+                "data/candidates/outlander_phev_watchdog_21_05.json",
+                "data/candidates/outlander_phev_watchdog_21_04.json"
             )
             decoderCandidates = candidateFiles.flatMap { file ->
                 runCatching { DiagnosticCatalogParser.decoderCandidates(http.get(url(file))) }.getOrDefault(emptyList())
