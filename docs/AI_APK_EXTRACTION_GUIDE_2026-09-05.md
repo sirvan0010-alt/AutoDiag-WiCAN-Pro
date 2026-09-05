@@ -1,22 +1,56 @@
 # AI APK extraction guide — current revision 2026-09-05
 
-This document supersedes ambiguous or stale instructions when they conflict with `AI_HANDOFF_APK_EXTRACTION_2026-09-05.md` and the current provenance records.
+This guide defines the extraction strategy for AutoDiag. It supersedes stale instructions that treat full APK reconstruction as the goal.
 
-## Objective
+## 1. Objective
 
-Extract diagnostic behaviour from Android APKs as reproducible evidence for AutoDiag. The output is evidence and data contracts, not copied proprietary source/database content.
+Extract **final diagnostic data contracts**, not the internal architecture of the source APK.
 
-## Mandatory evidence chain
+The desired result is:
+
+```text
+request/init
+ -> response
+ -> normalized payload boundary
+ -> exact byte/bit positions
+ -> expression/scale/offset
+ -> unit
+ -> canonical signal/UI value
+```
+
+The new AutoDiag runtime needs the final decoder behaviour. It normally does not need the APK's original class hierarchy, UI implementation, database implementation or internal naming.
+
+### Deep reverse engineering rule
+
+Use deep APK reverse engineering **only to resolve a missing or ambiguous final contract**. Once request, response, extraction and formula are proven, stop. Do not spend time reconstructing unrelated APK internals.
+
+## 2. Extraction priority
+
+For each vehicle/application:
+
+1. Search existing Diagnostic-Data and provenance for an already proven contract.
+2. Identify the requested final signals that are still missing.
+3. Search the APK for those exact requests, signal labels and decoder paths.
+4. Extract the smallest sufficient evidence chain.
+5. Write the contract and provenance to the canonical Diagnostic-Data repository.
+6. Add deterministic tests.
+7. Correlate ECU/address and vehicle scope separately.
+8. Validate with a real vehicle before promotion.
+
+This is the default method for Outlander PHEV and later EVs.
+
+Typical EV targets include SOC, SOH, HV voltage/current, battery temperature, cell voltages, cell min/max/difference, internal resistance, motor RPM, generator RPM and DTCs.
+
+## 3. Mandatory evidence chain when deep extraction is necessary
 
 ```text
 APK
- -> exact command literal
+ -> exact request literal
  -> code/string reference
- -> model/class/variant
- -> transport/address evidence
- -> response shape
- -> normalized diagnostic payload d[]
- -> exact decoder expression
+ -> actual decoder
+ -> normalized payload boundary
+ -> exact byte/bit positions
+ -> arithmetic
  -> byte order/signedness/scale/offset/unit
  -> provenance
  -> candidate (only if sufficient)
@@ -26,77 +60,47 @@ APK
  -> VERIFIED
 ```
 
-If any link is missing, record `UNRESOLVED`/`UNVERIFIED`. Never fill gaps from signal names, class names, public topology or intuition.
+If a link is missing, record `UNRESOLVED` or `UNVERIFIED`. Never fill a gap from signal names, class names, public CAN topology or intuition.
 
-## Canonical data ownership — SINGLE SOURCE OF TRUTH
+## 4. Canonical data ownership — SINGLE SOURCE OF TRUTH
 
-**`sirvan0010-alt/AutoDiag-WiCAN-Diagnostic-Data` is the sole source of truth for production diagnostic candidates, decoder definitions, extraction provenance and their manifests.**
+**`sirvan0010-alt/AutoDiag-WiCAN-Diagnostic-Data` is the sole source of truth for production diagnostic candidates, decoder definitions, extraction provenance and manifests.**
 
-The repository `AutoDiag-WiCAN-Pro` is the application/code repository. Its `diagnostic-data/` directory is **legacy seed/staging material only** and must not be used as a second production data store. New or changed candidates/provenance MUST NOT be written there.
+`AutoDiag-WiCAN-Pro` is the application/code repository. Its `diagnostic-data/` directory is legacy seed/staging/compatibility material only and is not a second production data store.
 
-Runtime direction is explicit:
+Runtime direction:
 
 ```text
-AutoDiag-WiCAN-Pro code
-        |
-        v
+AutoDiag-WiCAN-Pro
+      |
+      v
 GitHubDiagnosticDataProvider
-        |
-        v
+      |
+      v
 AutoDiag-WiCAN-Diagnostic-Data/main
-        |
-        +--> manifest.json
-        +--> data/candidates/*
-        +--> provenance/*
+      +--> manifest.json
+      +--> data/candidates/*
+      +--> provenance/*
 ```
 
-The local `diagnostic-data/` directory is not a synchronization target and must not be treated as an authoritative cache. If legacy files are needed temporarily for migration, they must be clearly labelled legacy and never edited as production data.
+New or changed production candidates/provenance MUST be written to the external Diagnostic-Data repository.
 
-### Three locations — exact roles
+## 5. DEX parser gate
 
-| Location | Role | Production authority |
-|---|---|---|
-| `AutoDiag-WiCAN-Diagnostic-Data/manifest.json` | canonical dataset manifest/counts | **YES** |
-| `AutoDiag-WiCAN-Diagnostic-Data/data/candidates/` + `provenance/` | canonical candidates and evidence | **YES** |
-| `AutoDiag-WiCAN-Pro/diagnostic-data/` | legacy seed/staging/compatibility only | **NO** |
+Before trusting custom DEX parsing, validate:
 
-A path mentioned from the `AutoDiag-WiCAN-Pro` repository must be prefixed with the repository name when it refers to the external repository. Never write `provenance/...` as if it were local when the intended location is the external repository.
+- header offsets and index ranges;
+- class-data method ownership against `method_ids`;
+- field ownership/types;
+- `code_item` bounds and instruction widths;
+- branch targets;
+- switch/array-data payload handling.
 
-## DEX parser gate
+A contradictory class/method mapping means **parser failure**, not protocol evidence.
 
-Before interpreting bytecode, validate the DEX parser.
+## 6. PHEV Watchdog — 21 04
 
-For DEX 035 the header fields are:
-
-```text
-string_ids_size @ 0x38
-string_ids_off  @ 0x3C
-type_ids_size   @ 0x40
-type_ids_off    @ 0x44
-proto_ids_size  @ 0x48
-proto_ids_off   @ 0x4C
-field_ids_size  @ 0x50
-field_ids_off   @ 0x54
-method_ids_size @ 0x58
-method_ids_off  @ 0x5C
-class_defs_size @ 0x60
-class_defs_off  @ 0x64
-```
-
-Required assertions:
-
-- index bounds are valid;
-- class-data method IDs resolve to methods belonging to the class being decoded;
-- field references have valid declaring class/type;
-- code offsets and instruction lengths stay within the DEX;
-- branch targets are valid;
-- payloads such as switch/array-data are handled according to DEX instruction rules.
-
-A contradictory class/method mapping means **parser failure**. It must never be converted into a protocol claim.
-
-## PHEV Watchdog 21 04
-
-Source:
+Source APK:
 
 `PHEV Watchdog Lite 1.9.1.2023OCT29.apk`
 
@@ -104,79 +108,87 @@ SHA-256:
 
 `9ebac53f13ba9a1d04be158e49e37b886b9c35a711c9a4e33029c16a17b86ce6`
 
-Observed:
-
-- one `classes.dex`, 6,554,216 bytes;
-- no native `lib/*` binaries;
-- exact command string `21 04`;
-- prior class association `Lz3/d;`;
-- related strings for cell-voltage maps and cell-voltage/internal-resistance aggregates.
-
-Current status:
+Established static decoder contract:
 
 ```text
-21 04 decoder      = UNRESOLVED
-scale/offset       = UNRESOLVED
-byte order         = UNRESOLVED
-signedness         = UNRESOLVED
-ECU/address        = UNRESOLVED
-verification       = UNVERIFIED
-candidate creation = BLOCKED
+request:        21 04
+outputs:        32
+responseIndex:  0..31
+raw type:       unsigned 8-bit
+scale:          0.02
+offset:         0
+unit:           V
+verification:   UNVERIFIED
 ```
 
-The phrase “32 voltage outputs, scale unresolved” is an old working hypothesis, not sufficient evidence for a candidate. It remains explicitly unpromoted until validated from bytecode/data flow.
+This is sufficient for an **unverified candidate**. It does not by itself establish physical cell numbering, ECU/address binding, vehicle generation or production applicability.
 
-## Extraction procedure for 21 04
+Canonical candidate:
 
-1. Locate all references to the exact `21 04` string.
-2. Trace the constructor/model registration around the reference.
-3. Identify the actual decoder method; do not assume a method name such as `s` is a decoder.
-4. Trace the input list/array and establish the meaning of `d[]`.
-5. Establish the response prefix and ISO-TP normalization boundary.
-6. Extract exact indices and arithmetic.
-7. Determine scale, offset, unit, endian and signedness only from code/data evidence.
-8. Record the result in `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/phev-watchdog/`.
-9. Create a candidate under `AutoDiag-WiCAN-Diagnostic-Data/data/candidates/` only after the decoder contract is sufficiently explicit.
-10. Add a deterministic unit test.
-11. Keep ECU/address and vehicle scope unresolved until independently supported.
+`AutoDiag-WiCAN-Diagnostic-Data/data/candidates/outlander_phev_watchdog_21_04.json`
 
-## Repository placement
+Provenance:
 
-### `AutoDiag-WiCAN-Diagnostic-Data`
+`AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/phev-watchdog/21-04-extraction-2026-09-05.json`
 
-Use for APK provenance, extraction matrices, decoder candidates and evidence metadata. This is the **only authoritative production data repository**.
+Do not reopen the entire APK architecture merely to reconfirm this contract. Reopen deep tracing only if a concrete contradiction appears.
 
-Do not place unresolved formulas into production candidate files.
+## 7. Candidate/verification levels
 
-### `AutoDiag-WiCAN-Pro`
-
-Use for parsers, runtime integration, tests, architecture and AI instructions. Its `diagnostic-data/` directory is legacy seed/staging only and is not a production source of truth.
-
-Do not hardcode a new decoder before its Diagnostic-Data contract is justified.
-
-## Pre-commit data-location checklist
-
-Before committing any extraction result:
-
-- [ ] Is this production candidate/provenance data? If yes, commit it only to `AutoDiag-WiCAN-Diagnostic-Data`.
-- [ ] Is the path explicitly prefixed with the correct repository when referenced from `AutoDiag-WiCAN-Pro`?
-- [ ] Did I avoid creating/updating a second candidate copy under `AutoDiag-WiCAN-Pro/diagnostic-data/`?
-- [ ] Does `AutoDiag-WiCAN-Diagnostic-Data/manifest.json` count match the actual candidate files?
-- [ ] Does `GitHubDiagnosticDataProvider` load every production candidate file that the manifest advertises?
-- [ ] Is provenance present for every promoted candidate?
-- [ ] Is `VERIFIED` still gated by real-vehicle evidence?
-
-If any answer is no, stop before extraction continues.
-
-## Verification levels
-
-- `UNRESOLVED`: the requested relationship has not been extracted safely.
-- `UNVERIFIED`: a static extraction/candidate exists but vehicle evidence is missing.
-- `PARTIALLY_VERIFIED`: decoder and some external correlation exist, but scope/address/vehicle proof is incomplete.
-- `VERIFIED`: reproducible vehicle evidence binds request, response, ECU/address, decoder and vehicle scope.
+- `UNRESOLVED`: final decoder contract is not safely established.
+- `UNVERIFIED`: static/equivalent evidence establishes a decoder contract, but vehicle evidence is missing.
+- `PARTIALLY_VERIFIED`: decoder plus external correlation exists, but scope/address/vehicle proof is incomplete.
+- `VERIFIED`: real-vehicle evidence binds request, response, ECU/address, decoder and vehicle scope.
 
 Static APK evidence can never directly create `VERIFIED`.
 
-## Safety
+## 8. Deterministic implementation rule
 
-APK reverse engineering is read-only evidence work. It does not authorize coding, adaptation, actuator commands, security access, immobilizer operations or other write functionality.
+A final contract should be representable independently of the source APK, for example:
+
+```text
+request = 010C
+signal  = ENGINE_RPM
+extract = unsigned16(response[B3], response[B4])
+scale   = 0.25
+unit    = RPM
+```
+
+or:
+
+```text
+request = 21 04
+signals = CELL_VOLTAGE[0..31]
+extract = unsigned8(response[index])
+scale   = 0.02
+unit    = V
+verification = UNVERIFIED
+```
+
+The exact request, indices, expression and normalization boundary must come from evidence. These examples do not authorize guessing unknown vehicle-specific values.
+
+## 9. Repository checklist
+
+Before committing extraction results:
+
+- [ ] Did I search existing final contracts first?
+- [ ] Am I extracting only missing/ambiguous fields?
+- [ ] Is the request/response and normalized payload boundary proven?
+- [ ] Are exact indices/bits and arithmetic proven?
+- [ ] Is unit/scale/offset/signedness/endian proven?
+- [ ] Is provenance stored in `AutoDiag-WiCAN-Diagnostic-Data`?
+- [ ] Is a deterministic test present?
+- [ ] Is ECU/address/vehicle scope clearly marked if still unresolved?
+- [ ] Does the external manifest include the candidate?
+- [ ] Does `GitHubDiagnosticDataProvider` load every advertised production candidate?
+- [ ] Have I avoided creating a second authoritative copy in `AutoDiag-WiCAN-Pro/diagnostic-data/`?
+
+## 10. Branch/PR discipline
+
+Outlander work remains on `feat/mitsubishi-outlander-phev` under draft PR #10. Do not claim mergeability or production completeness merely because an APK contract has been extracted.
+
+S3XY/Tesla extraction is separate and must not be mixed into Outlander candidate data.
+
+## 11. Safety
+
+APK reverse engineering is read-only evidence work. It does not authorize coding, adaptation, actuator commands, security access, immobilizer operations, immobilizer bypass or any other write functionality.
