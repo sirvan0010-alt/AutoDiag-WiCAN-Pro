@@ -42,8 +42,8 @@ class OutlanderPhev21LiveMeasurementRunner(
                         val parsed = OutlanderPhev21ResponseParser.parse(response.normalized)
                         val candidates = diagnosticData.findDecoderCandidates(REQUEST, variantId)
 
-                        fun unique(signalId: String): SignalDecoderDefinition? =
-                            candidates.filter { it.signalId == signalId }.singleOrNull()
+                        fun resolve(signalId: String): OutlanderPhevDecoderResolver.Resolution =
+                            OutlanderPhevDecoderResolver.resolve(candidates, signalId)
 
                         fun verification(definition: SignalDecoderDefinition): OutlanderMeasurementVerification =
                             when (definition.verification) {
@@ -52,50 +52,51 @@ class OutlanderPhev21LiveMeasurementRunner(
                                 VerificationState.UNVERIFIED -> OutlanderMeasurementVerification.UNVERIFIED
                             }
 
-                        val isolationDefinition = unique("battery.isolation_resistance")
-                        val maxDefinition = unique("battery.internal_resistance.max")
-                        val minDefinition = unique("battery.internal_resistance.min")
+                        fun definitionOrNull(signalId: String): SignalDecoderDefinition? =
+                            when (val result = resolve(signalId)) {
+                                OutlanderPhevDecoderResolver.Resolution.Resolved -> result.definition
+                                OutlanderPhevDecoderResolver.Resolution.NotFound -> null
+                                is OutlanderPhevDecoderResolver.Resolution.Ambiguous -> null
+                            }
 
-                        val isolation = isolationDefinition?.let {
-                            runCatching {
-                                OutlanderPhevResistanceDecoder.decodeMeasurement(
-                                    definition = it, response = parsed, timestampEpochMs = startedAt,
-                                    rawRequest = REQUEST, rawResponse = response.raw, verification = verification(it)
-                                )
-                            }.getOrNull()
-                        }
-                        val max = maxDefinition?.let {
-                            runCatching {
-                                OutlanderPhevResistanceDecoder.decodeMeasurement(
-                                    definition = it, response = parsed, timestampEpochMs = startedAt,
-                                    rawRequest = REQUEST, rawResponse = response.raw, verification = verification(it)
-                                )
-                            }.getOrNull()
-                        }
-                        val min = minDefinition?.let {
-                            runCatching {
-                                OutlanderPhevResistanceDecoder.decodeMeasurement(
-                                    definition = it, response = parsed, timestampEpochMs = startedAt,
-                                    rawRequest = REQUEST, rawResponse = response.raw, verification = verification(it)
-                                )
-                            }.getOrNull()
-                        }
+                        fun ambiguity(signalId: String): String? =
+                            when (val result = resolve(signalId)) {
+                                is OutlanderPhevDecoderResolver.Resolution.Ambiguous ->
+                                    "Ambiguous decoder variant for $REQUEST/$signalId: ${result.variantIds.joinToString()}; vehicle/ECU variant evidence required"
+                                else -> null
+                            }
 
-                        val ambiguity = listOf(
-                            "battery.isolation_resistance" to isolationDefinition,
-                            "battery.internal_resistance.max" to maxDefinition,
-                            "battery.internal_resistance.min" to minDefinition
-                        ).filter { (signal, definition) ->
-                            definition == null && candidates.any { it.signalId == signal }
-                        }.map { it.first }
+                        val isolationDefinition = definitionOrNull("battery.isolation_resistance")
+                        val maxDefinition = definitionOrNull("battery.internal_resistance.max")
+                        val minDefinition = definitionOrNull("battery.internal_resistance.min")
+                        val ambiguities = listOfNotNull(
+                            ambiguity("battery.isolation_resistance"),
+                            ambiguity("battery.internal_resistance.max"),
+                            ambiguity("battery.internal_resistance.min")
+                        )
+
+                        fun decode(definition: SignalDecoderDefinition?): OutlanderResistanceMeasurement? = definition?.let {
+                            OutlanderPhevResistanceDecoder.decodeMeasurement(
+                                definition = it,
+                                response = parsed,
+                                timestampEpochMs = startedAt,
+                                rawRequest = REQUEST,
+                                rawResponse = response.raw,
+                                verification = verification(it)
+                            )
+                        }
 
                         Result(
-                            timestampEpochMs = startedAt, rawRequest = REQUEST, rawResponse = response.raw,
-                            isolationResistance = isolation, internalResistanceMax = max, internalResistanceMin = min,
+                            timestampEpochMs = startedAt,
+                            rawRequest = REQUEST,
+                            rawResponse = response.raw,
+                            isolationResistance = decode(isolationDefinition),
+                            internalResistanceMax = decode(maxDefinition),
+                            internalResistanceMin = decode(minDefinition),
                             adapterStatus = response.kind,
                             error = when {
                                 candidates.isEmpty() -> "No diagnostic-data decoder candidate for $REQUEST"
-                                ambiguity.isNotEmpty() -> "Ambiguous decoder variant for $REQUEST: ${ambiguity.joinToString()}; vehicle/ECU variant evidence required"
+                                ambiguities.isNotEmpty() -> ambiguities.joinToString("; ")
                                 else -> null
                             }
                         )
