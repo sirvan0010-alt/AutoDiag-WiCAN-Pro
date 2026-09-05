@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "id": "src-s3xy-buttons-6.8.2",
+    "title": "S3XY Buttons 6.8.2 XAPK static reverse-engineering",
+    "artifact": "S3XY_6.8.2.xapk",
+    "verification": "OBSERVED_STATIC",
+    "artifactSha256": "b6d5188457978b4a9fd0e4c138d316abb7144291ff0eda97b20678a135faddc9",
+    "notes": "Capability names and compiled data-model structures only. No proprietary binaries, source code, UI assets or encrypted databases copied."
+  },
+  "capabilityDomains": {
+    "access": ["Lock", "Unlock", "LockUnlock"],
+    "doors": ["OpenDoor", "OpenDoorFL", "OpenDoorFR", "OpenDoorRL", "OpenDoorRR", "PresentingDoors", "PresentingDoorsAvailable", "PresentingDoorsNoBeep", "PresentingDoorsUnlock"],
+    "cargo": ["OpenTrunk", "TrunkOpened", "OpenFrunk", "FrunkOpened", "FrunkOpenLeftDoor", "FrunkOpenRightDoor"],
+    "charging": ["OpenChargePort", "ChargePort", "ChargePortSecurity", "ChargePortStatus", "Charging"],
+    "climate": ["ClimateKeeperMode", "ClimateSystemOnOff", "BatteryPrecond", "RemoteBatteryPreheat", "KeepClimateOn"],
+    "lights": ["LightsLowBeam", "LightsHighBeam", "LightsHighBeamFlash", "LightsHighBeamStrobe", "LightsHighBeamStrobe2", "LightsHighBeamStrobe3", "LightsHighBeamStrobe4", "LightsHighBeamStrobe5", "LightsHighBeamStrobe6", "LightsHighBeamStrobe7", "LightsHighBeamStrobe8", "LightsHighBeamStrobe9", "LightsHighBeamStrobe10", "LightsFrontFog", "LightsRearFog", "LightsAllFog", "LightsYokeHighBeam"],
+    "windows": ["WindowsPosition_Closed", "WindowsPosition_Open", "WindowsPosition_Vent", "WindowsPosition_CarWash", "WindowsPosition_0..100"],
+    "mirrors": ["MirrorsFold", "MirrorsTilt", "MirrorsDip", "MirrorsDim"],
+    "seats": ["SeatCoolingFlCar", "SeatCoolingFlBtn", "SeatCoolingFrCar", "SeatCoolingFrBtn", "SeatProfileData"],
+    "driverAssistance": ["AutopilotToggle", "AutopilotStart", "AutopilotRestart", "AutopilotRestartHW2_5", "AutopilotSpeedAdjust", "AutopilotSpeed+1", "AutopilotSpeed+5", "AutopilotSpeed-1", "AutopilotSpeed-5", "AutopilotMax", "AutopilotCCToggle", "AutopilotExtended", "LaneDepartureAvoidance", "BlindSpotAssistSettings"],
+    "security": ["SentryMode"],
+    "convenience": ["CampMode", "DogMode", "EasyEntry", "VolumeOnExit", "KickdownSport", "KickdownResetPedal"],
+    "speed": ["SpeedControl_Increase_1", "SpeedControl_Increase_5", "SpeedControl_Decrease_1", "SpeedControl_Decrease_5"],
+    "ambientLighting": ["AccelerationModeLED", "BatteryPreconditioning", "Charging", "GreetingRainbow", "OpenDoorWarningActive", "SpeedLimit", "TurnSignalsOnTurn", "TurnSignalsOnHazard", "BlindSpotAlways", "BlindSpotOnTurn"]
+  },
+  "automationSettings": [
+    "ActionsOnReverseSettings", "ActionsUponApproachSettings", "AmbientLightEffectsAutomationSettings", "AutoWindowDropSettings", "CameraOnFoldMirrorsSettings", "DiagnosticSettings", "EmergencyLaneKeepOffSettings", "GeneralAmbientLightSettings", "KickdownAutomationSettings", "LightsAutomationSettings", "PassengerEasyEntryAutomationSettings", "RemoteBatteryPreheatSettings", "ScrollWheelButtonSettings", "SuspensionByGearSettings", "VolumeOnExitAutomationSettings"
+  ],
+  "deviceSurfaces": ["Commander", "Dash", "Dashboard", "Knob", "Stalks", "Strip"],
+  "transportSurfaces": ["BLE", "Wi-Fi", "USB", "protobuf", "security", "OTA/update"],
+  "safety": {
+    "vehicleWrites": "PROFILE_GATED",
+    "driverAssistanceWrites": "EXPERIMENTAL_WRITE",
+    "securitySensitiveActions": "USER_CONFIRMATION",
+    "CAN_UDS_mapping": "UNVERIFIED",
+    "officialProtocolMapping": "UNVERIFIED"
+  }
+}
