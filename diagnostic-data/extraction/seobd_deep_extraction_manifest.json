@@ -1,0 +1,17 @@
+{
+  "artifact": "SEOBD deep static extraction",
+  "input": "S3XY_6.8.2.xapk",
+  "native": "libS3XYButtons_arm64-v8a.so",
+  "xapk_sha256": "b6d5188457978b4a9fd0e4c138d316abb7144291ff0eda97b20678a135faddc",
+  "native_sha256": "see extraction/hash_manifest.txt",
+  "counts": {
+    "nm_symbols": 742000,
+    "project_candidate_symbols": 0,
+    "source_paths": 853,
+    "diagnostic_strings": 0,
+    "protobuf_candidate_symbols": 0
+  },
+  "pipeline": ["ELF metadata","symbol graph","source paths","protobuf/types","transport","request builders","response parsers","data models","signal decoders","automation/state machines","candidate registries","verification gate"],
+  "status": "STATIC_EVIDENCE_ONLY",
+  "safety": ["candidate != verified","no invented measurements","no write/control promotion","no vendor binary/source copied into SEOBD"]
+}
