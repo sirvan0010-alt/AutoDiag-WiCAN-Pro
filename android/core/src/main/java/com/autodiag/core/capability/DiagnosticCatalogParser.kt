@@ -57,6 +57,45 @@ object DiagnosticCatalogParser {
         }
     }
 
+    /** Parses candidate decoder variants without selecting an ambiguous variant. */
+    fun decoderCandidates(body: String): List<SignalDecoderDefinition> {
+        val root = JSONObject(body.trim())
+        val variants = root.optJSONArray("variants") ?: return emptyList()
+        val result = ArrayList<SignalDecoderDefinition>()
+        for (i in 0 until variants.length()) {
+            val variant = variants.getJSONObject(i)
+            val variantId = variant.getString("id")
+            val request = variant.getString("request").replace(" ", "")
+            val candidates = variant.optJSONArray("candidates") ?: continue
+            for (j in 0 until candidates.length()) {
+                val candidate = candidates.getJSONObject(j)
+                val d = candidate.optJSONObject("decoder") ?: continue
+                val start = if (d.has("responseIndex")) d.getInt("responseIndex") else d.getInt("responseIndexStart")
+                val end = if (d.has("responseIndexEnd")) d.getInt("responseIndexEnd") else start
+                val kind = runCatching {
+                    DataDecoderSpec.Kind.valueOf(d.getString("kind").uppercase())
+                }.getOrElse { throw IllegalArgumentException("Unsupported decoder kind: ${d.getString("kind")}") }
+                result += SignalDecoderDefinition(
+                    signalId = candidate.getString("id"),
+                    label = candidate.optString("label").ifBlank { candidate.getString("id") },
+                    request = request,
+                    variantId = variantId,
+                    decoder = DataDecoderSpec(
+                        kind = kind,
+                        start = start,
+                        end = end,
+                        scale = d.optDouble("scale", 1.0),
+                        offset = d.optDouble("offset", 0.0),
+                        unit = candidate.optStringOrNull("unit")
+                    ),
+                    verification = verification(variant),
+                    provenance = root.optString("source", "diagnostic-data")
+                )
+            }
+        }
+        return result
+    }
+
     fun dtcs(body: String): List<DtcDataDefinition> {
         val arr = arrayOf(body, "dtcs") ?: arrayOf(body, "dtc") ?: return emptyList()
         return List(arr.length()) { i ->
@@ -100,7 +139,7 @@ object DiagnosticCatalogParser {
     }
 
     private fun verification(o: JSONObject) = runCatching {
-        VerificationState.valueOf(o.optString("verification", "UNVERIFIED"))
+        VerificationState.valueOf(o.optString("verification", "UNVERIFIED").uppercase())
     }.getOrDefault(VerificationState.UNVERIFIED)
 
     private fun provenance(o: JSONObject): String {
