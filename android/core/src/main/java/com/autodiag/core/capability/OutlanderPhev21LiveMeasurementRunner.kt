@@ -45,6 +45,13 @@ class OutlanderPhev21LiveMeasurementRunner(
                         fun unique(signalId: String): SignalDecoderDefinition? =
                             candidates.filter { it.signalId == signalId }.singleOrNull()
 
+                        fun verification(definition: SignalDecoderDefinition): OutlanderMeasurementVerification =
+                            when (definition.verification) {
+                                VerificationState.VERIFIED -> OutlanderMeasurementVerification.VERIFIED
+                                VerificationState.PARTIALLY_VERIFIED -> OutlanderMeasurementVerification.PARTIALLY_VERIFIED
+                                VerificationState.UNVERIFIED -> OutlanderMeasurementVerification.UNVERIFIED
+                            }
+
                         val isolationDefinition = unique("battery.isolation_resistance")
                         val maxDefinition = unique("battery.internal_resistance.max")
                         val minDefinition = unique("battery.internal_resistance.min")
@@ -52,36 +59,24 @@ class OutlanderPhev21LiveMeasurementRunner(
                         val isolation = isolationDefinition?.let {
                             runCatching {
                                 OutlanderPhevResistanceDecoder.decodeMeasurement(
-                                    definition = it,
-                                    response = parsed,
-                                    timestampEpochMs = startedAt,
-                                    rawRequest = REQUEST,
-                                    rawResponse = response.raw,
-                                    verification = OutlanderMeasurementVerification.PARTIALLY_VERIFIED
+                                    definition = it, response = parsed, timestampEpochMs = startedAt,
+                                    rawRequest = REQUEST, rawResponse = response.raw, verification = verification(it)
                                 )
                             }.getOrNull()
                         }
                         val max = maxDefinition?.let {
                             runCatching {
                                 OutlanderPhevResistanceDecoder.decodeMeasurement(
-                                    definition = it,
-                                    response = parsed,
-                                    timestampEpochMs = startedAt,
-                                    rawRequest = REQUEST,
-                                    rawResponse = response.raw,
-                                    verification = OutlanderMeasurementVerification.UNVERIFIED
+                                    definition = it, response = parsed, timestampEpochMs = startedAt,
+                                    rawRequest = REQUEST, rawResponse = response.raw, verification = verification(it)
                                 )
                             }.getOrNull()
                         }
                         val min = minDefinition?.let {
                             runCatching {
                                 OutlanderPhevResistanceDecoder.decodeMeasurement(
-                                    definition = it,
-                                    response = parsed,
-                                    timestampEpochMs = startedAt,
-                                    rawRequest = REQUEST,
-                                    rawResponse = response.raw,
-                                    verification = OutlanderMeasurementVerification.UNVERIFIED
+                                    definition = it, response = parsed, timestampEpochMs = startedAt,
+                                    rawRequest = REQUEST, rawResponse = response.raw, verification = verification(it)
                                 )
                             }.getOrNull()
                         }
@@ -95,12 +90,8 @@ class OutlanderPhev21LiveMeasurementRunner(
                         }.map { it.first }
 
                         Result(
-                            timestampEpochMs = startedAt,
-                            rawRequest = REQUEST,
-                            rawResponse = response.raw,
-                            isolationResistance = isolation,
-                            internalResistanceMax = max,
-                            internalResistanceMin = min,
+                            timestampEpochMs = startedAt, rawRequest = REQUEST, rawResponse = response.raw,
+                            isolationResistance = isolation, internalResistanceMax = max, internalResistanceMin = min,
                             adapterStatus = response.kind,
                             error = when {
                                 candidates.isEmpty() -> "No diagnostic-data decoder candidate for $REQUEST"
