@@ -1,0 +1,57 @@
+Evidence: DWARF enum `SVDF_*` → numeric value recovered from the native library.
+Status: SEMANTIC_FIELD_ID_CANDIDATE (not a CAN identifier and not a wire byte offset).
+
+SVDF_INVALID	0
+SVDF_nav_car_latitude	1
+SVDF_nav_car_longitude	2
+SVDF_nav_car_location_name	3
+SVDF_nav_destination_latitude	4
+SVDF_nav_destination_longitude	5
+SVDF_nav_destination_location_name	6
+SVDF_nav_distance_in_miles	7
+SVDF_nav_minutes_to_arrival	8
+SVDF_nav_energy_at_arrival	9
+SVDF_nav_traffic_minutes_delay	10
+SVDF_media_playback_status	11
+SVDF_media_now_playing_source	12
+SVDF_media_now_playing_artist	13
+SVDF_media_now_playing_title	14
+SVDF_media_now_playing_source_string	15
+SVDF_media_now_playing_album	16
+SVDF_media_now_playing_station	17
+SVDF_media_a2dp_source_name	18
+SVDF_media_now_playing_duration	19
+SVDF_media_now_playing_elapsed	20
+SVDF_media_audio_volume	21
+SVDF_media_audio_volume_increment	22
+SVDF_media_audio_volume_max	23
+SVDF_display_brightness	24
+SVDF_display_state	25
+SVDF_display_theme	26
+SVDF_sensors_outside_temperature	27
+SVDF_bms_battery_voltage	28
+SVDF_bms_battery_current	29
+SVDF_bms_charge_status	30
+SVDF_bms_energy_buffer	31
+SVDF_bms_temp_pt_inlet	32
+SVDF_bms_nominal_remaining	33
+SVDF_bms_nominal_full_pack_now	34
+SVDF_bms_nominal_full_pack_new	35
+SVDF_bms_ideal_energy_remaining	36
+SVDF_bms_max_discharge_power	37
+SVDF_bms_max_regen_power	38
+SVDF_bms_battery_heating_state	39
+SVDF_bms_cell_max_temp	41
+SVDF_bms_cell_min_temp	42
+SVDF_bms_cell_max_voltage	43
+SVDF_bms_cell_min_voltage	44
+SVDF_bms_ac_charge_total	45
+SVDF_bms_dc_charge_total	46
+SVDF_bms_discharge_total	47
+SVDF_bms_regen_total	48
+SVDF_charging_dc_current	75
+SVDF_charging_dc_voltage	76
+SVDF_charging_low_bus_voltage	77
+SVDF_charging_low_bus_current	78
+
+# Full raw DWARF pairing evidence is retained in the local extraction workspace; this tracked ledger contains the first reconstructed field-id block and will be extended in subsequent passes.
