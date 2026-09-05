@@ -28,6 +28,40 @@ APK
 
 If any link is missing, record `UNRESOLVED`/`UNVERIFIED`. Never fill gaps from signal names, class names, public topology or intuition.
 
+## Canonical data ownership — SINGLE SOURCE OF TRUTH
+
+**`sirvan0010-alt/AutoDiag-WiCAN-Diagnostic-Data` is the sole source of truth for production diagnostic candidates, decoder definitions, extraction provenance and their manifests.**
+
+The repository `AutoDiag-WiCAN-Pro` is the application/code repository. Its `diagnostic-data/` directory is **legacy seed/staging material only** and must not be used as a second production data store. New or changed candidates/provenance MUST NOT be written there.
+
+Runtime direction is explicit:
+
+```text
+AutoDiag-WiCAN-Pro code
+        |
+        v
+GitHubDiagnosticDataProvider
+        |
+        v
+AutoDiag-WiCAN-Diagnostic-Data/main
+        |
+        +--> manifest.json
+        +--> data/candidates/*
+        +--> provenance/*
+```
+
+The local `diagnostic-data/` directory is not a synchronization target and must not be treated as an authoritative cache. If legacy files are needed temporarily for migration, they must be clearly labelled legacy and never edited as production data.
+
+### Three locations — exact roles
+
+| Location | Role | Production authority |
+|---|---|---|
+| `AutoDiag-WiCAN-Diagnostic-Data/manifest.json` | canonical dataset manifest/counts | **YES** |
+| `AutoDiag-WiCAN-Diagnostic-Data/data/candidates/` + `provenance/` | canonical candidates and evidence | **YES** |
+| `AutoDiag-WiCAN-Pro/diagnostic-data/` | legacy seed/staging/compatibility only | **NO** |
+
+A path mentioned from the `AutoDiag-WiCAN-Pro` repository must be prefixed with the repository name when it refers to the external repository. Never write `provenance/...` as if it were local when the intended location is the external repository.
+
 ## DEX parser gate
 
 Before interpreting bytecode, validate the DEX parser.
@@ -102,7 +136,7 @@ The phrase “32 voltage outputs, scale unresolved” is an old working hypothes
 6. Extract exact indices and arithmetic.
 7. Determine scale, offset, unit, endian and signedness only from code/data evidence.
 8. Record the result in `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/phev-watchdog/`.
-9. Create a candidate under `data/candidates/` only after the decoder contract is sufficiently explicit.
+9. Create a candidate under `AutoDiag-WiCAN-Diagnostic-Data/data/candidates/` only after the decoder contract is sufficiently explicit.
 10. Add a deterministic unit test.
 11. Keep ECU/address and vehicle scope unresolved until independently supported.
 
@@ -110,15 +144,29 @@ The phrase “32 voltage outputs, scale unresolved” is an old working hypothes
 
 ### `AutoDiag-WiCAN-Diagnostic-Data`
 
-Use for APK provenance, extraction matrices, decoder candidates and evidence metadata.
+Use for APK provenance, extraction matrices, decoder candidates and evidence metadata. This is the **only authoritative production data repository**.
 
 Do not place unresolved formulas into production candidate files.
 
 ### `AutoDiag-WiCAN-Pro`
 
-Use for parsers, runtime integration, tests, architecture and AI instructions.
+Use for parsers, runtime integration, tests, architecture and AI instructions. Its `diagnostic-data/` directory is legacy seed/staging only and is not a production source of truth.
 
 Do not hardcode a new decoder before its Diagnostic-Data contract is justified.
+
+## Pre-commit data-location checklist
+
+Before committing any extraction result:
+
+- [ ] Is this production candidate/provenance data? If yes, commit it only to `AutoDiag-WiCAN-Diagnostic-Data`.
+- [ ] Is the path explicitly prefixed with the correct repository when referenced from `AutoDiag-WiCAN-Pro`?
+- [ ] Did I avoid creating/updating a second candidate copy under `AutoDiag-WiCAN-Pro/diagnostic-data/`?
+- [ ] Does `AutoDiag-WiCAN-Diagnostic-Data/manifest.json` count match the actual candidate files?
+- [ ] Does `GitHubDiagnosticDataProvider` load every production candidate file that the manifest advertises?
+- [ ] Is provenance present for every promoted candidate?
+- [ ] Is `VERIFIED` still gated by real-vehicle evidence?
+
+If any answer is no, stop before extraction continues.
 
 ## Verification levels
 
