@@ -24,13 +24,14 @@ The project is intentionally developed as a documented, testable platform rather
 Before architectural implementation, read:
 
 1. `README.md`
-2. `ROADMAP.md`
-3. `docs/ARCHITECTURE_OVERVIEW.md`
-4. `docs/CAPABILITY_DISCOVERY.md`
-5. `docs/AUTOMATION_ENGINE.md`
-6. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
-7. `docs/LONG_TERM_FEATURE_PRESERVATION.md`
-8. relevant battery/HV documents
+2. `AI_HANDOFF.md`
+3. `ROADMAP.md`
+4. `docs/ARCHITECTURE_OVERVIEW.md`
+5. `docs/CAPABILITY_DISCOVERY.md`
+6. `docs/AUTOMATION_ENGINE.md`
+7. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
+8. `docs/LONG_TERM_FEATURE_PRESERVATION.md`
+9. relevant battery/HV documents
 
 `docs/IMPLEMENTATION_TASKS.md` is the active implementation backlog.
 
@@ -96,6 +97,9 @@ Do not assume an undocumented protocol. Verify behavior against the current WiCA
 26. Before declaring a new capability supported, perform the project audit/cross-check and record evidence and scope.
 27. Hardware-dependent features must be explicitly separated from Android-only features.
 28. Competitor applications (PHEV Watchdog, Torque, Car Scanner, Mitsubishi Remote Ctrl, LCode, etc.) may be used as behavioural reference and for capability discovery. Signal maps, PID lists and coding tables extracted or reverse-engineered from them are allowed provided they are re-implemented with provenance, not binary-copied, and marked with verification status.
+29. **Repository synchronization rule:** `AI_CONTEXT.md`, `AI_HANDOFF.md`, manifests and evidence status are descriptive state, not authority over Git history. Before work, verify the actual current branch/HEAD and reconcile documentation if it differs.
+30. **Evidence-layer rule:** static APK/DEX extraction can establish an extracted decoder candidate (including response indexes, scale and unit when directly evidenced), but does not establish physical meaning, ECU/CAN binding or vehicle verification.
+31. **Candidate/verification rule:** `candidate` + `unverified` is a valid state and must not be rewritten as `unresolved` merely because vehicle capture is missing. Use `BLOCKED: vehicle verification required` for promotion gates.
 
 ## Diagnostic Knowledge Base
 
@@ -145,14 +149,9 @@ A real vehicle must never be the first place where an untested write operation i
 
 Version: 0.1-dev
 
-Initial project phase:
+Current repository state is actively evolving on `main`. Do not rely on a hard-coded commit SHA in this file; verify `main` at the start of each task. The current work includes the Android OBD foundation plus evidence/promotion-gate work for SEOBD/S3XY and Car Scanner research. These evidence additions are **not** vehicle verification.
 
-- Repository established
-- Documentation-first architecture
-- Android application to be built with Kotlin/Jetpack Compose
-- Transport abstraction planned
-- Simulator planned
-- Real WiCAN hardware validation is a separate milestone
+The separate `AutoDiag-WiCAN-Diagnostic-Data` repository is the canonical home for diagnostic evidence/candidate datasets. Its manifest must agree with the actual candidate files and must not expose candidate-internal ECU/signal counts as production records.
 
 ## Important distinction
 
