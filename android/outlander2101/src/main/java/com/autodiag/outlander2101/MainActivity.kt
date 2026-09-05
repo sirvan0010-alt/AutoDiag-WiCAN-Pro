@@ -8,7 +8,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.io.BufferedReader
@@ -23,15 +22,17 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var value: TextView
     private lateinit var graph: GraphView
+    private lateinit var button: Button
     private var socket: Socket? = null
     private var output: OutputStream? = null
     private var running = false
+    private var polling = false
     private val history = mutableListOf<Float>()
     private val handler = Handler(Looper.getMainLooper())
 
     private val poller = object : Runnable {
         override fun run() {
-            if (!running) return
+            if (!running || !polling) return
             send("2101")
             handler.postDelayed(this, 1000)
         }
@@ -45,21 +46,14 @@ class MainActivity : Activity() {
             setPadding(28, 28, 28, 20)
         }
 
-        val host = EditText(this).apply {
-            setText("192.168.0.10")
-            hint = "WiCAN IP"
-            singleLine = true
+        button = Button(this).apply {
+            text = "2101"
+            isEnabled = false
         }
-        val port = EditText(this).apply {
-            setText("35000")
-            hint = "Port"
-            singleLine = true
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        status = TextView(this).apply {
+            text = "Připojování k WiCAN…"
+            textSize = 16f
         }
-        val connect = Button(this).apply { text = "PŘIPOJIT WiCAN" }
-        val b2101 = Button(this).apply { text = "2101"; isEnabled = false }
-
-        status = TextView(this).apply { text = "Odpojeno"; textSize = 16f }
         value = TextView(this).apply {
             text = "—"
             textSize = 42f
@@ -67,31 +61,28 @@ class MainActivity : Activity() {
         }
         graph = GraphView()
 
-        root.addView(host)
-        root.addView(port)
-        root.addView(connect)
-        root.addView(b2101)
+        root.addView(button)
         root.addView(status)
         root.addView(value)
         root.addView(graph, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
 
-        connect.setOnClickListener {
-            if (running) disconnect() else connect(host.text.toString(), port.text.toString().toIntOrNull() ?: 35000, b2101)
-        }
-        b2101.setOnClickListener {
+        button.setOnClickListener {
             if (!running) return@setOnClickListener
+            polling = true
             handler.removeCallbacks(poller)
             send("2101")
             handler.postDelayed(poller, 1000)
         }
+
+        connect()
     }
 
-    private fun connect(host: String, port: Int, button: Button) {
+    private fun connect() {
         Thread {
             try {
                 val s = Socket()
-                s.connect(InetSocketAddress(host, port), 4000)
+                s.connect(InetSocketAddress("192.168.0.10", 35000), 4000)
                 socket = s
                 output = s.getOutputStream()
                 running = true
@@ -107,13 +98,15 @@ class MainActivity : Activity() {
                 sendRaw("ATST32")
                 sendRaw("ATSH761")
                 runOnUiThread {
-                    status.text = "WiCAN připojen"
+                    status.text = "WiCAN připojen • připraveno"
                     button.isEnabled = true
                 }
                 readLoop()
             } catch (e: Exception) {
                 running = false
-                runOnUiThread { status.text = "Chyba: ${e.message ?: "připojení"}" }
+                runOnUiThread {
+                    status.text = "WiCAN není dostupný: ${e.message ?: "připojení"}"
+                }
             }
         }.start()
     }
@@ -166,22 +159,19 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun disconnect() {
+    override fun onDestroy() {
+        polling = false
         running = false
         handler.removeCallbacks(poller)
         try { socket?.close() } catch (_: Exception) {}
         socket = null
         output = null
-        status.text = "Odpojeno"
-    }
-
-    override fun onDestroy() {
-        disconnect()
         super.onDestroy()
     }
 
     private inner class GraphView : View(this) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
         override fun onDraw(c: Canvas) {
             super.onDraw(c)
             if (history.size < 2) return
