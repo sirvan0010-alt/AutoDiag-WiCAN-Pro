@@ -36,10 +36,15 @@ class OutlanderPhev21IndependentDecodeContractTest {
         decoder = max.decoder.copy(start = 39)
     )
 
-    private fun decodeIndependently(response: IntArray): Triple<Double?, Double?, Double?> = Triple(
-        runCatching { OutlanderPhevResistanceDecoder.decode(isolation, response) }.getOrNull(),
-        runCatching { OutlanderPhevResistanceDecoder.decode(max, response) }.getOrNull(),
-        runCatching { OutlanderPhevResistanceDecoder.decode(min, response) }.getOrNull()
+    private fun decodeIndependently(
+        response: IntArray,
+        isolationDefinition: SignalDecoderDefinition? = isolation,
+        maxDefinition: SignalDecoderDefinition? = max,
+        minDefinition: SignalDecoderDefinition? = min
+    ): Triple<Double?, Double?, Double?> = Triple(
+        isolationDefinition?.let { runCatching { OutlanderPhevResistanceDecoder.decode(it, response) }.getOrNull() },
+        maxDefinition?.let { runCatching { OutlanderPhevResistanceDecoder.decode(it, response) }.getOrNull() },
+        minDefinition?.let { runCatching { OutlanderPhevResistanceDecoder.decode(it, response) }.getOrNull() }
     )
 
     private fun fullResponse(): IntArray = IntArray(80).also {
@@ -59,7 +64,7 @@ class OutlanderPhev21IndependentDecodeContractTest {
 
     @Test
     fun onlyIsolationIsAvailable() {
-        val result = decodeIndependently(fullResponse()).copy(second = null, third = null)
+        val result = decodeIndependently(fullResponse(), maxDefinition = null, minDefinition = null)
         assertEquals(500.0, result.first)
         assertNull(result.second)
         assertNull(result.third)
@@ -67,8 +72,7 @@ class OutlanderPhev21IndependentDecodeContractTest {
 
     @Test
     fun onlyMaximumIsAvailable() {
-        val response = IntArray(40).also { it[38] = 15 }
-        val result = decodeIndependently(response)
+        val result = decodeIndependently(fullResponse(), isolationDefinition = null, minDefinition = null)
         assertNull(result.first)
         assertEquals(1.5, result.second)
         assertNull(result.third)
@@ -76,8 +80,7 @@ class OutlanderPhev21IndependentDecodeContractTest {
 
     @Test
     fun onlyMinimumIsAvailable() {
-        val response = IntArray(40).also { it[39] = 9 }
-        val result = decodeIndependently(response)
+        val result = decodeIndependently(fullResponse(), isolationDefinition = null, maxDefinition = null)
         assertNull(result.first)
         assertNull(result.second)
         assertEquals(0.9, result.third)
@@ -85,7 +88,7 @@ class OutlanderPhev21IndependentDecodeContractTest {
 
     @Test
     fun isolationAndMaximumSurviveMissingMinimum() {
-        val result = decodeIndependently(fullResponse()).copy(third = null)
+        val result = decodeIndependently(fullResponse(), minDefinition = null)
         assertEquals(500.0, result.first)
         assertEquals(1.5, result.second)
         assertNull(result.third)
@@ -93,7 +96,7 @@ class OutlanderPhev21IndependentDecodeContractTest {
 
     @Test
     fun isolationAndMinimumSurviveMissingMaximum() {
-        val result = decodeIndependently(fullResponse()).copy(second = null)
+        val result = decodeIndependently(fullResponse(), maxDefinition = null)
         assertEquals(500.0, result.first)
         assertNull(result.second)
         assertEquals(0.9, result.third)
@@ -131,9 +134,8 @@ class OutlanderPhev21IndependentDecodeContractTest {
 
     @Test
     fun ambiguousCandidateIsRejectedByResolver() {
-        val first = max
         val second = max.copy(variantId = "watchdog.ld4a.21_01")
-        val result = OutlanderPhevDecoderResolver.resolve(listOf(first, second), max.signalId)
+        val result = OutlanderPhevDecoderResolver.resolve(listOf(max, second), max.signalId)
         assertIs<OutlanderPhevDecoderResolver.Resolution.Ambiguous>(result)
     }
 
