@@ -16,10 +16,10 @@ object DataDrivenDecoder {
     fun decode(tokens: IntArray, spec: DataDecoderSpec): Double {
         require(spec.start >= 0 && spec.end >= spec.start) { "Invalid decoder range ${spec.start}..${spec.end}" }
         require(tokens.size > spec.end) { "Response has ${tokens.size} tokens; decoder requires index ${spec.end}" }
-        val raw = when (spec.kind) {
-            DataDecoderSpec.Kind.UNSIGNED_U8 -> u8(tokens[spec.start])
-            DataDecoderSpec.Kind.UNSIGNED_U16_BE -> (u8(tokens[spec.start]) shl 8) or u8(tokens[spec.end])
-            DataDecoderSpec.Kind.UNSIGNED_U16_LE -> (u8(tokens[spec.end]) shl 8) or u8(tokens[spec.start])
+        val raw: Double = when (spec.kind) {
+            DataDecoderSpec.Kind.UNSIGNED_U8 -> u8(tokens[spec.start]).toDouble()
+            DataDecoderSpec.Kind.UNSIGNED_U16_BE -> ((u8(tokens[spec.start]) shl 8) or u8(tokens[spec.end])).toDouble()
+            DataDecoderSpec.Kind.UNSIGNED_U16_LE -> ((u8(tokens[spec.end]) shl 8) or u8(tokens[spec.start])).toDouble()
             DataDecoderSpec.Kind.SIGNED_U8 -> signed8(tokens[spec.start]).toDouble()
             DataDecoderSpec.Kind.SIGNED_I16_BE -> signed16((u8(tokens[spec.start]) shl 8) or u8(tokens[spec.end])).toDouble()
             DataDecoderSpec.Kind.SIGNED_I16_LE -> signed16((u8(tokens[spec.end]) shl 8) or u8(tokens[spec.start])).toDouble()
