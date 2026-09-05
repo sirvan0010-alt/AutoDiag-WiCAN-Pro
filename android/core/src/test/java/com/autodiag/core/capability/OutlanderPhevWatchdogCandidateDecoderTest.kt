@@ -27,6 +27,21 @@ class OutlanderPhevWatchdogCandidateDecoderTest {
     }
 
     @Test
+    fun decodesAllThirtyTwo21_04OutputsIndependentlyUsingStaticApkScale() {
+        val tokens = IntArray(32) { it + 180 }
+        val spec = DataDecoderSpec(
+            kind = DataDecoderSpec.Kind.UNSIGNED_U8,
+            start = 0,
+            end = 31,
+            scale = 0.02
+        )
+
+        assertEquals(32, tokens.size)
+        assertEquals(3.60, DataDrivenDecoder.decode(tokens, spec.copy(start = 0, end = 0)), 0.000001)
+        assertEquals(4.22, DataDrivenDecoder.decode(tokens, spec.copy(start = 31, end = 31)), 0.000001)
+    }
+
+    @Test
     fun decodesFrontMotorRpmAsLittleEndian() {
         val tokens = IntArray(32)
         tokens[30] = 0x34
