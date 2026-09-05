@@ -1,114 +1,147 @@
 # AI handoff — APK extraction continuation — 2026-09-05
 
-## Active task
+## Active strategy
 
-Continue evidence-driven extraction from `PHEV Watchdog Lite 1.9.1.2023OCT29.apk`, prioritizing request `21 04`.
+The goal of APK extraction is **not** to reproduce the source application internally. Extract only the final diagnostic data contract needed by AutoDiag:
 
-Source artifact SHA-256:
+```text
+request/init
+ -> response
+ -> normalized payload boundary
+ -> exact byte/bit positions
+ -> expression/scale/offset
+ -> unit
+ -> canonical UI signal
+```
+
+Prefer a direct, reproducible decoder contract over reconstructing the APK's class architecture, UI, database layer or internal abstractions.
+
+Deep APK reverse engineering is required **only when a final contract is missing or ambiguous**. Once the final contract is proven, stop tracing unrelated internals.
+
+## Source artifact
+
+`PHEV Watchdog Lite 1.9.1.2023OCT29.apk`
+
+SHA-256:
 
 `9ebac53f13ba9a1d04be158e49e37b886b9c35a711c9a4e33029c16a17b86ce6`
 
-## Current verified facts
+## Current verified APK facts
 
 - APK size: 12,127,187 bytes.
 - One `classes.dex` is present; size 6,554,216 bytes.
-- No `lib/*` native binaries are present in this APK.
-- Exact string literal `21 04` exists in the DEX string pool.
-- The APK contains related diagnostic labels for cell-voltage maps and cell-voltage/internal-resistance aggregates.
-- The broader command set already recorded in provenance includes `21 01`, `21 02`, `21 03`, `21 04`, `21 05`, `21 11`, `21 14`, `21 15`, `21 23`, `21 24`, `21 25`, `21 26`, `22 01 01..05`, and `22 B0 02`.
+- No native `lib/*` binaries are present.
+- Recorded command set includes `21 01`, `21 02`, `21 03`, `21 04`, `21 05`, `21 11`, `21 14`, `21 15`, `21 23`, `21 24`, `21 25`, `21 26`, `22 01 01..05`, and `22 B0 02`.
+- Direct decoder evidence already exists for several 21xx values, including isolation resistance, internal resistance, 32-cell groups, and motor/generator RPM.
 
-## 21 04 state
+## 21 04 current state
 
-`Lz3/d;` is the previously recorded class associated with `21 04`.
-
-Current production state:
+Static bytecode analysis of `Lz3/d;` established a final decoder shape:
 
 ```text
-request:       21 04
-class:         Lz3/d;
-decoder:       UNRESOLVED
-scale/offset:  UNRESOLVED
-byte order:    UNRESOLVED
-signedness:    UNRESOLVED
-ECU/address:   UNRESOLVED
-verification:  UNVERIFIED
-candidate:     NO
+request:        21 04
+outputs:        32
+responseIndex:  0..31
+raw type:       unsigned 8-bit
+scale:          0.02
+offset:         0
+unit:           V
+verification:   UNVERIFIED
 ```
 
-The earlier shorthand “32 voltage outputs, scale unresolved” is **not sufficient evidence for a candidate**. Treat it as a hypothesis until re-established from valid bytecode/data-flow analysis.
+The 32-output contract is suitable as an **unverified candidate** because the bytecode arithmetic and output cardinality are established. It does **not** prove physical cell numbering, exact ECU/address binding, vehicle generation or production applicability.
 
-Detailed provenance is in:
+The candidate is stored in the external canonical repository:
+
+`AutoDiag-WiCAN-Diagnostic-Data/data/candidates/outlander_phev_watchdog_21_04.json`
+
+Its provenance is:
 
 `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/phev-watchdog/21-04-extraction-2026-09-05.json`
 
-## Important correction to the supplied ad-hoc script
+## Extraction priority
 
-The supplied script produced a plausible-looking `Lz3/d.s` disassembly, but its result must not be accepted automatically. The extraction pass exposed contradictory class/method relationships when interpreted through the hand-written DEX parser. That is a parser-validation failure, not protocol evidence.
+For every APK/vehicle, work in this order:
 
-Before decoding `21 04`, the AI must:
+1. Find an already proven final data contract in repository data/provenance.
+2. Search the APK only for missing fields or ambiguous contracts.
+3. Extract the smallest sufficient evidence chain.
+4. Store the final contract in Diagnostic-Data with provenance.
+5. Add a deterministic decoder test.
+6. Keep ECU/address/vehicle scope `UNVERIFIED` until independently correlated.
+7. Stop. Do not continue reverse engineering merely because more APK internals exist.
 
-1. validate DEX header offsets and all index ranges;
-2. validate class-data method ownership against `method_ids`;
-3. validate field ownership/types;
-4. validate `code_item` bounds and instruction widths;
-5. only then follow `21 04` references into constructor/model registration and decoder data flow.
+Target EV signals currently include:
 
-## Required extraction chain
+- SOC
+- SOH
+- HV voltage
+- HV current
+- battery temperature
+- cell voltages
+- cell min/max/difference
+- internal resistance where available
+- front/rear motor RPM
+- generator RPM
+- DTCs
+
+The same final-contract method should be reused for other EVs.
+
+## Evidence chain when deep extraction is necessary
 
 ```text
-21 04 literal
- -> code reference(s)
- -> model/class registration
- -> actual decoder method
- -> input container
- -> normalized d[] boundary
- -> exact indices
+exact request
+ -> code reference
+ -> actual decoder
+ -> normalized payload boundary
+ -> exact indices/bits
  -> arithmetic
  -> unit/scale/offset/signedness/endian
  -> provenance
  -> candidate
- -> test
+ -> deterministic test
  -> ECU/address correlation
  -> real vehicle validation
 ```
 
-No skipped link may be filled by intuition.
+No missing link may be filled by intuition. Signal names, class names, public CAN topology and guesses are not decoder evidence.
+
+## DEX parser gate
+
+Before trusting custom DEX parsing, validate:
+
+- header offsets and index ranges;
+- class-data method ownership against `method_ids`;
+- field ownership/types;
+- `code_item` bounds and instruction widths;
+- branch targets and payload instructions.
+
+A contradictory class/method mapping means parser failure, not protocol evidence.
 
 ## Repository discipline
 
-### Diagnostic-Data
+### `AutoDiag-WiCAN-Diagnostic-Data`
 
-Use for:
+Canonical source of truth for production diagnostic candidates, decoder definitions, APK provenance and manifests.
 
-- APK provenance
-- extraction matrix
-- candidate JSON
-- decoder definitions
-- evidence metadata
+### `AutoDiag-WiCAN-Pro`
 
-Do not put an unresolved hypothesis into `data/candidates/`.
+Application/runtime repository. Use for parser/runtime implementation, tests and AI instructions. Its legacy `diagnostic-data/` directory is not the production source of truth.
 
-### AutoDiag-WiCAN-Pro
+## Candidate rules
 
-Use for:
-
-- extraction rules/instructions
-- parser/runtime implementation
-- tests
-- architecture documentation
-
-Do not hardcode a new `21 04` decoder until the data contract is justified by evidence.
+- `UNRESOLVED`: final decoder contract is not safely established.
+- `UNVERIFIED`: static/equivalent evidence establishes a contract but vehicle evidence is missing.
+- `PARTIALLY_VERIFIED`: decoder plus external correlation exists, but scope/address/vehicle proof is incomplete.
+- `VERIFIED`: real-vehicle evidence binds request, response, ECU/address, decoder and vehicle scope.
+- Never promote an unverified candidate to production merely because its formula looks plausible.
 
 ## Branch/PR discipline
 
-The Outlander implementation remains on `feat/mitsubishi-outlander-phev` under draft PR #10. Do not claim it is mergeable or production-complete merely because extraction work advances.
+The Outlander work remains on `feat/mitsubishi-outlander-phev` under draft PR #10. Do not claim mergeability or production completeness from extraction progress alone.
 
-The S3XY work is separate and remains on its own PR/branch. Do not mix Tesla/S3XY schema documentation into the Outlander Diagnostic-Data candidates.
+S3XY/Tesla work is separate and must not be mixed into the Outlander candidate dataset.
 
-## Verification gate
+## Safety
 
-`VERIFIED` requires real-vehicle evidence binding request/response, ECU/address, decoder and vehicle scope. APK evidence alone can never set `VERIFIED`.
-
-## Safety gate
-
-This extraction is read-only. No coding, adaptation, actuator, security-access, immobilizer or other write operation may be enabled as a result of APK reverse engineering.
+APK reverse engineering is read-only evidence work. It does not authorize coding, adaptation, actuator commands, security access, immobilizer operations, immobilizer bypass or any other write functionality.
