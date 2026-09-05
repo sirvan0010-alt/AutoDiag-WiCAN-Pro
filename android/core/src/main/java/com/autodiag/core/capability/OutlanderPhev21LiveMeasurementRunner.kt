@@ -66,24 +66,21 @@ class OutlanderPhev21LiveMeasurementRunner(
                                 else -> null
                             }
 
-                        val isolationDefinition = definitionOrNull("battery.isolation_resistance")
-                        val maxDefinition = definitionOrNull("battery.internal_resistance.max")
-                        val minDefinition = definitionOrNull("battery.internal_resistance.min")
-                        val ambiguities = listOfNotNull(
-                            ambiguity("battery.isolation_resistance"),
-                            ambiguity("battery.internal_resistance.max"),
-                            ambiguity("battery.internal_resistance.min")
-                        )
-
+                        // Each signal decodes independently. A response too short/malformed for one
+                        // signal (e.g. isolation needs the highest byte offset) must not discard the
+                        // other two signals if they decoded successfully - hence runCatching per call,
+                        // not one shared block wrapping all three decode() invocations.
                         fun decode(definition: SignalDecoderDefinition?): OutlanderResistanceMeasurement? = definition?.let {
-                            OutlanderPhevResistanceDecoder.decodeMeasurement(
-                                definition = it,
-                                response = parsed,
-                                timestampEpochMs = startedAt,
-                                rawRequest = REQUEST,
-                                rawResponse = response.raw,
-                                verification = verification(it)
-                            )
+                            runCatching {
+                                OutlanderPhevResistanceDecoder.decodeMeasurement(
+                                    definition = it,
+                                    response = parsed,
+                                    timestampEpochMs = startedAt,
+                                    rawRequest = REQUEST,
+                                    rawResponse = response.raw,
+                                    verification = verification(it)
+                                )
+                            }.getOrNull()
                         }
 
                         Result(
