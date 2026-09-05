@@ -4,20 +4,18 @@ Date: 2026-09-05
 
 ## Scope
 
-This artifact records the static reconstruction of the `ReqSubscribeVehicleData` / `PushVehicleDataHolder` protobuf layer from the supplied ARM64 native library. It does **not** claim a CAN mapping.
+Static reconstruction of the `ReqSubscribeVehicleData` / `PushVehicleDataHolder` protobuf layer from the supplied ARM64 native library. This does **not** claim a CAN mapping.
 
 ## 1. Request construction
 
-`CMessageHelper::GetReqSubscribeVehicleData(bool)` allocates `ReqSubscribeVehicleData` and fills its repeated integer `subscribe_fields` list. The observed values include semantic IDs such as 24, 25, 26, 27, 125, 126, 127, 128, 28, 29, 30, ... .
-
-Therefore the application explicitly requests vehicle-data semantic fields by numeric identifier.
+`CMessageHelper::GetReqSubscribeVehicleData(bool)` allocates `ReqSubscribeVehicleData` and fills its repeated integer `subscribe_fields` list. Observed values include semantic IDs 24, 25, 26, 27, 125, 126, 127, 128, 28, 29, 30, ... . The application therefore explicitly requests vehicle-data semantic fields by numeric identifier.
 
 ## 2. Protobuf field-number reconstruction
 
 `PushVehicleDataHolder::_InternalSerialize(...)` checks the oneof discriminator for each semantic case and emits a protobuf key. For the EV-relevant block the emitted keys are varint keys (`wire_type = 0`). The protobuf field number is `key >> 3`.
 
-| semantic ID / case | field | protobuf key | wire type |
-|---:|---:|---:|---:|
+| semantic ID / case | field | protobuf field | wire type |
+|---:|---|---:|---:|
 | 27 | sensors_outside_temperature | 59 | 0 |
 | 28 | bms_battery_voltage | 60 | 0 |
 | 29 | bms_battery_current | 61 | 0 |
@@ -75,9 +73,9 @@ Therefore the application explicitly requests vehicle-data semantic fields by nu
 | 125 | sensors_front_left_brake_temp | 253 | 0 |
 | 126 | sensors_front_right_brake_temp | 254 | 0 |
 | 127 | sensors_rear_left_brake_temp | 255 | 0 |
-| 128 | sensors_rear_right_brake_temp | 256 | 0 |
+| 128 | sensors_rear_right_brake_temp | 272 | 0 |
 
-The high-number cases 124–128 are especially useful: their serializer constants are 2016, 2024, 2032, 2040 and 2176 respectively, giving protobuf fields 252, 253, 254, 255 and 272 where the serializer branch must be checked independently for the final case. The table above records the directly observed first key for cases 124–128 except that the last case requires one additional verification pass before promotion.
+The last five mappings are directly supported by serializer constants 2016, 2024, 2032, 2040 and 2176 respectively (`field = key >> 3`).
 
 ## 3. Typed raw values
 
@@ -88,15 +86,19 @@ DWARF/accessor evidence establishes:
 - `OptionalBmsBatteryVoltageCase::kBmsBatteryVoltage` = 28.
 - `OptionalBmsCellMaxVoltageCase::kBmsCellMaxVoltage` = 43.
 
-For `bms_battery_voltage`, the serializer path is therefore consistent with a protobuf varint carrying the raw `uint32` value. The observed key is `480 = 60 << 3`, so the generated protobuf field number is **60**, not 28. This is the concrete demonstration that semantic ID and protobuf field number are separate namespaces.
+For `bms_battery_voltage`, the serializer emits key `480 = 60 << 3`, so the generated protobuf field number is **60**, while semantic case/ID is **28**. This proves these identifiers are separate namespaces.
 
-## 4. Important boundary
+## 4. Evidence boundary
 
-This layer is now substantially reconstructed:
+Reconstructed:
 
-`GetReqSubscribeVehicleData()` → repeated semantic-field request → `ReqSubscribeVehicleData` protobuf → protobuf field key/type → `PushVehicleDataHolder` protobuf serialization/deserialization → typed application value.
+`GetReqSubscribeVehicleData()` → repeated semantic-field request → `ReqSubscribeVehicleData` → protobuf field key/type → `PushVehicleDataHolder` serialization/deserialization → typed application value.
 
-It is **not yet** a CAN decoder. No CAN arbitration ID, DLC, byte offset, bit offset, endianness, scale, offset or physical-unit conversion is promoted by this artifact.
+Not yet reconstructed/verified:
+
+`CAN frame → CAN ID → DLC → byte/bit → endianness → signedness → scale → offset → unit → physical signal`.
+
+No CAN arbitration ID, DLC, byte/bit location, endianness, scaling, offset or unit conversion is promoted from this artifact.
 
 ## Evidence addresses
 
