@@ -2,6 +2,7 @@ package com.autodiag.core.capability
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class OutlanderPhev21ResponseParserTest {
     @Test
@@ -26,5 +27,12 @@ class OutlanderPhev21ResponseParserTest {
         val parsed = OutlanderPhev21ResponseParser.parse(response)
 
         assertEquals(listOf(0xAA, 0xBB, 0xCC, 0xDD), parsed.toList())
+    }
+
+    @Test
+    fun rejectsIncompleteIsoTpFirstFrame() {
+        assertFailsWith<IllegalArgumentException> {
+            OutlanderPhev21ResponseParser.parse("762 10 37 61")
+        }
     }
 }
