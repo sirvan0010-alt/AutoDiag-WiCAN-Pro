@@ -54,7 +54,7 @@ class OutlanderPhev21LiveMeasurementRunner(
 
                         fun definitionOrNull(signalId: String): SignalDecoderDefinition? =
                             when (val result = resolve(signalId)) {
-                                OutlanderPhevDecoderResolver.Resolution.Resolved -> result.definition
+                                is OutlanderPhevDecoderResolver.Resolution.Resolved -> result.definition
                                 OutlanderPhevDecoderResolver.Resolution.NotFound -> null
                                 is OutlanderPhevDecoderResolver.Resolution.Ambiguous -> null
                             }
