@@ -72,9 +72,9 @@ class GitHubDiagnosticDataProviderTest {
         val candidates = provider.findDecoderCandidates("21 04", "watchdog.lz3d.21_04")
 
         assertEquals(1, candidates.size)
-        assertEquals("watchdog.21_04.output_group_32", candidates.single().id)
-        assertEquals("V", candidates.single().unit)
-        assertEquals(0.02, candidates.single().scale)
+        assertEquals("watchdog.21_04.output_group_32", candidates.single().signalId)
+        assertEquals("V", candidates.single().decoder.unit)
+        assertEquals(0.02, candidates.single().decoder.scale)
     }
 
     private class FakeHttp(private val responses: Map<String, String>) : DiagnosticDataHttpClient {
