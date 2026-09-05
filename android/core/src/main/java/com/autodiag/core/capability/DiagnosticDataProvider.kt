@@ -62,7 +62,10 @@ data class SignalDecoderDefinition(
     val variantId: String,
     val decoder: DataDecoderSpec,
     val verification: VerificationState = VerificationState.UNVERIFIED,
-    val provenance: String = "diagnostic-data"
+    val provenance: String = "diagnostic-data",
+    /** Optional diagnostic CAN request/response IDs when the source proves them. */
+    val requestCanId: Int? = null,
+    val responseCanId: Int? = null
 )
 
 data class DtcDataDefinition(
