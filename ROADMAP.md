@@ -1,10 +1,23 @@
 # SEOBD Roadmap
 
 > Master specification: `docs/TODAY_MASTER_PLAN_2026-09-02.md`
+> Deep extraction evidence: `diagnostic-data/extraction/SEOBD_DEEP_EXTRACTION_01_12.md`
 > Repair/estimate architecture: `docs/REPAIR_KNOWLEDGE_ESTIMATE_ARCHITECTURE.md`
 > Oscilloscope architecture: `docs/OSCILLOSCOPE_ARCHITECTURE.md`
 > DTC memory architecture: `docs/DTC_MEMORY_AND_CLEAR_ARCHITECTURE.md`
 > UI tokens: `docs/UI_TESLA_THEME.md`
+
+## Research priority — deep evidence first
+- [x] Acquire and hash reference XAPK/native library
+- [x] ELF/symbol/source-path inventory
+- [x] DWARF semantic field reconstruction
+- [x] Vehicle-data request/response chain anchors
+- [x] Candidate EV semantic-field registry
+- [ ] Protobuf field-number and serialization reconstruction
+- [ ] Transport characteristic / framing reconstruction
+- [ ] Request → response → field → decoder end-to-end proof
+- [ ] Runtime capture corroboration
+- [ ] Promote only independently corroborated signals to VERIFIED
 
 ## Phase 0 — Foundation
 - [x] Vehicle-scope model
@@ -78,7 +91,9 @@
 
 ## Phase 6 — Vehicle-specific READ diagnostics
 - [ ] Exact vehicle/profile matching
-- [ ] Verified signal database
+- [ ] Verified signal database — **blocked on deep reconstruction**
+- [x] Semantic EV field inventory from native evidence
+- [ ] Wire-level decoder reconstruction
 - [ ] Model-specific identification where possible
 - [ ] Battery telemetry
 - [ ] Per-module/per-cell telemetry where exposed
@@ -101,7 +116,7 @@
 
 ## Phase 8 — Repair intelligence / estimates
 - [ ] `needs_review` handling
-- [ ] RepairSource / Procedure / Part models
+- [ ] `RepairSource` / `Procedure` / `Part` models
 - [ ] LaborEstimate / PriceEstimate
 - [ ] RepairEstimateEngine
 - [ ] Exact vehicle/ECU matching
