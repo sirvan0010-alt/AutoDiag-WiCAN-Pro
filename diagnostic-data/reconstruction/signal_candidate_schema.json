@@ -1,0 +1,25 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"SEOBD Signal Evidence Candidate",
+  "type":"object",
+  "required":["signal","status","evidence"],
+  "properties":{
+    "signal":{"type":"string"},
+    "status":{"enum":["CANDIDATE","CORROBORATED","VERIFIED","REJECTED"]},
+    "transport":{"type":["string","null"]},
+    "request":{"type":["string","null"]},
+    "response":{"type":["string","null"]},
+    "semantic_field_id":{"type":["integer","null"]},
+    "identifier":{"type":["string","integer","null"]},
+    "byte_offset":{"type":["integer","null"]},
+    "bit_offset":{"type":["integer","null"]},
+    "bit_length":{"type":["integer","null"]},
+    "mask":{"type":["string","null"]},
+    "signed":{"type":["boolean","null"]},
+    "scaling":{"type":["number","null"]},
+    "offset":{"type":["number","null"]},
+    "unit":{"type":["string","null"]},
+    "evidence":{"type":"array","items":{"type":"object","required":["kind","reference"],"properties":{"kind":{"type":"string"},"reference":{"type":"string"}}}},
+    "notes":{"type":"string"}
+  }
+}
