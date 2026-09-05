@@ -42,6 +42,41 @@ class GitHubDiagnosticDataProviderTest {
         assertEquals(VerificationState.VERIFIED, dtc.verification)
     }
 
+    @Test
+    fun candidateManifest_loads21_04Decoder() = runBlocking {
+        val http = FakeHttp(mapOf(
+            "manifest.json" to """{"records":{"candidates":1}}""",
+            "data/candidates/outlander_phev_watchdog_21_04.json" to """
+                {
+                  "schemaVersion":2,
+                  "variants":[
+                    {
+                      "id":"watchdog.lz3d.21_04",
+                      "request":"21 04",
+                      "verification":"unverified",
+                      "candidates":[
+                        {
+                          "id":"watchdog.21_04.output_group_32",
+                          "label":"Watchdog 21 04 voltage outputs (32 values)",
+                          "unit":"V",
+                          "decoder":{"kind":"unsigned_u8","responseIndexStart":0,"responseIndexEnd":31,"scale":0.02,"offset":0.0}
+                        }
+                      ]
+                    }
+                  ]
+                }
+            """.trimIndent()
+        ))
+        val provider = GitHubDiagnosticDataProvider("https://example.test", http)
+
+        val candidates = provider.findDecoderCandidates("21 04", "watchdog.lz3d.21_04")
+
+        assertEquals(1, candidates.size)
+        assertEquals("watchdog.21_04.output_group_32", candidates.single().id)
+        assertEquals("V", candidates.single().unit)
+        assertEquals(0.02, candidates.single().scale)
+    }
+
     private class FakeHttp(private val responses: Map<String, String>) : DiagnosticDataHttpClient {
         override fun get(url: String): String = responses[url.substringAfter("example.test/")]
             ?: error("Unexpected URL: $url")
