@@ -1,26 +1,33 @@
 # AI_HANDOFF.md — AutoDiag-WiCAN-Pro
 
-Živý handoff pro AI a vývojáře. Není roadmapa. Před prací vždy znovu ověř
-aktuální HEAD `main` — tento soubor může být o commit pozadu.
-
-**Audit HEAD při vzniku této verze handoffu:** `94f1409`
-(`fix(obd): buffer ELM responses across TCP chunks and serialize commands`)
+Živý handoff pro AI a vývojáře. Není roadmapa. Před prací vždy znovu ověř aktuální HEAD této větve a `main` — tento soubor může být o commit pozadu.
 
 ---
 
 ## PROJECT
 
-AutoDiag-WiCAN-Pro — open, modulární Android automotive diagnostická a
-automatizační platforma nad **WiCAN PRO** (ESP32, meatpiHQ/wican-fw).
+AutoDiag-WiCAN-Pro — open, modulární Android automotive diagnostická a automatizační platforma nad **WiCAN PRO** (ESP32, meatpiHQ/wican-fw).
 
 - WiCAN PRO = hardware / interface / firmware
 - AutoDiag = diagnostická a automatizační vrstva nad ním
 
-## ARCHITECTURAL PRINCIPLE (zakotveno)
+## READ FIRST
 
-Nebudeme optimalizovat projekt na „co nejjednodušší implementaci“.
+Před architekturou nebo změnou diagnostického jádra čti:
 
-Stavíme **rozsáhlý diagnostický systém** v pořadí:
+1. `README.md`
+2. `AI_CONTEXT.md`
+3. `ROADMAP.md`
+4. `docs/ARCHITECTURE_OVERVIEW.md`
+5. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
+6. `docs/LONG_TERM_FEATURE_PRESERVATION.md`
+7. `docs/AI_APK_EXTRACTION_GUIDE.md` — **povinné pro APK/reverse-engineering extraction**
+
+---
+
+## ARCHITECTURAL PRINCIPLE
+
+Nebudeme optimalizovat projekt na „co nejjednodušší implementaci“. Stavíme rozsáhlý diagnostický systém v pořadí:
 
 ```text
 hardware → transport → evidence → diagnostika → automatizace → analýza → UI
@@ -28,183 +35,167 @@ hardware → transport → evidence → diagnostika → automatizace → analýz
 
 Vždy rozlišovat:
 
-1. co umí **WiCAN PRO**
-2. co skutečně poskytuje **konkrétní auto**
-3. co umíme **bezpečně přečíst**
-4. co umíme **odvodit** (s označením inference)
-5. co je **experimentální / reverse-engineered**
-6. co ještě **nemáme ověřené**
+1. co umí WiCAN PRO
+2. co poskytuje konkrétní auto
+3. co umíme bezpečně přečíst
+4. co umíme odvodit (inference)
+5. co je experimentální / reverse-engineered
+6. co ještě nemáme ověřené
 
-AI **nesmí smazat** plánovanou funkci jen proto, že ji teď nelze implementovat.
-Použít `BLOCKED: <důvod>`, ne „tato funkce nebude“.
-
-**READ FIRST.** Žádné vymyšlené CAN ID, PID, Tesla signály, Riso MΩ, SOH.
-`NOT_AVAILABLE` / `UNAVAILABLE` ≠ `ERROR` ≠ `FAIL`.
+AI nesmí smazat plánovanou funkci jen proto, že ji teď nelze implementovat. Použít `BLOCKED: <důvod>`.
 
 ---
 
-## 🟢 HOTOVO (kód v `main`, ověřeno stromem repa)
+## CURRENT OUTLANDER EXTRACTION STATE
 
-### Dokumentace / pravidla
+Aktivní extraction target je **Mitsubishi Outlander PHEV**. Nešiř scope bez explicitního požadavku.
 
-- `README.md`, `AI_CONTEXT.md` (24 pravidel), `ROADMAP.md`
-- `docs/` včetně `CAPABILITY_DISCOVERY.md`, `AUTOMATION_ENGINE.md`,
-  `PRE_PURCHASE_TEST.md`, `PRE_PURCHASE_EV_TEST.md`,
-  `EV_ACCELERATION_BATTERY_ANALYSIS.md`, `IMPLEMENTATION_TASKS.md`,
-  `DIAGNOSTIC_KNOWLEDGE_BASE.md`, a další
-
-### Android stack
-
-- Multi-module: `android/app`, `android/core`, `android/simulator`
-- `WiCanMdnsDiscovery` — mDNS/NSD
-- `TcpWiCanTransport` — TCP + reconnect
-- `SimulatorWiCanTransport` — in-process, bez sítě
-- `Elm327Session` — AT init, **bufferovaný** reader do `>`, serializace příkazů
-- `CapabilityDiscovery` — ATI, ATDP, 0902, 03, 010C
-- `ConnectionViewModel` — fáze CONNECTING → INITIALIZING_ELM →
-  DISCOVERING_CAPABILITIES → READY / ERROR
-- UI: discovery, ruční IP, **ELM327 :3333**, **SLCAN :23 link-only**,
-  **Simulátor**, tooltipy, transport state (mode / state / host / port)
-
-### Capability presence (ne dekódování hodnot)
-
-| Probe | Účel |
-|-------|------|
-| ATI | komunikace s adaptérem |
-| ATDP | OBD protokol |
-| 0902 | VIN (pokud vozidlo poskytne) |
-| 03 | Mode 03 presence |
-| 010C | Mode 01 presence |
-
-SLCAN **neprohlašuje** OBD AVAILABLE jen proto, že TCP funguje.
-
----
-
-## 🟡 ROZPRACOVÁNO / částečně
-
-- Capability **IDs** pro battery/HV/DTC alerts existují v modelech, ale
-  **nejsou probené** — nesmí se UI ukazovat jako AVAILABLE
-- InfoTooltip komponenta existuje; centrální help content (`help_content_schema`)
-  se teprve zavádí
-- CI/status checks na recent commits často **neověřené** — lokální
-  `assembleDebug` + test na zařízení je stále nutný
-
----
-
-## 🔴 CHYBÍ (kód / ověřená funkce)
-
-- Plný Mode 01 **parser hodnot** (RPM, speed, coolant, …)
-- DTC **dekódér** (P0xxx význam, multi-frame)
-- Freeze frame, readiness, Mode 06
-- EV/HV: SOC, cell voltages, isolation numeric, pack current — **jen když
-  vozidlo data poskytne a mapping je verified**
-- OEM/Tesla specific decoders
-- SLCAN CAN monitor / sniffer / frame UI
-- AUTO TEST / PRE-PURCHASE orchestrace v kódu (spec v `docs/` už je)
-- Adaptive sampling engine + time-series store
-- MQTT / Home Assistant
-- WRITE_COMMAND subsystem (izolovaný, default off)
-- Licence v root (ověřit stav)
-- `SAFETY.md` v root — README na něj odkazuje; pokud chybí, doplnit
-
----
-
-## 🔵 PLÁNOVÁNO
-
-Zdroj produktových návrhů: `FEATURE_PROPOSALS.md` (sekce A–D).
-
-Klíčové cíle uživatele (neodstraňovat):
-
-### PRE-PURCHASE TEST
-
-One-tap workflow: identifikace → capability discovery → DTC/freeze/readiness →
-live data → 12V → EV/HV pokud dostupná → battery/cells pokud dostupná →
-teploty → charging → Riso pokud dostupná → bus health → load/recovery →
-analýza → report s confidence + provenance + seznam **co nešlo otestovat**.
-
-### AUTO TEST architektura
+U PHEV Watchdog Lite 1.9.1.2023OCT29 byly potvrzeny command literals:
 
 ```text
-identifikuj → zjisti dostupná data → nastav test podle schopností vozidla
-→ měř → synchronně loguj → detekuj změny → analyzuj průběh
-→ vyhodnoť kvalitu měření → uveď omezení → závěr s confidence/provenance
+21 01, 21 02, 21 03, 21 04, 21 05, 21 11, 21 14, 21 15,
+21 23, 21 24, 21 25, 21 26,
+22 01 01, 22 01 02, 22 01 03, 22 01 04, 22 01 05, 22 B0 02
 ```
 
-Ne: „PID → OK/FAIL podle univerzálního limitu“.
+Důležité již potvrzené decoder behaviour:
 
-### HV baterie — automatizovaný test (Phase 5 / PRE-PURCHASE)
+- `21 01` / `Lz3a`: `ISOLATION_RESISTANCE = d[78]*256+d[79]`, kΩ
+- `21 02` / `Lz3b`: 32 cell-voltage outputs, `d[i]/50.0`, V
+- `21 03` / `Lz3c`: cell-voltage outputs, `d[i]/50.0`, V
+- `21 03` / `Lz3e`: `FRONT_MOTOR_RPM = d[31]*256+d[30]`
+- `21 03` / `Lz3e`: `GENERATOR_RPM = d[29]*256+d[26]` — **non-contiguous indices; use `responseIndices`**
 
-Scénáře podle možností vozidla:
+`21 01`, `21 02` and `21 03` have tests in AutoDiag. These tests prove decoder arithmetic, not universal ECU applicability.
 
-1. **REST** — SOC, V, I, T, cells/modules pokud dostupná
-2. **CHARGE** — průběhy při nabíjení
-3. **LOAD** — topení / spotřebiče / akcelerace — živá data + log
-4. **RECOVERY** — návrat po zátěži
-5. Přechody REST→LOAD→RECOVERY, CHARGE→LOAD→RECOVERY→CHARGE
+### Important unresolved transport mapping
 
-**Adaptive sampling** (ne pevné „1× za X s“):
+Public Outlander CAN evidence correlates:
 
-- pomalé veličiny → nižší frekvence
-- proud/napětí při dynamice → vyšší frekvence
-- detekce přechodu stavu → dočasně hustší log
-- ustálený stav → frekvenci snížit
+```text
+BMU       0x761 -> 0x762   21 01   strong community correlation
+rear motor 0x753 -> 0x754  candidate
+front motor 0x755 -> 0x756 candidate
+generator 0x73C -> 0x73D   candidate
+```
 
-Limity frekvence musí vycházet z WiCAN / ESP32 / ECU / TCP — nevymýšlet
-přesnost, kterou systém nemá.
+Do **not** bind Watchdog `Lz3e` to a motor/generator address merely from signal names. Direct APK transport tracing or reproducible vehicle capture is required.
 
-Výstup: časové řady jen pro **skutečně získané** veličiny s doloženým původem.
-Chybí-li cell data → `UNAVAILABLE` („Vozidlo údaj neposkytlo“), ne `ERROR`.
-
----
-
-## ⚠️ NEOVĚŘENO
-
-Veškerá vehicle-specific mapování, Tesla CAN, battery mV prahy, Riso MΩ,
-SOH výpočty bez OEM reportu — dokud nemají `verification: verified` + scope
-(VIN/firmware/HW).
+`21 03` cells and motor/generator variants remain address-unresolved unless new evidence is found.
 
 ---
 
-## 🚧 HARDWARE LIMIT
+## REQUIRED EXTRACTION CHAIN
 
-WiCAN/ESP32, CAN bitrate, TCP throughput, polling rate, buffer, počet
-současných signálů, Android výkon při hustém logu během AUTO TEST.
+Every APK-derived diagnostic item must follow:
 
-Při limitu: `BLOCKED: hardware/transport limit`, funkce zůstává v plánu.
+```text
+ECU/address → variant/model → request → response → normalized d[]
+→ decoder → unit/scale/offset/signedness/byte order
+→ test → provenance → candidate → vehicle validation → production
+```
+
+Never skip an unresolved link. Use `UNRESOLVED`, `CANDIDATE`, or `BLOCKED`, never a guessed value.
+
+See `docs/AI_APK_EXTRACTION_GUIDE.md` for the detailed procedure.
+
+### Parser boundary is critical
+
+Watchdog decoder indices refer to normalized diagnostic payload bytes. They do **not** include:
+
+- CAN arbitration/header bytes
+- ISO-TP PCI bytes
+- first-frame length bytes
+- consecutive-frame sequence numbers
+- diagnostic positive-response service/PID prefix
+
+AutoDiag's `OutlanderPhev21ResponseParser` currently performs this normalization for the `21 xx` Watchdog family. Add tests before changing the boundary.
+
+### Variant rule
+
+The same request may have multiple decoder classes. If variants disagree, require an explicit `variantId`; do not guess. Resolver behaviour must fail closed on ambiguity.
+
+### Candidate rule
+
+Static APK extraction can create a diagnostic-data **candidate**. It cannot make a signal `VERIFIED`.
+
+`VERIFIED` requires reproducible vehicle evidence tying together ECU identity/address, request, response payload, decoder variant and vehicle/software scope.
 
 ---
 
-## CURRENT TASK (doporučené pořadí po tomto docs commitu)
+## DIAGNOSTIC-DATA
 
-1. Lokální `./gradlew :app:assembleDebug` + test **Simulátor** end-to-end
-2. Test reálný WiCAN: ELM327 + SLCAN link-only
-3. Mode 01 value parser pro PIDy s **verified** OBD mapováním
-4. DTC parser z Mode 03 odpovědi (bez vymyšlených oprav)
-5. Help content podle `help_content_schema.md` napojený na capability ID
-6. Teprve pak orchestration PRE-PURCHASE / HV adaptive sampling engine
+The normalized data repository is:
+
+`AutoDiag-WiCAN-Diagnostic-Data`
+
+Current manifest reports `candidates: 2`. The provider loads both Outlander Watchdog candidate JSON files:
+
+```text
+data/candidates/outlander_phev_watchdog_resistance.json
+data/candidates/outlander_phev_watchdog_cells_and_motor.json
+```
+
+Do not duplicate signal maps in Kotlin when the data-driven decoder can represent them.
+
+For non-contiguous bytes use `responseIndices`, never a fake contiguous range.
 
 ---
 
-## HELP SYSTEM
+## SAFETY / VERIFICATION
 
-Každý diagnostický prvek: `short_tooltip`, `extended`, `verification`,
-`kb_link`, `a11y_label`. Schema: `help_content_schema.md`.
+- READ has priority over WRITE.
+- No coding/adaptation/actuator/security/write capability may be enabled by static APK extraction.
+- Community evidence is research input, not OEM authority.
+- Do not infer an MΩ Riso value from an OK/fault status.
+- A single low cell voltage under load is not proof of a defective cell.
+- Missing data is `NOT_AVAILABLE` / `UNAVAILABLE`, not `ERROR`.
+- Production thresholds require explicit evidence and scope.
 
 ---
 
-## SAFETY (shrnutí)
+## CI
 
-- Žádné vymyšlené CAN ID / Tesla signály / Riso MΩ z OK/fault
-- Jedna nízká cell voltage při akceleraci ≠ vadný článek
-- WRITE izolované, default off
-- Simulator/replay před reálným vozidlem pro nové dekodéry
+The Android workflow now runs:
+
+```text
+gradle :core:testDebugUnitTest --stacktrace
+gradle :app:assembleDebug --stacktrace
+```
+
+Tests must pass before the debug APK is built/uploaded.
+
+Recent CI failure was caused by stale tests referring to removed APIs (`DtcKnowledgeEntry`, obsolete resistance aggregator APIs) and an `Int`/`Byte` literal mismatch in `CanFrameTest`. Those tests have been migrated to the current APIs. Always inspect the latest run before claiming the build is green.
+
+---
+
+## CURRENT TASK ORDER
+
+Continue autonomously in this order:
+
+1. Confirm latest CI run is green after the test migrations.
+2. If CI fails, fix the actual failure and rerun; do not mask failures.
+3. Continue forensic extraction from the local PHEV Watchdog APK for the remaining commands:
+
+```text
+21 04, 21 05, 21 11, 21 14, 21 15, 21 23, 21 24, 21 25, 21 26,
+22 01 01, 22 01 02, 22 01 03, 22 01 04, 22 01 05, 22 B0 02
+```
+
+4. For each command complete `variant → request → response → decoder → test` before promoting it.
+5. Trace `ATSH` and `CAN_RECEIVE_ADDRESS` to establish ECU/address context wherever possible.
+6. Add only evidence-backed candidates to Diagnostic-Data.
+7. Do not promote a candidate to verified/production without real-vehicle evidence.
+8. Update provenance after each meaningful extraction step.
+9. Keep this handoff and `docs/AI_APK_EXTRACTION_GUIDE.md` synchronized with the actual repository state.
 
 ---
 
 ## WORK STYLE
 
-- Pracovat proti **aktuálnímu GitHubu**, ne starému ZIP
-- Malé commity, testy, nepushovat falešné AVAILABLE
-- Dokumentace = specifikace; kód = implementace; simulator = test; auto = validace
-
-*Aktualizuj tento soubor při každé významné změně stavu `main`.*
+- Work against current GitHub, not an old ZIP.
+- Small reviewable commits.
+- Tests with every decoder/parser change.
+- Documentation = specification; code = implementation; simulator/replay = deterministic validation; vehicle = final validation.
+- Never claim `AVAILABLE` merely because code exists.
+- Never invent missing ECU/address/decoder links.
