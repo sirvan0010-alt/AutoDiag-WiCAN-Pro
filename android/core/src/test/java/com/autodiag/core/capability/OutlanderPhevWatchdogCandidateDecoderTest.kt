@@ -40,4 +40,24 @@ class OutlanderPhevWatchdogCandidateDecoderTest {
             )
         )
     }
+
+    @Test
+    fun decodesGeneratorRpmUsingExactNonContiguousWatchdogIndices() {
+        val tokens = IntArray(30)
+        tokens[29] = 0x12
+        tokens[26] = 0x34
+
+        assertEquals(
+            0x1234.toDouble(),
+            DataDrivenDecoder.decode(
+                tokens,
+                DataDecoderSpec(
+                    kind = DataDecoderSpec.Kind.UNSIGNED_U16_BE,
+                    start = 29,
+                    end = 26,
+                    indices = listOf(29, 26)
+                )
+            )
+        )
+    }
 }
