@@ -11,6 +11,8 @@ object Mode01Decoder {
         val labelCs: String
     )
 
+    private val hexRun = Regex("[0-9A-F]+")
+
     fun decode(response: String): DecodedPid? {
         val detailed = decodeDetailed(response) ?: return null
         return DecodedPid(detailed.mode, detailed.pid, detailed.rawHex, detailed.value, detailed.unit, detailed.labelCs)
@@ -30,6 +32,13 @@ object Mode01Decoder {
             if (value != null) ObdValueAvailability.AVAILABLE else ObdValueAvailability.UNAVAILABLE, def)
     }
 
+    /**
+     * Extracts a Mode 01 positive response from common ELM327 text layouts.
+     *
+     * Supports both spaced and contiguous byte streams (e.g. `41 0C 1A F8`
+     * and `410C1AF8`) and tolerates CAN/ELM headers before the `41` response.
+     * It deliberately does not infer values from arbitrary non-hex text.
+     */
     fun extractDataBytes(response: String): List<Int>? {
         val upper = response.uppercase().replace("SEARCHING...", "").trim()
         if (upper.isEmpty()) return null
@@ -37,10 +46,17 @@ object Mode01Decoder {
             upper.contains("UNABLE TO CONNECT") || upper.contains("NOT CONNECTED") ||
             (upper.contains("BUS INIT") && upper.contains("ERROR")) ||
             (upper.contains("?") && upper.replace(Regex("[^0-9A-F?]"), "").length < 8)) return null
-        val lines = upper.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith(">") }
-        val line = lines.firstOrNull { it.replace(" ", "").startsWith("41") } ?: lines.lastOrNull() ?: return null
-        val hex = line.replace(Regex("[^0-9A-F]"), " ").trim().split(Regex("\\s+")).filter { it.length == 2 }
-        if (hex.isEmpty()) return null
-        return hex.mapNotNull { it.toIntOrNull(16) }
+
+        for (line in upper.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith(">") }) {
+            val bytes = hexRun.findAll(line)
+                .flatMap { run -> run.value.chunked(2).asSequence() }
+                .mapNotNull { it.takeIf { byte -> byte.length == 2 }?.toIntOrNull(16) }
+                .toList()
+            val responseStart = bytes.indexOf(0x41)
+            if (responseStart >= 0 && bytes.size > responseStart + 1) {
+                return bytes.drop(responseStart)
+            }
+        }
+        return null
     }
 }
