@@ -38,13 +38,15 @@ object OutlanderPhev21ResponseParser {
             when (pci and 0xF0) {
                 0x10 -> {
                     require(firstFrame) { "Unexpected ISO-TP first frame" }
-                    require(bytes.size >= 4) { "Incomplete ISO-TP first frame" }
-                    payload.addAll(bytes.drop(3))
+                    require(bytes.size >= 5) { "Incomplete ISO-TP first frame" }
+                    // PCI + FF length (2 bytes) + positive service + PID/DID.
+                    payload.addAll(bytes.drop(4))
                     firstFrame = false
                 }
                 0x00 -> {
                     require(firstFrame) { "Unexpected ISO-TP single frame" }
                     require(bytes.size >= 3) { "Incomplete ISO-TP single frame" }
+                    // PCI + positive service + PID/DID.
                     payload.addAll(bytes.drop(3))
                     firstFrame = false
                 }
