@@ -19,6 +19,24 @@ Před architekturou nebo změnou diagnostického jádra čti:
 5. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
 6. `docs/LONG_TERM_FEATURE_PRESERVATION.md`
 7. `docs/AI_APK_EXTRACTION_GUIDE.md`
+8. `docs/AI_APK_EXTRACTION_GUIDE_2026-09-05.md`
+9. `docs/AI_HANDOFF_APK_EXTRACTION_2026-09-05.md`
+
+## SINGLE SOURCE OF TRUTH — MANDATORY
+
+**`sirvan0010-alt/AutoDiag-WiCAN-Diagnostic-Data` is the sole source of truth for production diagnostic candidates, decoder definitions, extraction provenance and their manifests.**
+
+`AutoDiag-WiCAN-Pro/diagnostic-data/` is legacy seed/staging material only. It is not a production dataset, must not receive new candidates/provenance, and must not be treated as a synchronization target. The runtime `GitHubDiagnosticDataProvider` reads the external `AutoDiag-WiCAN-Diagnostic-Data/main` repository.
+
+Canonical locations:
+
+```text
+AutoDiag-WiCAN-Diagnostic-Data/manifest.json
+AutoDiag-WiCAN-Diagnostic-Data/data/candidates/*
+AutoDiag-WiCAN-Diagnostic-Data/provenance/*
+```
+
+Never write an external-repository path as bare `provenance/...` in instructions; name the repository explicitly.
 
 ## REQUIRED EXTRACTION CHAIN
 
@@ -73,9 +91,9 @@ For generator RPM the representation must be explicit `responseIndices: [29,26]`
 
 ### Current command/class extraction matrix
 
-The complete matrix is stored in Diagnostic-Data:
+The complete matrix is stored in the canonical external repository:
 
-`provenance/apk-extraction/phev-watchdog/command-extraction-status-2026-09-05.json`
+`AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/phev-watchdog/command-extraction-status-2026-09-05.json`
 
 Current state:
 
@@ -84,7 +102,7 @@ Current state:
 21 02      -> Lz3/b              -> decoder extracted -> candidate
 21 03      -> Lz3/c, Lz3/e       -> decoder extracted -> candidate
 21 04      -> Lz3/d              -> decoder unresolved
-21 05      -> La4/a, Lb4/a       -> variant separation/decoder unresolved
+21 05      -> La4/a, Lb4/a       -> decoder extracted -> candidate
 21 11      -> Lc4/c              -> decoder unresolved
 21 14      -> Lc4/a              -> decoder unresolved
 21 15      -> Lc4/b              -> decoder unresolved
@@ -102,6 +120,14 @@ Current state:
 
 “Complete matrix” means every queued command has an explicit status. It does not mean unresolved commands are silently promoted.
 
+## 21 04 PARSER BOUNDARY
+
+`21 04 / Lz3/d;` remains `UNRESOLVED`. Do not promote the old hypothesis “32 voltage outputs, scale unresolved”. The supplied hand-written DEX disassembler produced contradictory class/method relationships and therefore failed the parser-validation gate. Validate DEX indices, class-data method ownership, field ownership, code-item bounds and instruction widths before interpreting `Lz3/d` bytecode.
+
+Canonical provenance:
+
+`AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/phev-watchdog/21-04-extraction-2026-09-05.json`
+
 ## ECU / ADDRESS EVIDENCE
 
 Independent public Outlander evidence supports:
@@ -114,7 +140,7 @@ front motor  0x755 -> 0x756           candidate topology
 generator    0x73C -> 0x73D           candidate topology
 ```
 
-The 21 02 BMU address correlation is now preserved in Diagnostic-Data candidate metadata. The same request `21 03` remains deliberately unbound because the available evidence does not prove which Watchdog model/address combination selects `Lz3/c` or `Lz3/e`.
+The 21 02 BMU address correlation is preserved in Diagnostic-Data candidate metadata. The same request `21 03` remains deliberately unbound because the available evidence does not prove which Watchdog model/address combination selects `Lz3/c` or `Lz3/e`.
 
 Topology does not by itself prove Watchdog class-to-address binding. In particular, do not bind `Lz3e` to motor/generator addresses from signal names alone.
 
@@ -131,13 +157,11 @@ Remove/handle explicitly:
 - consecutive-frame sequence byte
 - flow-control traffic
 
-For an ISO-TP First Frame such as `762 10 37 61 01 ...`, the parser must remove the CAN header, PCI byte, FF length byte, positive-response service and PID so the first actual payload byte becomes `d[0]`. The parser now has explicit regression coverage for this boundary and for incomplete First Frames.
-
 `OutlanderPhev21ResponseParser` implements the current `21 xx` boundary and has tests. A different response family must get its own parser logic/tests if its prefix differs.
 
 ## DATA-DRIVEN ARCHITECTURE
 
-Decoder definitions belong in Diagnostic-Data, not hardcoded Kotlin business logic.
+Decoder definitions belong in the external Diagnostic-Data repository, not hardcoded Kotlin business logic.
 
 Current `DataDecoderSpec` supports:
 
@@ -152,14 +176,26 @@ Current `DataDecoderSpec` supports:
 
 `OutlanderPhevDecoderResolver` fails closed on ambiguity rather than guessing.
 
-`GitHubDiagnosticDataProvider` loads:
+The provider must load every candidate file advertised by the external manifest. Current canonical candidate files are:
 
 ```text
 data/candidates/outlander_phev_watchdog_resistance.json
 data/candidates/outlander_phev_watchdog_cells_and_motor.json
+data/candidates/outlander_phev_watchdog_21_05.json
 ```
 
-Diagnostic-Data manifest reports `candidates: 2`.
+The external manifest must report `candidates: 3`.
+
+## DATA LOCATION CHECK BEFORE EVERY EXTRACTION COMMIT
+
+- [ ] Production candidate/provenance -> external `AutoDiag-WiCAN-Diagnostic-Data` only.
+- [ ] No new candidate/provenance under local `AutoDiag-WiCAN-Pro/diagnostic-data/`.
+- [ ] External manifest count matches actual candidate files.
+- [ ] Provider loads every advertised candidate file.
+- [ ] Provenance exists before promotion.
+- [ ] `VERIFIED` still requires real-vehicle evidence.
+
+If any item fails, stop before continuing the extraction queue.
 
 ## TESTING
 
