@@ -56,8 +56,13 @@ class GitHubDiagnosticDataProvider(
         if ((r?.optInt("signals", 0) ?: 0) > 0) signals = parseSignals(http.get(url("data/signals.json")))
         if ((r?.optInt("dtc", 0) ?: 0) > 0) dtcs = parseDtcs(http.get(url("data/dtc.json")))
         if ((r?.optInt("candidates", 0) ?: 0) > 0) {
-            val candidateBody = http.get(url("data/candidates/outlander_phev_watchdog_resistance.json"))
-            decoderCandidates = DiagnosticCatalogParser.decoderCandidates(candidateBody)
+            val candidateFiles = listOf(
+                "data/candidates/outlander_phev_watchdog_resistance.json",
+                "data/candidates/outlander_phev_watchdog_cells_and_motor.json"
+            )
+            decoderCandidates = candidateFiles.flatMap { file ->
+                runCatching { DiagnosticCatalogParser.decoderCandidates(http.get(url(file))) }.getOrDefault(emptyList())
+            }
         }
         loaded = true
     }
