@@ -1,7 +1,7 @@
 # Competitor app feature audit (READ-only takeaways)
 
-**Date:** 2026-09-03
-**Sources inspected as APKs (not copied):** Torque 1.10.144, Car Scanner 2.1.50, PHEV Watchdog Lite 1.9.1, Mitsubishi Remote Ctrl A.3.1.6
+**Date:** 2026-09-05
+**Sources inspected as APKs (not copied):** Torque 1.10.144, Car Scanner 2.1.50, PHEV Watchdog Lite 1.9.1, Mitsubishi Remote Ctrl A.3.1.6, S3XY Buttons 6.8.2
 
 ## Legal / safety rules
 
@@ -48,6 +48,16 @@ Implemented as command builders in `ElmIsoTpAtCommands`. No ECU IDs marked AVAIL
 PHEV measurement *names* (capability IDs only): displayed SOC, pack current/power, aux 12V, cell min/max/avg, OBC, front/rear motor, fan PWM. All `UNAVAILABLE` until a verified profile exists.
 
 Illustrative headers from one log (unverified): `7E0`, `761`, `765`, `724`, `755`, `753`, `73C`.
+
+## S3XY Buttons 6.8.2 — static capability extraction
+
+The supplied XAPK contains a large native `libS3XYButtons_arm64-v8a.so` with DWARF debug paths and symbols. Static extraction recovered the device surfaces Commander, Dash/Dashboard, Knob, Stalks and Strip; BLE/Wi-Fi/USB/protobuf/security/OTA surfaces; and a rich action/automation model.
+
+Observed vehicle-action families include lock/unlock, door presentation/opening, trunk/frunk, charge-port, climate/battery preconditioning, lights, windows, mirrors, seat cooling/profiles, Sentry, Camp/Dog modes, speed-control, Autopilot-related controls, lane-departure/blind-spot settings and ambient-light effects. The `Automation` model references actions-on-reverse, actions-upon-approach, auto-window-drop, ambient-light, kickdown, easy-entry, remote battery preheat, suspension-by-gear and volume-on-exit settings.
+
+**AutoDiag treatment:** these are capability-name evidence only. No proprietary S3XY binary/source/UI is imported, and no vehicle CAN/UDS mapping is marked available from this APK alone. Writes remain profile-gated; driver-assistance writes remain experimental.
+
+Reference artifacts: `docs/S3XY_6_8_2_REFERENCE.md`, `docs/S3XY_6_8_2_ACTIONS.md`, `diagnostic-data/references/s3xy_buttons_6_8_2.json`.
 
 ## Remote Ctrl (Inventec iMobile2)
 
