@@ -2,10 +2,10 @@
 
 Živý handoff pro AI a vývojáře. Není roadmapa. Před prací vždy znovu ověř aktuální HEAD `main`.
 
-**Aktuální auditovaný HEAD `main`:** `85db5617360ee0a08bf4cb042760435211b86c3d`
+**Auditovaný code baseline `main`:** `85db5617360ee0a08bf4cb042760435211b86c3d`
 (*Add vehicle signal promotion evidence gate*, 2026-09-05).
 
-Tento handoff je synchronizovaný s tímto HEAD. Při každé významné změně `main` aktualizuj HEAD a stav níže.
+Po tomto code baseline byly provedeny pouze dokumentační/evidence-synchronizační změny. **Nezaměňovat tento baseline za aktuální Git HEAD**; aktuální HEAD vždy ověřit přímo v GitHubu.
 
 ---
 
@@ -48,7 +48,8 @@ AI **nesmí smazat** plánovanou funkci jen proto, že ji teď nelze implementov
 
 - `README.md`, `AI_CONTEXT.md`, `ROADMAP.md`
 - `docs/` včetně `CAPABILITY_DISCOVERY.md`, `AUTOMATION_ENGINE.md`, `PRE_PURCHASE_TEST.md`, `PRE_PURCHASE_EV_TEST.md`, `EV_ACCELERATION_BATTERY_ANALYSIS.md`, `IMPLEMENTATION_TASKS.md`, `DIAGNOSTIC_KNOWLEDGE_BASE.md` a dalších
-- `AI_HANDOFF.md` je nyní synchronizovaný s HEAD `85db561`
+- `AI_CONTEXT.md` nyní obsahuje explicitní repository/evidence synchronization rules
+- tento `AI_HANDOFF.md` popisuje code baseline a odděluje jej od následných dokumentačních commitů
 
 ### Android stack
 
@@ -73,10 +74,10 @@ AI **nesmí smazat** plánovanou funkci jen proto, že ji teď nelze implementov
 
 SLCAN **neprohlašuje** OBD AVAILABLE jen proto, že TCP funguje.
 
-### Evidence / research, které jsou na `main`
+### Evidence / research
 
-- SEOBD/S3XY výzkumné commity a evidence gates jsou research/evidence, **ne automaticky vehicle-verified Tesla runtime diagnostika**.
-- Car Scanner 2.1.50 evidence je vedena jako candidate/reconstruction evidence, nikoli jako produkční PID engine.
+- SEOBD/S3XY evidence a promotion gates jsou research/evidence, **ne automaticky vehicle-verified Tesla runtime diagnostika**.
+- Car Scanner 2.1.50 evidence je candidate/reconstruction evidence, nikoli automaticky produkční PID engine.
 - Vehicle-specific mapování se nesmí povýšit bez explicitní provenance a verification scope.
 
 ---
@@ -176,7 +177,7 @@ Candidate evidence může obsahovat konkrétní decoder, scale nebo response ind
 
 ### Outlander PHEV — 21 04
 
-`21 04` je na Diagnostic-Data `main` veden jako **candidate / unverified**, nikoli jako unresolved extraction.
+`21 04` je v Diagnostic-Data `main` veden jako **candidate / unverified / static_apk_extraction** s `promotionStatus: blocked: vehicle verification required`.
 
 Aktuální evidence dovoluje tvrdit pouze:
 
@@ -201,11 +202,9 @@ Nesmí se tvrdit bez další evidence:
 
 ## 🚧 EXTERNÍ DIAGNOSTIC-DATA REPO
 
-Zdroj dat je oddělen od Android aplikace:
+Zdroj dat je oddělen od Android aplikace.
 
-`AutoDiag-WiCAN-Diagnostic-Data` aktuálně eviduje `datasetVersion` `0.1.9-car-scanner-2.1.50-decoder-reconstruction` a canonical candidate set. Manifest musí vždy odpovídat skutečným souborům na `main`.
-
-Aktuální canonical candidate set obsahuje **10 souborů**. `records.candidates` proto musí být 10. `records.vehicles` je 0. Dokud neexistují produkční `data/ecus.json` a `data/signals.json`, nesmí manifest jejich obsahové počty prezentovat jako production records; aktuální hodnoty jsou proto normalizovány na 0.
+Aktuální manifest `AutoDiag-WiCAN-Diagnostic-Data` má canonical candidate set **10 souborů**. `records.candidates` je proto **10**; `records.vehicles`, `records.ecus` a `records.signals` jsou **0**, protože manifest má počítat pouze production records, nikoli candidate-internal ECU/signal counts. Manifest obsahuje explicitní `record_count_policy`.
 
 S3XY/Tesla evidence zůstává schema/research evidence, pokud není v Diagnostic-Data explicitně zapsána s provenance a `unverified` stavem.
 
@@ -225,4 +224,4 @@ S3XY/Tesla evidence zůstává schema/research evidence, pokud není v Diagnosti
 - Dokumentace = specifikace; kód = implementace; simulator = test; auto = validace.
 - Po každém významném commitu ověřit, že `AI_CONTEXT.md`, `AI_HANDOFF.md`, evidence a manifest stále popisují stejný stav.
 
-*Aktualizováno pro `main` HEAD `85db5617360ee0a08bf4cb042760435211b86c3d` dne 2026-09-05.*
+*Synchronizační revize: 2026-09-05. Před další prací vždy ověř skutečný Git HEAD.*
