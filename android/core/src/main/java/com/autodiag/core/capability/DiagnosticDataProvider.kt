@@ -10,6 +10,13 @@ interface DiagnosticDataProvider {
     suspend fun findEcu(identity: EcuDataIdentity): EcuDataDefinition?
     suspend fun findSignals(identity: EcuDataIdentity): List<SignalDataDefinition>
     suspend fun findDtc(code: String): DtcDataDefinition?
+
+    /**
+     * Returns source-defined decoder candidates for a request.
+     * A null variantId deliberately returns all matching variants so callers
+     * cannot silently guess when the same request has multiple layouts.
+     */
+    suspend fun findDecoderCandidates(request: String, variantId: String? = null): List<SignalDecoderDefinition> = emptyList()
 }
 
 data class EcuDataIdentity(
@@ -43,6 +50,17 @@ data class SignalDataDefinition(
     val request: String? = null,
     val scale: Double = 1.0,
     val offset: Double = 0.0,
+    val verification: VerificationState = VerificationState.UNVERIFIED,
+    val provenance: String = "diagnostic-data"
+)
+
+/** A decoder definition kept in diagnostic-data rather than vehicle-specific Kotlin. */
+data class SignalDecoderDefinition(
+    val signalId: String,
+    val label: String,
+    val request: String,
+    val variantId: String,
+    val decoder: DataDecoderSpec,
     val verification: VerificationState = VerificationState.UNVERIFIED,
     val provenance: String = "diagnostic-data"
 )
