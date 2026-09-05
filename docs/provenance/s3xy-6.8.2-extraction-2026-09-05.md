@@ -28,7 +28,7 @@ The native binary contains a structured vehicle-data model with protobuf-related
 - `CPushVehicleDataNotification`
 - `CTeslaAPIVehicleDataResponse`
 
-A static symbol inventory identified 131 `SVDF_*` vehicle-data fields. The inventory includes BMS, charging, drivetrain, driving-state, climate, latch, lighting, sensor, trip and navigation domains.
+A static symbol inventory identified 131 `SVDF_*` vehicle-data fields. The inventory includes BMS, charging, drivetrain, driving-state, climate, latch, lighting, sensor, trip and navigation domains. A normalized catalog is stored separately in Diagnostic-Data under `provenance/apk-extraction/s3xy-6.8.2-vehicle-data-catalog-2026-09-05.json`.
 
 Examples of directly observed field names include:
 
@@ -41,6 +41,39 @@ Examples of directly observed field names include:
 - Navigation: vehicle/destination coordinates, distance, energy at arrival, arrival time and traffic delay.
 
 These names establish the application's data vocabulary. Exact protobuf field numbers, wire types and transport payload encodings require a separate descriptor/native-code extraction pass and must not be guessed from symbol names.
+
+## Subscription protocol surface
+
+The native symbols expose a concrete subscription lifecycle rather than only isolated field names:
+
+`ReqSubscribeVehicleData -> RespSubscribeVehicleData -> PushVehicleDataHolder`
+
+`ReqSubscribeVehicleData` exposes repeated `subscribe_fields` and `unsubscribe_fields` entries of type `SubscribeVehicleDataField`, plus subscribe-all/unsubscribe-all state. The enum descriptor and validity function are present in the native binary. This proves that the application builds field-level subscriptions from a typed enum, but the exact enum numeric assignments still require descriptor extraction.
+
+`ProcessSubscripVehicleDataRequest`, `ProcessSubscripVehicleDataResponse`, `ProcessUnSubscripVehicleDataRequest/Response` and `ProcessPushVehicleDataHolder` are present in the native command layer. These symbols establish request/response/push stages, but static symbol presence alone does not prove the exact wire framing or BLE characteristic used.
+
+AutoDiag mapping should therefore be modelled as:
+
+```text
+VehicleDataCapability
+        |
+        v
+SubscriptionSpec(fields)
+        |
+        v
+Transport-specific request
+        |
+        v
+Subscription response
+        |
+        v
+PushVehicleDataHolder
+        |
+        v
+Normalized telemetry
+```
+
+The transport-specific request and response remain adapter-layer concerns. No protobuf field number or BLE UUID is promoted until recovered exactly.
 
 ## Actions and control surface
 
@@ -62,7 +95,7 @@ Native symbols include `CBLECommander`, `CCommanderData`, `CCarModule`, request/
 
 `UI/QML -> application bridge -> native commander -> BLE/GATT -> structured request/response model -> vehicle-data subscription -> push notification -> UI`
 
-AutoDiag should take this as an architectural reference while keeping its own transport abstraction independent of the source application.
+The application also exposes `ProcessTryActionRequest/Response`, car configuration/settings request/response processors, and Tesla API connection/session processors. These are kept outside AutoDiag's read-only production capability path until exact protocol and security semantics are independently established.
 
 ## Tesla API
 
@@ -80,6 +113,30 @@ Suggested evidence classification:
 - `VERIFIED`: only after independent vehicle/capture validation within an explicit vehicle scope.
 
 The extraction therefore feeds AutoDiag's knowledge/capability system but does not bypass the project's permanent verification gates.
+
+## Current extraction status
+
+### Exact from static evidence
+
+- Qt6/QML + Java bridge + native C++ architecture.
+- BLE/GATT abstraction is present.
+- Typed vehicle-data subscription messages exist.
+- `SubscribeVehicleDataField` is a protobuf enum used by subscription requests.
+- Subscription request, response and push processing stages exist.
+- 131 `SVDF_*` vehicle-data field names were observed.
+- Large typed action surface exists.
+- Device UUID verification/exchange surface exists.
+
+### Still unresolved
+
+- Numeric values of `SubscribeVehicleDataField` enum members.
+- Protobuf field numbers/wire types for `PushVehicleDataHolder`.
+- Exact BLE service/characteristic UUID mapping for vehicle-data traffic.
+- Exact serialized request/response bytes.
+- Complete push-notification decoding path.
+- Exact Tesla API endpoint/authentication details.
+
+No unresolved item is guessed or promoted to production.
 
 ## Next extraction pass
 
