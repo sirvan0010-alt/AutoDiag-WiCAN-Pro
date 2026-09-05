@@ -30,6 +30,24 @@ class OutlanderPhev21ResponseParserTest {
     }
 
     @Test
+    fun preservesThirtyTwo21_04OutputPositionsAfterTransportAndServiceHeaders() {
+        val response = """
+            762 10 24 61 04 BE BF C0 C1
+            762 21 C2 C3 C4 C5 C6 C7 C8
+            762 22 C9 CA CB CC CD CE CF
+            762 23 D0 D1 D2 D3 D4 D5 D6
+            762 24 D7 D8 D9 DA DB DC DD
+        """.trimIndent()
+
+        val parsed = OutlanderPhev21ResponseParser.parse(response)
+
+        assertEquals(32, parsed.size)
+        assertEquals(0xBE, parsed[0])
+        assertEquals(0xCD, parsed[15])
+        assertEquals(0xDD, parsed[31])
+    }
+
+    @Test
     fun rejectsIncompleteIsoTpFirstFrame() {
         assertFailsWith<IllegalArgumentException> {
             OutlanderPhev21ResponseParser.parse("762 10 37 61")
