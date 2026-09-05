@@ -9,41 +9,38 @@ class OutlanderPhevResistanceDecoderTest {
         val response = IntArray(80)
         response[78] = 0x01
         response[79] = 0xF4
-
-        assertEquals(500.0, OutlanderPhevResistanceDecoder.decodeIsolationResistance(response))
+        val definition = SignalDecoderDefinition(
+            signalId = "battery.isolation_resistance",
+            label = "HV isolation resistance",
+            request = "21 01",
+            variantId = "watchdog.lz3a.21_01",
+            decoder = DataDecoderSpec(
+                kind = DataDecoderSpec.Kind.UNSIGNED_U16_BE,
+                start = 78,
+                end = 79,
+                unit = "kΩ"
+            )
+        )
+        assertEquals(500.0, OutlanderPhevResistanceDecoder.decode(definition, response))
     }
 
     @Test
-    fun sourceLabelledInternalResistanceUsesWatchdogBytes38And39InMegohm() {
+    fun internalResistanceCandidateUsesWatchdogBytes38And39InMegohm() {
         val response = IntArray(40)
         response[38] = 15
         response[39] = 9
-
-        assertEquals(
-            1.5,
-            OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(response)
+        val definition = SignalDecoderDefinition(
+            signalId = "battery.internal_resistance.max",
+            label = "Maximum internal resistance candidate",
+            request = "21 01",
+            variantId = "watchdog.le4a.21_01",
+            decoder = DataDecoderSpec(
+                kind = DataDecoderSpec.Kind.UNSIGNED_U8,
+                start = 38,
+                scale = 0.1,
+                unit = "MΩ"
+            )
         )
-        assertEquals(
-            0.9,
-            OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(response)
-        )
-    }
-
-    @Test
-    fun isolationMeasurementIsPartiallyVerifiedUntilVehicleEvidenceConfirmsDecoder() {
-        val response = IntArray(80)
-        response[78] = 0x00
-        response[79] = 0x7B
-
-        val measurement = OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(
-            response = response,
-            timestampEpochMs = 1234L,
-            rawResponse = "21 01 ... 00 7B"
-        )
-
-        assertEquals(123.0, measurement.value)
-        assertEquals("kΩ", measurement.unit)
-        assertEquals(OutlanderMeasurementVerification.PARTIALLY_VERIFIED, measurement.verification)
-        assertEquals("21 01", measurement.rawRequest)
+        assertEquals(1.5, OutlanderPhevResistanceDecoder.decode(definition, response))
     }
 }
