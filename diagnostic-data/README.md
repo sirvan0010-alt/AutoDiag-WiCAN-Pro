@@ -1,22 +1,23 @@
-# AutoDiag-WiCAN Diagnostic Data
+# AutoDiag-WiCAN diagnostic-data directory
 
-This directory defines the contract for the separate diagnostic data repository.
+## IMPORTANT: not the production data repository
 
-## Proposed repository
+This directory is **legacy seed/staging/compatibility material only**. It is **not** a second source of truth for diagnostic candidates, decoder definitions or APK provenance.
+
+The sole production source of truth is:
 
 `AutoDiag-WiCAN-Diagnostic-Data`
 
-The data repository should contain only data that we are legally allowed to redistribute, plus metadata derived from proprietary reference material without copying proprietary payloads.
+Canonical production locations:
 
-## Initial upload set
+```text
+AutoDiag-WiCAN-Diagnostic-Data/manifest.json
+AutoDiag-WiCAN-Diagnostic-Data/data/candidates/*
+AutoDiag-WiCAN-Diagnostic-Data/provenance/*
+```
 
-Priority order:
+`GitHubDiagnosticDataProvider` reads the external repository directly. New candidate or provenance data must never be added to this local directory.
 
-1. Public SAE/J1979 OBD Mode 01/02/03/06/09 definitions and tests.
-2. Public UDS service/DID definitions and standards-derived mappings.
-3. Our own vehicle/ECU/signal schema.
-4. Safe ROD metadata index: filename, SHA-256, section tags, platform/family hints and provenance; **not** raw `.rod` files.
-5. VCDS AutoScan-derived chassis/address inventory only where redistribution is permitted; otherwise keep the source local and export only our own normalized metadata.
-6. Verified vehicle captures/replays produced by AutoDiag-WiCAN.
+The existing JSON files here are retained only as legacy seed material during migration. They must not be edited to represent newer production state. If a future migration removes these legacy files, it must also update any tests or tooling that explicitly depend on them.
 
-The application must treat this repository as optional knowledge. Live vehicle evidence always has higher trust than database metadata.
+When documenting a path from the external repository, always name the repository explicitly; do not write `provenance/...` as though it were local.
