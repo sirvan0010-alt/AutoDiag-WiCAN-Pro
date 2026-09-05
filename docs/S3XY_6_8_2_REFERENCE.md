@@ -5,8 +5,8 @@
 
 ## Artifact evidence
 
-- XAPK SHA-256: `REPLACE_XAPK_SHA`
-- XAPK size: `REPLACE_XAPK_SIZE` bytes
+- XAPK SHA-256: `b6d5188457978b4a9fd0e4c138d316abb7144291ff0eda97b20678a135faddc9`
+- XAPK size: 153,942,169 bytes
 - APK splits: 3 (`base.apk`, `split_0.apk`, `split_1.apk`)
 - Native library: `libS3XYButtons_arm64-v8a.so`, 299,688,392 bytes
 - Native Build ID: `1148f4bc53db364e6f769b56920effed02c30a3b`
