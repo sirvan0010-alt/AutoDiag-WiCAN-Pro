@@ -12,7 +12,9 @@ import kotlinx.coroutines.launch
 class OutlanderPhev21LiveMeasurementRunner(
     private val session: Elm327Session,
     private val scope: CoroutineScope,
-    private val onResult: (Result) -> Unit
+    private val onResult: (Result) -> Unit,
+    private val diagnosticData: DiagnosticDataProvider = EmptyDiagnosticDataProvider,
+    private val variantId: String? = null
 ) {
     data class Result(
         val timestampEpochMs: Long,
@@ -38,38 +40,78 @@ class OutlanderPhev21LiveMeasurementRunner(
                 if (response.kind == Elm327ResponseKind.POSITIVE) {
                     val decoded = runCatching {
                         val parsed = OutlanderPhev21ResponseParser.parse(response.normalized)
-                        val isolation = runCatching {
-                            OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(
-                                response = parsed,
-                                timestampEpochMs = startedAt,
-                                ecuIdentity = null,
-                                rawRequest = REQUEST,
-                                rawResponse = response.raw
-                            )
-                        }.getOrNull()
-                        val max = runCatching {
-                            OutlanderResistanceMeasurement(
-                                kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED,
-                                value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(parsed),
-                                timestampEpochMs = startedAt,
-                                rawRequest = REQUEST,
-                                rawResponse = response.raw,
-                                verification = OutlanderMeasurementVerification.UNVERIFIED
-                            )
-                        }.getOrNull()
-                        val min = runCatching {
-                            OutlanderResistanceMeasurement(
-                                kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED,
-                                value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(parsed),
-                                timestampEpochMs = startedAt,
-                                rawRequest = REQUEST,
-                                rawResponse = response.raw,
-                                verification = OutlanderMeasurementVerification.UNVERIFIED
-                            )
-                        }.getOrNull()
-                        Result(startedAt, REQUEST, response.raw, isolation, max, min, response.kind)
+                        val candidates = diagnosticData.findDecoderCandidates(REQUEST, variantId)
+
+                        fun unique(signalId: String): SignalDecoderDefinition? =
+                            candidates.filter { it.signalId == signalId }.singleOrNull()
+
+                        val isolationDefinition = unique("battery.isolation_resistance")
+                        val maxDefinition = unique("battery.internal_resistance.max")
+                        val minDefinition = unique("battery.internal_resistance.min")
+
+                        val isolation = isolationDefinition?.let {
+                            runCatching {
+                                OutlanderPhevResistanceDecoder.decodeMeasurement(
+                                    definition = it,
+                                    response = parsed,
+                                    timestampEpochMs = startedAt,
+                                    rawRequest = REQUEST,
+                                    rawResponse = response.raw,
+                                    verification = OutlanderMeasurementVerification.PARTIALLY_VERIFIED
+                                )
+                            }.getOrNull()
+                        }
+                        val max = maxDefinition?.let {
+                            runCatching {
+                                OutlanderPhevResistanceDecoder.decodeMeasurement(
+                                    definition = it,
+                                    response = parsed,
+                                    timestampEpochMs = startedAt,
+                                    rawRequest = REQUEST,
+                                    rawResponse = response.raw,
+                                    verification = OutlanderMeasurementVerification.UNVERIFIED
+                                )
+                            }.getOrNull()
+                        }
+                        val min = minDefinition?.let {
+                            runCatching {
+                                OutlanderPhevResistanceDecoder.decodeMeasurement(
+                                    definition = it,
+                                    response = parsed,
+                                    timestampEpochMs = startedAt,
+                                    rawRequest = REQUEST,
+                                    rawResponse = response.raw,
+                                    verification = OutlanderMeasurementVerification.UNVERIFIED
+                                )
+                            }.getOrNull()
+                        }
+
+                        val ambiguity = listOf(
+                            "battery.isolation_resistance" to isolationDefinition,
+                            "battery.internal_resistance.max" to maxDefinition,
+                            "battery.internal_resistance.min" to minDefinition
+                        ).filter { (signal, definition) ->
+                            definition == null && candidates.any { it.signalId == signal }
+                        }.map { it.first }
+
+                        Result(
+                            timestampEpochMs = startedAt,
+                            rawRequest = REQUEST,
+                            rawResponse = response.raw,
+                            isolationResistance = isolation,
+                            internalResistanceMax = max,
+                            internalResistanceMin = min,
+                            adapterStatus = response.kind,
+                            error = when {
+                                candidates.isEmpty() -> "No diagnostic-data decoder candidate for $REQUEST"
+                                ambiguity.isNotEmpty() -> "Ambiguous decoder variant for $REQUEST: ${ambiguity.joinToString()}; vehicle/ECU variant evidence required"
+                                else -> null
+                            }
+                        )
                     }
-                    onResult(decoded.getOrElse { error -> Result(startedAt, REQUEST, response.raw, adapterStatus = response.kind, error = error.message ?: "Outlander 21 01 decode failed") })
+                    onResult(decoded.getOrElse { error ->
+                        Result(startedAt, REQUEST, response.raw, adapterStatus = response.kind, error = error.message ?: "Outlander 21 01 decode failed")
+                    })
                 } else {
                     onResult(Result(startedAt, REQUEST, response.raw.ifBlank { null }, adapterStatus = response.kind, error = response.error ?: "21 01 returned ${response.kind}"))
                 }
