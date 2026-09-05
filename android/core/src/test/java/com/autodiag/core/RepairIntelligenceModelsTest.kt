@@ -31,23 +31,23 @@ class RepairIntelligenceModelsTest {
     }
 
     @Test
-    fun dtcDoesNotBecomeAutomaticPartVerdict() {
-        val source = RepairSource(
-            id = "community-example",
-            provider = "example",
-            label = "Example",
-            sourceType = "community",
-            access = SourceAccess.COMMUNITY,
-            verification = VerificationState.VERIFIED
-        )
-        val dtc = DtcKnowledgeEntry("P0000", "Test", "Test explanation")
-        val intelligence = RepairIntelligenceResolver.resolve(
-            dtc = dtc,
-            sources = listOf(source),
-            parts = listOf(
+    fun dtcModelKeepsPartVerdictNonDeterministicWithoutVerifiedPartEvidence() {
+        val intelligence = RepairIntelligence(
+            dtcCode = "P0000",
+            candidateParts = listOf(
                 RepairPart(
                     component = "candidate",
                     confidence = VerificationState.PARTIALLY_VERIFIED
+                )
+            ),
+            sources = listOf(
+                RepairSource(
+                    id = "community-example",
+                    provider = "example",
+                    label = "Example",
+                    sourceType = "community",
+                    access = SourceAccess.COMMUNITY,
+                    verification = VerificationState.VERIFIED
                 )
             )
         )
