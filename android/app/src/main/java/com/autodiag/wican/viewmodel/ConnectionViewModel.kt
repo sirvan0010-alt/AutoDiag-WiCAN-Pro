@@ -7,13 +7,10 @@ import com.autodiag.core.can.RawCanMonitorState
 import com.autodiag.core.can.SlcanCanFrameStream
 import com.autodiag.core.capability.CapabilityDiscovery
 import com.autodiag.core.capability.CapabilitySnapshot
-import com.autodiag.core.capability.EcuDataIdentity
 import com.autodiag.core.capability.OutlanderLiveSamplingSettings
 import com.autodiag.core.capability.OutlanderPhev21LiveMeasurementRunner
-import com.autodiag.core.capability.OutlanderPhevResistanceDecoder
 import com.autodiag.core.capability.OutlanderResistanceHistory
 import com.autodiag.core.capability.OutlanderResistanceKind
-import com.autodiag.core.capability.OutlanderResistanceMeasurement
 import com.autodiag.core.capability.OutlanderResistanceSample
 import com.autodiag.core.capability.OutlanderResistanceSessionStats
 import com.autodiag.core.obd.Elm327Session
@@ -99,12 +96,16 @@ class ConnectionViewModel(
             return
         }
         outlanderRunner?.stop()
-        val runner = OutlanderPhev21LiveMeasurementRunner(activeSession, viewModelScope) { result ->
-            val acceptedAny = acceptOutlanderLiveResult(result)
-            if (!acceptedAny) {
-                _uiState.update { it.copy(outlanderLastMeasurementError = result.error ?: "21 01 neposkytl žádnou dekódovatelnou hodnotu.") }
+        val runner = OutlanderPhev21LiveMeasurementRunner(
+            session = activeSession,
+            scope = viewModelScope,
+            onResult = { result ->
+                val acceptedAny = acceptOutlanderLiveResult(result)
+                if (!acceptedAny) {
+                    _uiState.update { it.copy(outlanderLastMeasurementError = result.error ?: "21 01 neposkytl žádnou dekódovatelnou hodnotu.") }
+                }
             }
-        }
+        )
         outlanderRunner = runner
         _uiState.update { it.copy(outlanderLiveMeasurementActive = true, outlanderLastMeasurementError = null) }
         runner.start(_uiState.value.outlanderSamplingSettings.intervalMs)
@@ -116,18 +117,13 @@ class ConnectionViewModel(
         _uiState.update { it.copy(outlanderLiveMeasurementActive = false) }
     }
 
-    /**
-     * Accept each decoded 21 01 signal independently. A missing signal must
-     * not discard other signals decoded from the same response.
-     */
+    /** Accept each decoded 21 01 signal independently. */
     private fun acceptOutlanderLiveResult(result: OutlanderPhev21LiveMeasurementRunner.Result): Boolean {
         val isolation = result.isolationResistance
         val maxMeasurement = result.internalResistanceMax
         val minMeasurement = result.internalResistanceMin
 
-        if (isolation == null && maxMeasurement == null && minMeasurement == null) {
-            return false
-        }
+        if (isolation == null && maxMeasurement == null && minMeasurement == null) return false
 
         isolation?.let { isolationHistory.add(OutlanderResistanceSample(result.timestampEpochMs, it.value, it.verification)) }
         maxMeasurement?.let { internalMaxHistory.add(OutlanderResistanceSample(result.timestampEpochMs, it.value, it.verification)) }
@@ -147,62 +143,6 @@ class ConnectionViewModel(
             )
         }
         return true
-    }
-
-    /**
-     * Feed a source-normalized Watchdog-style 21 01 response into Outlander live-data state.
-     * This method is intentionally passive: it never sends a request and never invents an ECU/CAN ID.
-     */
-    fun ingestOutlanderBatteryResponse(
-        response: IntArray,
-        timestampEpochMs: Long,
-        ecuIdentity: EcuDataIdentity? = null,
-        rawResponse: String? = null
-    ) {
-        val isolation = runCatching {
-            OutlanderPhevResistanceDecoder.decodeIsolationMeasurement(response, timestampEpochMs, ecuIdentity, "21 01", rawResponse)
-        }.getOrNull()
-        val maxMeasurement = runCatching {
-            OutlanderResistanceMeasurement(
-                kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MAX_UNVERIFIED,
-                value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMaximum(response),
-                timestampEpochMs = timestampEpochMs,
-                ecuIdentity = ecuIdentity,
-                rawRequest = "21 01",
-                rawResponse = rawResponse,
-                verification = com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED
-            )
-        }.getOrNull()
-        val minMeasurement = runCatching {
-            OutlanderResistanceMeasurement(
-                kind = OutlanderResistanceKind.INTERNAL_RESISTANCE_MIN_UNVERIFIED,
-                value = OutlanderPhevResistanceDecoder.decodeUnverifiedInternalResistanceMinimum(response),
-                timestampEpochMs = timestampEpochMs,
-                ecuIdentity = ecuIdentity,
-                rawRequest = "21 01",
-                rawResponse = rawResponse,
-                verification = com.autodiag.core.capability.OutlanderMeasurementVerification.UNVERIFIED
-            )
-        }.getOrNull()
-
-        isolation?.let { isolationHistory.add(OutlanderResistanceSample(timestampEpochMs, it.value, it.verification)) }
-        maxMeasurement?.let { internalMaxHistory.add(OutlanderResistanceSample(timestampEpochMs, it.value, it.verification)) }
-        minMeasurement?.let { internalMinHistory.add(OutlanderResistanceSample(timestampEpochMs, it.value, it.verification)) }
-
-        if (isolation == null && maxMeasurement == null && minMeasurement == null) return
-
-        _uiState.update { state ->
-            state.copy(
-                outlanderIsolation = isolation?.let { state.outlanderIsolation.accept(it) } ?: state.outlanderIsolation,
-                outlanderInternalResistanceMax = maxMeasurement?.let { state.outlanderInternalResistanceMax.accept(it) } ?: state.outlanderInternalResistanceMax,
-                outlanderInternalResistanceMin = minMeasurement?.let { state.outlanderInternalResistanceMin.accept(it) } ?: state.outlanderInternalResistanceMin,
-                outlanderIsolationHistory = isolationHistory.snapshot(),
-                outlanderInternalMaxHistory = internalMaxHistory.snapshot(),
-                outlanderInternalMinHistory = internalMinHistory.snapshot(),
-                outlanderExpertRequest = "21 01",
-                outlanderExpertResponse = rawResponse
-            )
-        }
     }
 
     private fun transportFor(mode: TransportMode): WiCanTransport = when (mode) {
