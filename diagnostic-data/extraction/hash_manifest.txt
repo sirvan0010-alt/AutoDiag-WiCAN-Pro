@@ -1,0 +1,11 @@
+SEOBD deep extraction input hashes
+
+S3XY_6.8.2.xapk
+SHA-256: b6d5188457978b4a9fd0e4c138d316abb7144291ff0eda97b20678a135faddc
+
+libS3XYButtons_arm64-v8a.so
+SHA-256: 0de3963bced2f22c859b673cc34eed7b7734925c9fd75a92b28a5ff1cb9079ca
+Size: 299688392 bytes
+Architecture: AArch64 / ARM64
+
+Rule: hashes identify the evidence source only. They do not imply vendor ownership, protocol correctness, or runtime behavior.
