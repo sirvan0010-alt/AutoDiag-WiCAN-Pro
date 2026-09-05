@@ -43,4 +43,45 @@ class OutlanderPhevResistanceDecoderTest {
         )
         assertEquals(1.5, OutlanderPhevResistanceDecoder.decode(definition, response))
     }
+
+    @Test
+    fun internalResistanceLd4UsesBigEndianPairs() {
+        val response = IntArray(72)
+        response[12] = 0x01
+        response[13] = 0xF4
+        response[14] = 0x00
+        response[15] = 0xFA
+        response[71] = 25
+
+        val max = SignalDecoderDefinition(
+            signalId = "battery.internal_resistance.max",
+            label = "Maximum internal resistance candidate",
+            request = "21 01",
+            variantId = "watchdog.ld4a.21_01",
+            decoder = DataDecoderSpec(
+                kind = DataDecoderSpec.Kind.UNSIGNED_U16_BE,
+                start = 12,
+                end = 13,
+                scale = 0.001,
+                unit = "MΩ"
+            )
+        )
+        val min = max.copy(
+            signalId = "battery.internal_resistance.min",
+            decoder = max.decoder.copy(start = 14, end = 15)
+        )
+        val diff = max.copy(
+            signalId = "battery.max_internal_resistance_difference",
+            decoder = DataDecoderSpec(
+                kind = DataDecoderSpec.Kind.UNSIGNED_U8,
+                start = 71,
+                scale = 0.02,
+                unit = "MΩ"
+            )
+        )
+
+        assertEquals(0.5, OutlanderPhevResistanceDecoder.decode(max, response))
+        assertEquals(0.25, OutlanderPhevResistanceDecoder.decode(min, response))
+        assertEquals(0.5, OutlanderPhevResistanceDecoder.decode(diff, response))
+    }
 }
