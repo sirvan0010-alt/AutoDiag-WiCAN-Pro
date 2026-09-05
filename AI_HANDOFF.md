@@ -1,17 +1,17 @@
 # AI_HANDOFF.md — AutoDiag-WiCAN-Pro
 
-Živý handoff pro AI a vývojáře. Není roadmapa. Před prací vždy znovu ověř
-aktuální HEAD `main` — tento soubor může být o commit pozadu.
+Živý handoff pro AI a vývojáře. Není roadmapa. Před prací vždy znovu ověř aktuální HEAD `main`.
 
-**Audit HEAD při vzniku této verze handoffu:** `94f1409`
-(`fix(obd): buffer ELM responses across TCP chunks and serialize commands`)
+**Aktuální auditovaný HEAD `main`:** `85db5617360ee0a08bf4cb042760435211b86c3d`
+(*Add vehicle signal promotion evidence gate*, 2026-09-05).
+
+Tento handoff je synchronizovaný s tímto HEAD. Při každé významné změně `main` aktualizuj HEAD a stav níže.
 
 ---
 
 ## PROJECT
 
-AutoDiag-WiCAN-Pro — open, modulární Android automotive diagnostická a
-automatizační platforma nad **WiCAN PRO** (ESP32, meatpiHQ/wican-fw).
+AutoDiag-WiCAN-Pro — open, modulární Android automotive diagnostická a automatizační platforma nad **WiCAN PRO** (ESP32, meatpiHQ/wican-fw).
 
 - WiCAN PRO = hardware / interface / firmware
 - AutoDiag = diagnostická a automatizační vrstva nad ním
@@ -35,23 +35,20 @@ Vždy rozlišovat:
 5. co je **experimentální / reverse-engineered**
 6. co ještě **nemáme ověřené**
 
-AI **nesmí smazat** plánovanou funkci jen proto, že ji teď nelze implementovat.
-Použít `BLOCKED: <důvod>`, ne „tato funkce nebude“.
+AI **nesmí smazat** plánovanou funkci jen proto, že ji teď nelze implementovat. Použít `BLOCKED: <důvod>`, ne „tato funkce nebude“.
 
 **READ FIRST.** Žádné vymyšlené CAN ID, PID, Tesla signály, Riso MΩ, SOH.
 `NOT_AVAILABLE` / `UNAVAILABLE` ≠ `ERROR` ≠ `FAIL`.
 
 ---
 
-## 🟢 HOTOVO (kód v `main`, ověřeno stromem repa)
+## 🟢 HOTOVO / AKTUÁLNĚ V `main`
 
 ### Dokumentace / pravidla
 
-- `README.md`, `AI_CONTEXT.md` (24 pravidel), `ROADMAP.md`
-- `docs/` včetně `CAPABILITY_DISCOVERY.md`, `AUTOMATION_ENGINE.md`,
-  `PRE_PURCHASE_TEST.md`, `PRE_PURCHASE_EV_TEST.md`,
-  `EV_ACCELERATION_BATTERY_ANALYSIS.md`, `IMPLEMENTATION_TASKS.md`,
-  `DIAGNOSTIC_KNOWLEDGE_BASE.md`, a další
+- `README.md`, `AI_CONTEXT.md`, `ROADMAP.md`
+- `docs/` včetně `CAPABILITY_DISCOVERY.md`, `AUTOMATION_ENGINE.md`, `PRE_PURCHASE_TEST.md`, `PRE_PURCHASE_EV_TEST.md`, `EV_ACCELERATION_BATTERY_ANALYSIS.md`, `IMPLEMENTATION_TASKS.md`, `DIAGNOSTIC_KNOWLEDGE_BASE.md` a dalších
+- `AI_HANDOFF.md` je nyní synchronizovaný s HEAD `85db561`
 
 ### Android stack
 
@@ -59,12 +56,10 @@ Použít `BLOCKED: <důvod>`, ne „tato funkce nebude“.
 - `WiCanMdnsDiscovery` — mDNS/NSD
 - `TcpWiCanTransport` — TCP + reconnect
 - `SimulatorWiCanTransport` — in-process, bez sítě
-- `Elm327Session` — AT init, **bufferovaný** reader do `>`, serializace příkazů
+- `Elm327Session` — AT init, bufferovaný reader do `>`, serializace příkazů
 - `CapabilityDiscovery` — ATI, ATDP, 0902, 03, 010C
-- `ConnectionViewModel` — fáze CONNECTING → INITIALIZING_ELM →
-  DISCOVERING_CAPABILITIES → READY / ERROR
-- UI: discovery, ruční IP, **ELM327 :3333**, **SLCAN :23 link-only**,
-  **Simulátor**, tooltipy, transport state (mode / state / host / port)
+- `ConnectionViewModel` — CONNECTING → INITIALIZING_ELM → DISCOVERING_CAPABILITIES → READY / ERROR
+- UI: discovery, ruční IP, **ELM327 :3333**, **SLCAN :23 link-only**, **Simulátor**, tooltipy, transport state
 
 ### Capability presence (ne dekódování hodnot)
 
@@ -78,34 +73,37 @@ Použít `BLOCKED: <důvod>`, ne „tato funkce nebude“.
 
 SLCAN **neprohlašuje** OBD AVAILABLE jen proto, že TCP funguje.
 
----
+### Evidence / research, které jsou na `main`
 
-## 🟡 ROZPRACOVÁNO / částečně
-
-- Capability **IDs** pro battery/HV/DTC alerts existují v modelech, ale
-  **nejsou probené** — nesmí se UI ukazovat jako AVAILABLE
-- InfoTooltip komponenta existuje; centrální help content (`help_content_schema`)
-  se teprve zavádí
-- CI/status checks na recent commits často **neověřené** — lokální
-  `assembleDebug` + test na zařízení je stále nutný
+- SEOBD/S3XY výzkumné commity a evidence gates jsou research/evidence, **ne automaticky vehicle-verified Tesla runtime diagnostika**.
+- Car Scanner 2.1.50 evidence je vedena jako candidate/reconstruction evidence, nikoli jako produkční PID engine.
+- Vehicle-specific mapování se nesmí povýšit bez explicitní provenance a verification scope.
 
 ---
 
-## 🔴 CHYBÍ (kód / ověřená funkce)
+## 🟡 ROZPRACOVÁNO / ČÁSTEČNĚ
 
-- Plný Mode 01 **parser hodnot** (RPM, speed, coolant, …)
-- DTC **dekódér** (P0xxx význam, multi-frame)
-- Freeze frame, readiness, Mode 06
-- EV/HV: SOC, cell voltages, isolation numeric, pack current — **jen když
-  vozidlo data poskytne a mapping je verified**
-- OEM/Tesla specific decoders
-- SLCAN CAN monitor / sniffer / frame UI
-- AUTO TEST / PRE-PURCHASE orchestrace v kódu (spec v `docs/` už je)
-- Adaptive sampling engine + time-series store
-- MQTT / Home Assistant
-- WRITE_COMMAND subsystem (izolovaný, default off)
-- Licence v root (ověřit stav)
-- `SAFETY.md` v root — README na něj odkazuje; pokud chybí, doplnit
+- Capability **IDs** pro battery/HV/DTC alerts existují v modelech, ale nejsou probené — nesmí se UI ukazovat jako AVAILABLE.
+- InfoTooltip komponenta existuje; centrální help content (`help_content_schema`) se teprve zavádí.
+- CI/status checks na recent commits mohou být neověřené — lokální `assembleDebug` + test na zařízení je stále nutný.
+- Outlander PHEV větev/PR obsahuje více candidate dekodérů, ale žádný z nich není tímto handoffem prohlášen za vehicle-verified.
+
+---
+
+## 🔴 CHYBÍ / NENÍ VEHICLE-VERIFIED
+
+- Plný Mode 01 **parser hodnot** pro produkční použití s verified OBD mapováním.
+- DTC **dekodér** (P0xxx význam, multi-frame).
+- Freeze frame, readiness, Mode 06.
+- EV/HV: SOC, cell voltages, isolation numeric, pack current — pouze pokud vozidlo data poskytne a mapping je verified.
+- OEM/Tesla specific decoders jako vehicle-verified runtime funkce.
+- SLCAN CAN monitor / sniffer / frame UI.
+- AUTO TEST / PRE-PURCHASE orchestrace v kódu.
+- Adaptive sampling engine + time-series store.
+- MQTT / Home Assistant.
+- WRITE_COMMAND subsystem (izolovaný, default off).
+
+**Důležité:** existence reverse-engineered evidence, candidate JSON nebo parseru sama o sobě neznamená `VERIFIED`.
 
 ---
 
@@ -117,10 +115,7 @@ Klíčové cíle uživatele (neodstraňovat):
 
 ### PRE-PURCHASE TEST
 
-One-tap workflow: identifikace → capability discovery → DTC/freeze/readiness →
-live data → 12V → EV/HV pokud dostupná → battery/cells pokud dostupná →
-teploty → charging → Riso pokud dostupná → bus health → load/recovery →
-analýza → report s confidence + provenance + seznam **co nešlo otestovat**.
+One-tap workflow: identifikace → capability discovery → DTC/freeze/readiness → live data → 12V → EV/HV pokud dostupná → battery/cells pokud dostupná → teploty → charging → Riso pokud dostupná → bus health → load/recovery → analýza → report s confidence + provenance + seznam **co nešlo otestovat**.
 
 ### AUTO TEST architektura
 
@@ -142,69 +137,92 @@ Scénáře podle možností vozidla:
 4. **RECOVERY** — návrat po zátěži
 5. Přechody REST→LOAD→RECOVERY, CHARGE→LOAD→RECOVERY→CHARGE
 
-**Adaptive sampling** (ne pevné „1× za X s“):
+**Adaptive sampling**:
 
 - pomalé veličiny → nižší frekvence
 - proud/napětí při dynamice → vyšší frekvence
 - detekce přechodu stavu → dočasně hustší log
 - ustálený stav → frekvenci snížit
 
-Limity frekvence musí vycházet z WiCAN / ESP32 / ECU / TCP — nevymýšlet
-přesnost, kterou systém nemá.
+Limity frekvence musí vycházet z WiCAN / ESP32 / ECU / TCP — nevymýšlet přesnost, kterou systém nemá.
 
-Výstup: časové řady jen pro **skutečně získané** veličiny s doloženým původem.
-Chybí-li cell data → `UNAVAILABLE` („Vozidlo údaj neposkytlo“), ne `ERROR`.
+Výstup: časové řady jen pro **skutečně získané** veličiny s doloženým původem. Chybí-li cell data → `UNAVAILABLE` („Vozidlo údaj neposkytlo“), ne `ERROR`.
 
 ---
 
-## ⚠️ NEOVĚŘENO
+## ⚠️ EVIDENCE / VERIFICATION GATE
 
-Veškerá vehicle-specific mapování, Tesla CAN, battery mV prahy, Riso MΩ,
-SOH výpočty bez OEM reportu — dokud nemají `verification: verified` + scope
-(VIN/firmware/HW).
+Používej tuto hierarchii:
+
+```text
+RAW EXTRACTION
+  ↓
+STATIC EVIDENCE
+  ↓
+SCHEMA / FIELD CANDIDATE
+  ↓
+PROTOCOL / CAN / BLE MAPPING
+  ↓
+DECODER CANDIDATE
+  ↓
+TESTED (simulator/replay)
+  ↓
+VEHICLE VERIFIED
+  ↓
+PRODUCTION
+```
+
+Candidate evidence může obsahovat konkrétní decoder, scale nebo response indexy, pokud jsou přímo doložené zdrojem. To však **nepotvrzuje jejich fyzický význam, ECU/CAN binding ani vehicle applicability**.
+
+### Outlander PHEV — 21 04
+
+`21 04` je na Diagnostic-Data `main` veden jako **candidate / unverified**, nikoli jako unresolved extraction.
+
+Aktuální evidence dovoluje tvrdit pouze:
+
+- request: `21 04`
+- 32 output positions, index `0..31`
+- decoder: `unsigned_u8`
+- scale: `0.02` (`/50.0`)
+- unit: `V`
+- zdroj: přímá DEX evidence z PHEV Watchdog APK
+
+Nesmí se tvrdit bez další evidence:
+
+- přesné fyzické přiřazení hodnot k článkům/modulům
+- ECU adresa / CAN ID
+- konkrétní CAN framing
+- generace vozidla mimo doložený scope
+- vehicle verification
+
+`21 04` tedy není „false/unresolved“ jen proto, že není vehicle-verified. Správný stav je **EXTRACTED / CANDIDATE / UNVERIFIED** a promotion do production je blokována požadavkem na vehicle capture/verification.
 
 ---
 
-## 🚧 HARDWARE LIMIT
+## 🚧 EXTERNÍ DIAGNOSTIC-DATA REPO
 
-WiCAN/ESP32, CAN bitrate, TCP throughput, polling rate, buffer, počet
-současných signálů, Android výkon při hustém logu během AUTO TEST.
+Zdroj dat je oddělen od Android aplikace:
 
-Při limitu: `BLOCKED: hardware/transport limit`, funkce zůstává v plánu.
+`AutoDiag-WiCAN-Diagnostic-Data` aktuálně eviduje `datasetVersion` `0.1.9-car-scanner-2.1.50-decoder-reconstruction` a canonical candidate set. Manifest musí vždy odpovídat skutečným souborům na `main`.
 
----
+Aktuální canonical candidate set obsahuje **10 souborů**. `records.candidates` proto musí být 10. `records.vehicles` je 0. Dokud neexistují produkční `data/ecus.json` a `data/signals.json`, nesmí manifest jejich obsahové počty prezentovat jako production records; aktuální hodnoty jsou proto normalizovány na 0.
 
-## CURRENT TASK (doporučené pořadí po tomto docs commitu)
-
-1. Lokální `./gradlew :app:assembleDebug` + test **Simulátor** end-to-end
-2. Test reálný WiCAN: ELM327 + SLCAN link-only
-3. Mode 01 value parser pro PIDy s **verified** OBD mapováním
-4. DTC parser z Mode 03 odpovědi (bez vymyšlených oprav)
-5. Help content podle `help_content_schema.md` napojený na capability ID
-6. Teprve pak orchestration PRE-PURCHASE / HV adaptive sampling engine
+S3XY/Tesla evidence zůstává schema/research evidence, pokud není v Diagnostic-Data explicitně zapsána s provenance a `unverified` stavem.
 
 ---
 
-## HELP SYSTEM
+## SAFETY
 
-Každý diagnostický prvek: `short_tooltip`, `extended`, `verification`,
-`kb_link`, `a11y_label`. Schema: `help_content_schema.md`.
-
----
-
-## SAFETY (shrnutí)
-
-- Žádné vymyšlené CAN ID / Tesla signály / Riso MΩ z OK/fault
-- Jedna nízká cell voltage při akceleraci ≠ vadný článek
-- WRITE izolované, default off
-- Simulator/replay před reálným vozidlem pro nové dekodéry
-
----
+- Žádné vymyšlené CAN ID / Tesla signály / Riso MΩ z OK/fault.
+- Jedna nízká cell voltage při akceleraci ≠ vadný článek.
+- WRITE izolované, default off.
+- Simulator/replay před reálným vozidlem pro nové dekodéry.
 
 ## WORK STYLE
 
-- Pracovat proti **aktuálnímu GitHubu**, ne starému ZIP
-- Malé commity, testy, nepushovat falešné AVAILABLE
-- Dokumentace = specifikace; kód = implementace; simulator = test; auto = validace
+- Pracovat proti **aktuálnímu GitHubu**, ne starému ZIP.
+- Malé commity, testy, nepushovat falešné AVAILABLE.
+- Dokumentace = specifikace; kód = implementace; simulator = test; auto = validace.
+- Po každém významném commitu ověřit, že `AI_CONTEXT.md`, `AI_HANDOFF.md`, evidence a manifest stále popisují stejný stav.
 
-*Aktualizuj tento soubor při každé významné změně stavu `main`.*
+*Aktualizováno pro `main` HEAD `85db5617360ee0a08bf4cb042760435211b86c3d` dne 2026-09-05.*
