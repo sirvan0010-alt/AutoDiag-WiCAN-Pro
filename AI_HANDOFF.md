@@ -2,14 +2,11 @@
 
 Živý handoff pro AI a vývojáře. Není roadmapa. Před prací vždy znovu ověř aktuální HEAD této větve a `main` — tento soubor může být o commit pozadu.
 
----
+## CURRENT STATE — 2026-09-05
 
-## PROJECT
+Aktivní větev: `feat/mitsubishi-outlander-phev`
 
-AutoDiag-WiCAN-Pro — open, modulární Android automotive diagnostická a automatizační platforma nad **WiCAN PRO** (ESP32, meatpiHQ/wican-fw).
-
-- WiCAN PRO = hardware / interface / firmware
-- AutoDiag = diagnostická a automatizační vrstva nad ním
+Hlavní aktuální práce: evidence-driven reverse engineering PHEV Watchdog Lite pro Mitsubishi Outlander PHEV a převod pouze bezpečně doložených decoderů do data-driven Diagnostic-Data vrstvy.
 
 ## READ FIRST
 
@@ -21,36 +18,40 @@ Před architekturou nebo změnou diagnostického jádra čti:
 4. `docs/ARCHITECTURE_OVERVIEW.md`
 5. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
 6. `docs/LONG_TERM_FEATURE_PRESERVATION.md`
-7. `docs/AI_APK_EXTRACTION_GUIDE.md` — **povinné pro APK/reverse-engineering extraction**
+7. `docs/AI_APK_EXTRACTION_GUIDE.md`
 
----
+## REQUIRED EXTRACTION CHAIN
 
-## ARCHITECTURAL PRINCIPLE
-
-Nebudeme optimalizovat projekt na „co nejjednodušší implementaci“. Stavíme rozsáhlý diagnostický systém v pořadí:
+Každý APK-derived diagnostický údaj musí projít celým řetězcem:
 
 ```text
-hardware → transport → evidence → diagnostika → automatizace → analýza → UI
+ECU/address
+  -> varianta Watchdog modelu
+  -> request
+  -> response
+  -> ISO-TP normalization
+  -> decoder / d[]
+  -> unit/scale/offset/endian/signedness
+  -> test
+  -> provenance
+  -> candidate
+  -> ECU/address correlation
+  -> real vehicle validation
+  -> production promotion
 ```
 
-Vždy rozlišovat:
-
-1. co umí WiCAN PRO
-2. co poskytuje konkrétní auto
-3. co umíme bezpečně přečíst
-4. co umíme odvodit (inference)
-5. co je experimentální / reverse-engineered
-6. co ještě nemáme ověřené
-
-AI nesmí smazat plánovanou funkci jen proto, že ji teď nelze implementovat. Použít `BLOCKED: <důvod>`.
-
----
+Žádný článek řetězce se nesmí doplnit odhadem. `UNRESOLVED`, `CANDIDATE` a `BLOCKED` jsou platné výsledky.
 
 ## CURRENT OUTLANDER EXTRACTION STATE
 
-Aktivní extraction target je **Mitsubishi Outlander PHEV**. Nešiř scope bez explicitního požadavku.
+Aktivní extraction target je **Mitsubishi Outlander PHEV**.
 
-U PHEV Watchdog Lite 1.9.1.2023OCT29 byly potvrzeny command literals:
+Referenční APK:
+
+- `PHEV Watchdog Lite 1.9.1.2023OCT29`
+- SHA-256: `9ebac53f13ba9a1d04be158e49e37b886b9c35a711c9a4e33029c16a17b86ce6`
+
+Z APK jsou potvrzeny command literals:
 
 ```text
 21 01, 21 02, 21 03, 21 04, 21 05, 21 11, 21 14, 21 15,
@@ -58,144 +59,132 @@ U PHEV Watchdog Lite 1.9.1.2023OCT29 byly potvrzeny command literals:
 22 01 01, 22 01 02, 22 01 03, 22 01 04, 22 01 05, 22 B0 02
 ```
 
-Důležité již potvrzené decoder behaviour:
+### Exact decoder behaviour already established
 
-- `21 01` / `Lz3a`: `ISOLATION_RESISTANCE = d[78]*256+d[79]`, kΩ
-- `21 02` / `Lz3b`: 32 cell-voltage outputs, `d[i]/50.0`, V
-- `21 03` / `Lz3c`: cell-voltage outputs, `d[i]/50.0`, V
-- `21 03` / `Lz3e`: `FRONT_MOTOR_RPM = d[31]*256+d[30]`
-- `21 03` / `Lz3e`: `GENERATOR_RPM = d[29]*256+d[26]` — **non-contiguous indices; use `responseIndices`**
+- `21 01 / Lz3/a;`: `ISOLATION_RESISTANCE = d[78]*256+d[79]`, kΩ
+- `21 02 / Lz3/b;`: 32 cell-voltage outputs, `d[i]/50.0`, V
+- `21 03 / Lz3/c;`: 32 cell-voltage outputs, `d[i]/50.0`, V
+- `21 03 / Lz3/e;`: `FRONT_MOTOR_RPM = d[31]*256+d[30]`
+- `21 03 / Lz3/e;`: `GENERATOR_RPM = d[29]*256+d[26]`
 
-`21 01`, `21 02` and `21 03` have tests in AutoDiag. These tests prove decoder arithmetic, not universal ECU applicability.
+For generator RPM the representation must be explicit `responseIndices: [29,26]`; never model it as a contiguous range.
 
-### Important unresolved transport mapping
+### Current command/class extraction matrix
 
-Public Outlander CAN evidence correlates:
+The complete matrix is stored in Diagnostic-Data:
 
-```text
-BMU       0x761 -> 0x762   21 01   strong community correlation
-rear motor 0x753 -> 0x754  candidate
-front motor 0x755 -> 0x756 candidate
-generator 0x73C -> 0x73D   candidate
-```
+`provenance/apk-extraction/phev-watchdog/command-extraction-status-2026-09-05.json`
 
-Do **not** bind Watchdog `Lz3e` to a motor/generator address merely from signal names. Direct APK transport tracing or reproducible vehicle capture is required.
-
-`21 03` cells and motor/generator variants remain address-unresolved unless new evidence is found.
-
----
-
-## REQUIRED EXTRACTION CHAIN
-
-Every APK-derived diagnostic item must follow:
+Current state:
 
 ```text
-ECU/address → variant/model → request → response → normalized d[]
-→ decoder → unit/scale/offset/signedness/byte order
-→ test → provenance → candidate → vehicle validation → production
+21 01      -> Lz3/a, Ld4/a, Le4/a -> decoder extracted -> candidate
+21 02      -> Lz3/b              -> decoder extracted -> candidate
+21 03      -> Lz3/c, Lz3/e       -> decoder extracted -> candidate
+21 04      -> Lz3/d              -> decoder unresolved
+21 05      -> La4/a, Lb4/a       -> variant separation/decoder unresolved
+21 11      -> Lc4/c              -> decoder unresolved
+21 14      -> Lc4/a              -> decoder unresolved
+21 15      -> Lc4/b              -> decoder unresolved
+21 23      -> Lc4/h              -> decoder unresolved
+21 24      -> Lc4/i              -> decoder unresolved
+21 25      -> Lc4/j              -> decoder unresolved
+21 26      -> Lc4/k              -> decoder unresolved
+22 01 01   -> Ly3/b              -> decoder unresolved
+22 01 02   -> Ly3/c              -> decoder unresolved
+22 01 03   -> Ly3/d              -> decoder unresolved
+22 01 04   -> Ly3/e              -> decoder unresolved
+22 01 05   -> Ly3/a              -> decoder unresolved
+22 B0 02   -> Lz3/g              -> decoder unresolved
 ```
 
-Never skip an unresolved link. Use `UNRESOLVED`, `CANDIDATE`, or `BLOCKED`, never a guessed value.
+“Complete matrix” means every queued command has an explicit status. It does not mean unresolved commands are silently promoted.
 
-See `docs/AI_APK_EXTRACTION_GUIDE.md` for the detailed procedure.
+## ECU / ADDRESS EVIDENCE
 
-### Parser boundary is critical
+Independent public Outlander evidence supports:
 
-Watchdog decoder indices refer to normalized diagnostic payload bytes. They do **not** include:
+```text
+BMU          0x761 -> 0x762   21 01   strong correlation
+rear motor   0x753 -> 0x754           candidate topology
+front motor  0x755 -> 0x756           candidate topology
+generator    0x73C -> 0x73D           candidate topology
+```
 
-- CAN arbitration/header bytes
-- ISO-TP PCI bytes
-- first-frame length bytes
-- consecutive-frame sequence numbers
-- diagnostic positive-response service/PID prefix
+This topology does not by itself prove Watchdog class-to-address binding. In particular, do not bind `Lz3e` to motor/generator addresses from signal names alone.
 
-AutoDiag's `OutlanderPhev21ResponseParser` currently performs this normalization for the `21 xx` Watchdog family. Add tests before changing the boundary.
+## PARSER BOUNDARY
 
-### Variant rule
+Watchdog decoder `d[]` indexes normalized diagnostic payload bytes, not raw CAN/ISO-TP frames.
 
-The same request may have multiple decoder classes. If variants disagree, require an explicit `variantId`; do not guess. Resolver behaviour must fail closed on ambiguity.
+Remove/handle explicitly:
 
-### Candidate rule
+- CAN header/arbitration identifier
+- ISO-TP PCI
+- first-frame length
+- diagnostic response service/PID prefix for the applicable family
+- consecutive-frame sequence byte
+- flow-control traffic
 
-Static APK extraction can create a diagnostic-data **candidate**. It cannot make a signal `VERIFIED`.
+`OutlanderPhev21ResponseParser` implements the current `21 xx` boundary and has tests. A different response family must get its own parser logic/tests if its prefix differs.
 
-`VERIFIED` requires reproducible vehicle evidence tying together ECU identity/address, request, response payload, decoder variant and vehicle/software scope.
+## DATA-DRIVEN ARCHITECTURE
 
----
+Decoder definitions belong in Diagnostic-Data, not hardcoded Kotlin business logic.
 
-## DIAGNOSTIC-DATA
+Current `DataDecoderSpec` supports:
 
-The normalized data repository is:
+- unsigned/signed 8 bit
+- unsigned/signed 16 bit BE/LE
+- scale
+- offset
+- unit
+- explicit byte `indices` / JSON `responseIndices`
 
-`AutoDiag-WiCAN-Diagnostic-Data`
+`OutlanderPhevDecoderResolver` fails closed on ambiguity rather than guessing.
 
-Current manifest reports `candidates: 2`. The provider loads both Outlander Watchdog candidate JSON files:
+`GitHubDiagnosticDataProvider` loads:
 
 ```text
 data/candidates/outlander_phev_watchdog_resistance.json
 data/candidates/outlander_phev_watchdog_cells_and_motor.json
 ```
 
-Do not duplicate signal maps in Kotlin when the data-driven decoder can represent them.
+Diagnostic-Data manifest reports `candidates: 2`.
 
-For non-contiguous bytes use `responseIndices`, never a fake contiguous range.
+## TESTING
 
----
+The decoder tests establish arithmetic correctness. They do not establish ECU addressing or universal vehicle applicability.
 
-## SAFETY / VERIFICATION
+Mandatory levels:
 
-- READ has priority over WRITE.
-- No coding/adaptation/actuator/security/write capability may be enabled by static APK extraction.
-- Community evidence is research input, not OEM authority.
-- Do not infer an MΩ Riso value from an OK/fault status.
-- A single low cell voltage under load is not proof of a defective cell.
-- Missing data is `NOT_AVAILABLE` / `UNAVAILABLE`, not `ERROR`.
-- Production thresholds require explicit evidence and scope.
+1. unit test
+2. simulator/replay test where practical
+3. real-vehicle capture for `VERIFIED`
 
----
+Static APK evidence can create a candidate, never a verified production signal.
 
 ## CI
 
-The Android workflow now runs:
+Workflow:
 
 ```text
-gradle :core:testDebugUnitTest --stacktrace
-gradle :app:assembleDebug --stacktrace
+:core:testDebugUnitTest
+-> :app:assembleDebug
+-> upload debug APK
 ```
 
-Tests must pass before the debug APK is built/uploaded.
+The latest run must be inspected before claiming green. A run seen as `in_progress` must not be reported as successful.
 
-Recent CI failure was caused by stale tests referring to removed APIs (`DtcKnowledgeEntry`, obsolete resistance aggregator APIs) and an `Int`/`Byte` literal mismatch in `CanFrameTest`. Those tests have been migrated to the current APIs. Always inspect the latest run before claiming the build is green.
+## SAFETY
 
----
-
-## CURRENT TASK ORDER
-
-Continue autonomously in this order:
-
-1. Confirm latest CI run is green after the test migrations.
-2. If CI fails, fix the actual failure and rerun; do not mask failures.
-3. Continue forensic extraction from the local PHEV Watchdog APK for the remaining commands:
-
-```text
-21 04, 21 05, 21 11, 21 14, 21 15, 21 23, 21 24, 21 25, 21 26,
-22 01 01, 22 01 02, 22 01 03, 22 01 04, 22 01 05, 22 B0 02
-```
-
-4. For each command complete `variant → request → response → decoder → test` before promoting it.
-5. Trace `ATSH` and `CAN_RECEIVE_ADDRESS` to establish ECU/address context wherever possible.
-6. Add only evidence-backed candidates to Diagnostic-Data.
-7. Do not promote a candidate to verified/production without real-vehicle evidence.
-8. Update provenance after each meaningful extraction step.
-9. Keep this handoff and `docs/AI_APK_EXTRACTION_GUIDE.md` synchronized with the actual repository state.
-
----
+- READ-only extraction.
+- No coding/adaptation/actuator/security/write capability is unlocked by APK evidence.
+- Community evidence is research input, not OEM authority.
+- Never derive Riso MΩ from an OK/fault status.
+- A single low cell voltage during load is not proof of a defective cell.
+- Missing data is `UNAVAILABLE`/`NOT_AVAILABLE`, not `ERROR`.
 
 ## WORK STYLE
 
-- Work against current GitHub, not an old ZIP.
-- Small reviewable commits.
-- Tests with every decoder/parser change.
-- Documentation = specification; code = implementation; simulator/replay = deterministic validation; vehicle = final validation.
-- Never claim `AVAILABLE` merely because code exists.
-- Never invent missing ECU/address/decoder links.
+Work against current GitHub. Use small commits. Test every decoder/parser change. Update provenance after meaningful extraction. If a link cannot be proven, record `UNRESOLVED` and continue with independently extractable evidence — never invent the missing link.
