@@ -1,33 +1,45 @@
 package com.autodiag.core.capability
 
 /**
- * Source-derived decoders from the analysed PHEV Watchdog APK.
+ * Compatibility facade for the current Outlander UI path.
  *
- * The indexes intentionally remain explicit. The Watchdog parser includes a
- * three-character CAN header token in its response array when present, so
- * these offsets must only be applied to the same normalized response layout.
+ * The actual byte decoding primitive is generic and lives in DataDrivenDecoder;
+ * vehicle-specific decoder definitions are maintained as provenance data.
  */
 object OutlanderPhevResistanceDecoder {
-    /** Watchdog z3/a, command 21 01: bytes 78..79, unsigned 16-bit, kΩ. */
-    fun decodeIsolationResistance(response: IntArray): Double {
-        require(response.size > 79) { "Outlander isolation response is too short" }
-        return ((response[78] and 0xFF) * 256 + (response[79] and 0xFF)).toDouble()
-    }
+    private val isolation = DataDecoderSpec(
+        kind = DataDecoderSpec.Kind.UNSIGNED_U16_BE,
+        start = 78,
+        end = 79,
+        scale = 1.0,
+        unit = "kΩ"
+    )
 
-    /**
-     * Watchdog e4/a, command 21 01: byte 38, source-labelled MΩ.
-     * Retained for forensic/source comparison only; NOT a confirmed battery ESR.
-     */
-    fun decodeUnverifiedInternalResistanceMaximum(response: IntArray): Double {
-        require(response.size > 38) { "Outlander battery response is too short" }
-        return (response[38] and 0xFF) / 10.0
-    }
+    private val internalMaximum = DataDecoderSpec(
+        kind = DataDecoderSpec.Kind.UNSIGNED_U8,
+        start = 38,
+        scale = 0.1,
+        unit = "MΩ"
+    )
 
-    /** Watchdog e4/a, command 21 01: byte 39, source-labelled MΩ; meaning unverified. */
-    fun decodeUnverifiedInternalResistanceMinimum(response: IntArray): Double {
-        require(response.size > 39) { "Outlander battery response is too short" }
-        return (response[39] and 0xFF) / 10.0
-    }
+    private val internalMinimum = DataDecoderSpec(
+        kind = DataDecoderSpec.Kind.UNSIGNED_U8,
+        start = 39,
+        scale = 0.1,
+        unit = "MΩ"
+    )
+
+    /** Watchdog Lz3/a, 21 01: unsigned 16-bit BE, tokens 78..79, kΩ. */
+    fun decodeIsolationResistance(response: IntArray): Double =
+        DataDrivenDecoder.decode(response, isolation)
+
+    /** Watchdog Le4/a, 21 01: unsigned byte 38, source-labelled MΩ. */
+    fun decodeUnverifiedInternalResistanceMaximum(response: IntArray): Double =
+        DataDrivenDecoder.decode(response, internalMaximum)
+
+    /** Watchdog Le4/a, 21 01: unsigned byte 39, source-labelled MΩ. */
+    fun decodeUnverifiedInternalResistanceMinimum(response: IntArray): Double =
+        DataDrivenDecoder.decode(response, internalMinimum)
 
     fun decodeIsolationMeasurement(
         response: IntArray,
