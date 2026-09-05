@@ -62,6 +62,8 @@ Z APK jsou potvrzeny command literals:
 ### Exact decoder behaviour already established
 
 - `21 01 / Lz3/a;`: `ISOLATION_RESISTANCE = d[78]*256+d[79]`, kΩ
+- `21 01 / Le4/a;`: internal resistance max/min from `d[38]` / `d[39]`, scale 0.1 MΩ
+- `21 01 / Ld4/a;`: max `d[12]*256+d[13]`, min `d[14]*256+d[15]`, each scale 0.001 MΩ; max difference `d[71]`, scale 0.02 MΩ
 - `21 02 / Lz3/b;`: 32 cell-voltage outputs, `d[i]/50.0`, V
 - `21 03 / Lz3/c;`: 32 cell-voltage outputs, `d[i]/50.0`, V
 - `21 03 / Lz3/e;`: `FRONT_MOTOR_RPM = d[31]*256+d[30]`
@@ -106,12 +108,15 @@ Independent public Outlander evidence supports:
 
 ```text
 BMU          0x761 -> 0x762   21 01   strong correlation
+BMU          0x761 -> 0x762   21 02   explicit cell-voltage addressing evidence
 rear motor   0x753 -> 0x754           candidate topology
 front motor  0x755 -> 0x756           candidate topology
 generator    0x73C -> 0x73D           candidate topology
 ```
 
-This topology does not by itself prove Watchdog class-to-address binding. In particular, do not bind `Lz3e` to motor/generator addresses from signal names alone.
+The 21 02 BMU address correlation is now preserved in Diagnostic-Data candidate metadata. The same request `21 03` remains deliberately unbound because the available evidence does not prove which Watchdog model/address combination selects `Lz3/c` or `Lz3/e`.
+
+Topology does not by itself prove Watchdog class-to-address binding. In particular, do not bind `Lz3e` to motor/generator addresses from signal names alone.
 
 ## PARSER BOUNDARY
 
@@ -125,6 +130,8 @@ Remove/handle explicitly:
 - diagnostic response service/PID prefix for the applicable family
 - consecutive-frame sequence byte
 - flow-control traffic
+
+For an ISO-TP First Frame such as `762 10 37 61 01 ...`, the parser must remove the CAN header, PCI byte, FF length byte, positive-response service and PID so the first actual payload byte becomes `d[0]`. The parser now has explicit regression coverage for this boundary and for incomplete First Frames.
 
 `OutlanderPhev21ResponseParser` implements the current `21 xx` boundary and has tests. A different response family must get its own parser logic/tests if its prefix differs.
 
@@ -141,6 +148,8 @@ Current `DataDecoderSpec` supports:
 - unit
 - explicit byte `indices` / JSON `responseIndices`
 
+`SignalDecoderDefinition` additionally preserves optional proven `requestCanId` / `responseCanId`; missing IDs remain null rather than guessed.
+
 `OutlanderPhevDecoderResolver` fails closed on ambiguity rather than guessing.
 
 `GitHubDiagnosticDataProvider` loads:
@@ -155,6 +164,18 @@ Diagnostic-Data manifest reports `candidates: 2`.
 ## TESTING
 
 The decoder tests establish arithmetic correctness. They do not establish ECU addressing or universal vehicle applicability.
+
+Current regression coverage includes:
+
+- ISO-TP first-frame boundary
+- multiline ISO-TP payload
+- incomplete First Frame rejection
+- all extracted resistance decoder variants
+- 32-cell voltage scale
+- front motor RPM little-endian decoding
+- generator RPM exact non-contiguous byte selection
+- decoder CAN-ID provenance parsing
+- resolver ambiguity/fail-closed behaviour
 
 Mandatory levels:
 
@@ -174,7 +195,7 @@ Workflow:
 -> upload debug APK
 ```
 
-The latest run must be inspected before claiming green. A run seen as `in_progress` must not be reported as successful.
+Run `33945628477` was still `in_progress` when last checked, with `Run core unit tests` active. It must not be called green until the workflow completes successfully. Subsequent source commits require a fresh CI run as well.
 
 ## SAFETY
 
