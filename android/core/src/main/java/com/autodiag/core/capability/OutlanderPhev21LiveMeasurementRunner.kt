@@ -13,7 +13,7 @@ class OutlanderPhev21LiveMeasurementRunner(
     private val session: Elm327Session,
     private val scope: CoroutineScope,
     private val onResult: (Result) -> Unit,
-    private val diagnosticData: DiagnosticDataProvider = EmptyDiagnosticDataProvider,
+    private val diagnosticData: DiagnosticDataProvider = GitHubDiagnosticDataProvider(),
     private val variantId: String? = null
 ) {
     data class Result(
