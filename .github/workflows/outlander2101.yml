@@ -3,6 +3,8 @@ name: Outlander 2101 sidecar
 on:
   push:
     branches: ["sidecar/outlander-2101-monitor"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
