@@ -70,11 +70,15 @@ object DiagnosticCatalogParser {
             for (j in 0 until candidates.length()) {
                 val candidate = candidates.getJSONObject(j)
                 val d = candidate.optJSONObject("decoder") ?: continue
-                val start = if (d.has("responseIndex")) d.getInt("responseIndex") else d.getInt("responseIndexStart")
-                val end = if (d.has("responseIndexEnd")) d.getInt("responseIndexEnd") else start
                 val kind = runCatching {
                     DataDecoderSpec.Kind.valueOf(d.getString("kind").uppercase())
                 }.getOrElse { throw IllegalArgumentException("Unsupported decoder kind: ${d.getString("kind")}") }
+                val indices = if (d.has("responseIndices")) {
+                    val a = d.getJSONArray("responseIndices")
+                    List(a.length()) { a.getInt(it) }
+                } else null
+                val start = if (indices != null) indices.first() else if (d.has("responseIndex")) d.getInt("responseIndex") else d.getInt("responseIndexStart")
+                val end = if (indices != null) indices.last() else if (d.has("responseIndexEnd")) d.getInt("responseIndexEnd") else start
                 result += SignalDecoderDefinition(
                     signalId = candidate.getString("id"),
                     label = candidate.optString("label").ifBlank { candidate.getString("id") },
@@ -86,7 +90,8 @@ object DiagnosticCatalogParser {
                         end = end,
                         scale = d.optDouble("scale", 1.0),
                         offset = d.optDouble("offset", 0.0),
-                        unit = candidate.optStringOrNull("unit")
+                        unit = candidate.optStringOrNull("unit"),
+                        indices = indices
                     ),
                     verification = verification(variant),
                     provenance = root.optString("source", "diagnostic-data")
