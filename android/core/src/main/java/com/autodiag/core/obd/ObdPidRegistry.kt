@@ -30,7 +30,7 @@ object ObdPidRegistry {
         ObdPidDefinition(0x2F, 1, "%", "Úroveň paliva v nádrži") { d -> d.getOrNull(0)?.let { it * 100.0 / 255.0 } },
         ObdPidDefinition(0x33, 1, "kPa", "Barometrický tlak") { d -> d.getOrNull(0)?.toDouble() },
         ObdPidDefinition(0x42, 2, "V", "Napětí řídicí jednotky") { d -> u16(d)?.div(1000.0) },
-        ObdPidDefinition(0x43, 2, "%", "Absolutní hodnota zatížení") { d -> u16(d)?.let { it * 100.0 / 255.0 } },
+        ObdPidDefinition(0x43, 2, "%", "Absolutní hodnota zatížení") { d -> u16(d)?.let { it * 100.0 / (255.0 * 256.0) } },
         ObdPidDefinition(0x46, 1, "°C", "Okolní teplota vzduchu") { d -> d.getOrNull(0)?.let { (it - 40).toDouble() } },
         ObdPidDefinition(0x4D, 2, "min", "Doba se zapnutou kontrolkou MIL") { d -> u16(d)?.toDouble() },
         ObdPidDefinition(0x4E, 2, "min", "Doba od vymazání DTC") { d -> u16(d)?.toDouble() },
