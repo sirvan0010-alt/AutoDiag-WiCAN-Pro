@@ -66,6 +66,15 @@ class OutlanderPhev21LiveMeasurementRunner(
                                 else -> null
                             }
 
+                        val isolationDefinition = definitionOrNull("battery.isolation_resistance")
+                        val maxDefinition = definitionOrNull("battery.internal_resistance.max")
+                        val minDefinition = definitionOrNull("battery.internal_resistance.min")
+                        val ambiguities = listOf(
+                            "battery.isolation_resistance",
+                            "battery.internal_resistance.max",
+                            "battery.internal_resistance.min"
+                        ).mapNotNull(::ambiguity)
+
                         // Each signal decodes independently. A response too short/malformed for one
                         // signal (e.g. isolation needs the highest byte offset) must not discard the
                         // other two signals if they decoded successfully - hence runCatching per call,
