@@ -67,6 +67,8 @@ object DiagnosticCatalogParser {
             val variantId = variant.getString("id")
             val request = variant.getString("request").replace(" ", "")
             val candidates = variant.optJSONArray("candidates") ?: continue
+            val requestCanId = parseCanId(variant.opt("requestCanId"))
+            val responseCanId = parseCanId(variant.opt("responseCanId"))
             for (j in 0 until candidates.length()) {
                 val candidate = candidates.getJSONObject(j)
                 val d = candidate.optJSONObject("decoder") ?: continue
@@ -94,7 +96,9 @@ object DiagnosticCatalogParser {
                         indices = indices
                     ),
                     verification = verification(variant),
-                    provenance = root.optString("source", "diagnostic-data")
+                    provenance = root.optString("source", "diagnostic-data"),
+                    requestCanId = requestCanId,
+                    responseCanId = responseCanId
                 )
             }
         }
@@ -134,6 +138,13 @@ object DiagnosticCatalogParser {
         is String -> ParsedRequest(if (raw.startsWith("01")) "obd" else null, raw.replace(" ", ""))
         is JSONObject -> ParsedRequest(raw.optStringOrNull("protocol"), raw.optStringOrNull("elm_payload")?.replace(" ", ""))
         else -> ParsedRequest(null, null)
+    }
+
+    private fun parseCanId(raw: Any?): Int? = when (raw) {
+        null, JSONObject.NULL -> null
+        is Number -> raw.toInt()
+        is String -> raw.trim().removePrefix("0x").removePrefix("0X").takeIf { it.isNotBlank() }?.toIntOrNull(16)
+        else -> null
     }
 
     private fun arrayOf(body: String, key: String): JSONArray? {
