@@ -298,7 +298,36 @@ For PHEV Watchdog Lite 1.9.1.2023OCT29, continue in this order:
 
 For each command complete the full chain before moving on. Do not bulk-create speculative candidate JSON.
 
-## 15. Required final audit before production promotion
+## 15. Current extraction matrix — 2026-09-05
+
+The following is the current forensic state. It is deliberately explicit about what is known and what is not.
+
+| Request | Watchdog class/variant | Decoder state | ECU/address state | Production state |
+|---|---|---|---|---|
+| `21 01` | `Lz3/a;`, `Ld4/a;`, `Le4/a;` | exact decoder evidence for several outputs | BMU `0x761 -> 0x762` independently correlated; variant scope incomplete | candidate only |
+| `21 02` | `Lz3/b;` | 32 × `u8`, `d[i]/50` | unresolved in APK | candidate only |
+| `21 03` | `Lz3/c;`, `Lz3/e;` | exact cell + motor/generator expressions | unresolved in APK | candidate only |
+| `21 04` | `Lz3/d;` | class/request found; decoder not yet safely normalized | unresolved | unresolved |
+| `21 05` | `La4/a;`, `Lb4/a;` | multiple model paths; exact decoder separation pending | unresolved | unresolved |
+| `21 11` | `Lc4/c;` | class/request found; decoder pending | unresolved | unresolved |
+| `21 14` | `Lc4/a;` | class/request found; decoder pending | unresolved | unresolved |
+| `21 15` | `Lc4/b;` | class/request found; decoder pending | unresolved | unresolved |
+| `21 23` | `Lc4/h;` | class/request found; decoder pending | unresolved | unresolved |
+| `21 24` | `Lc4/i;` | class/request found; decoder pending | unresolved | unresolved |
+| `21 25` | `Lc4/j;` | class/request found; decoder pending | unresolved | unresolved |
+| `21 26` | `Lc4/k;` | class/request found; decoder pending | unresolved | unresolved |
+| `22 01 01` | `Ly3/b;` | command/class correlation found; exact expressions pending | unresolved | unresolved |
+| `22 01 02` | `Ly3/c;` | command/class correlation found; exact expressions pending | unresolved | unresolved |
+| `22 01 03` | `Ly3/d;` | command/class correlation found; exact expressions pending | unresolved | unresolved |
+| `22 01 04` | `Ly3/e;` | command/class correlation found; exact expressions pending | unresolved | unresolved |
+| `22 01 05` | `Ly3/a;` | command/class correlation found; exact expressions pending | unresolved | unresolved |
+| `22 B0 02` | `Lz3/g;` | command/class correlation found; exact expressions pending | unresolved | unresolved |
+
+The complete matrix is also stored as provenance in the Diagnostic-Data repository at `provenance/apk-extraction/phev-watchdog/command-extraction-status-2026-09-05.json`.
+
+**Important:** “complete matrix” means every queued command has a recorded extraction status. It does **not** mean every unresolved command has been promoted. An unresolved decoder or ECU binding remains unresolved.
+
+## 16. Required final audit before production promotion
 
 Before a candidate becomes production-capable, confirm all of the following:
 
