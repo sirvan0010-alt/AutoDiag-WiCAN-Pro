@@ -18,8 +18,8 @@ object CanCaptureJson {
                 JSONObject()
                     .put("timestampNanos", record.timestampNanos)
                     .put("canId", frame.id)
-                    .put("extended", frame.extended)
-                    .put("remote", frame.remote)
+                    .put("extended", frame.isExtended)
+                    .put("remote", frame.isRemote)
                     .put("data", frame.data.joinToString("") { "%02X".format(it.toInt() and 0xFF) })
             )
         }
