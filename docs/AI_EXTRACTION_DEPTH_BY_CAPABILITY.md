@@ -9,6 +9,8 @@ zápis do ECU**, **D = okamžitá akce na skutečné komponentě**, **E = appka 
 možná umí, ale u nás to nikdy nejde do produkce**. Pořadí není náhodné — je
 to i pořadí, ve kterém stoupá potřebná opatrnost.
 
+Celkem je definováno **17 kategorií (A1–A9, B1–B2, C1–C3, D1, E1–E2)**.
+
 ---
 
 ## A. Čisté čtení (nejnižší riziko)
@@ -75,40 +77,36 @@ jen v laboratorních podmínkách.
 
 ### B1. Historie / trip statistiky / agregace
 Spotřeba za jízdu, skóre jízdního stylu, grafy v čase — appka tohle počítá
-sama z primárních dat, není to fakt o vozidle. Extrahuj vzorec/agregační
-logiku jako "appka X to počítá takhle", ne jako ověřený fakt o autě.
+sama z primárních dat, není to fakt o vozidle. Extrahuj vzorec/agregační logiku
+jako "appka X to počítá takhle", ne jako ověřený fakt o autě.
 
 ### B2. Prahové hodnoty a upozornění
 "Appka varuje při teplotě > 110 °C" — to je appkou zvolený práh, ne
 specifikace výrobce. Označ explicitně jako "vendor threshold", ať se to
-nesmíchá s A1 daty.
+nesmíchat s A1 daty.
 
 ---
 
 ## C. Trvalý zápis konfigurace (WRITE — persistent)
 
 ### C1. Long coding / adaptace
-Bitová mapa konfiguračního řetězce (který bit/nibble = která funkce),
-security access mechanismus (`0x27` seed-key — appka ho zná, nebo je modul
-pro ni zamčený?), a **validní rozsah hodnot, který appka dovoluje nastavit**
-(ne teoretické maximum bitového pole).
+Bitová mapa konfiguračního řetězce (který bit/nibble = která funkce), security
+access mechanismus (`0x27` seed-key — appka ho zná, nebo je modul pro ni zamčený?),
+a **validní rozsah hodnot, který appka dovoluje nastavit** (ne teoretické maximum
+bitového pole).
 
 ### C2. Servisní/údržbové resety (state machine, ne jeden zápis)
-Reset servisního intervalu, EPB servisní režim na výměnu destiček,
-registrace nové baterie, regenerace DPF, adaptace škrticí klapky. Tohle není
-jeden write — je to **sekvence kroků s podmínkami** (motor vypnutý,
-zapalování zapnuté, brzda uvolněná...). Extrahuj celou sekvenci a
-předpoklady, ne jen finální routine-control command, jinak to v reálu selže
-i s "správným" příkazem.
+Reset servisního intervalu, EPB servisní režim na výměnu destiček, registrace nové
+baterie, regenerace DPF, adaptace škrticí klapky. Tohle není jeden write — je to
+**sekvence kroků s podmínkami** (motor vypnutý, zapalování zapnuté, brzda uvolněná...).
+Extrahuj celou sekvenci a předpoklady, ne jen finální routine-control command,
+jinak to v reálu selže i s "správným" příkazem.
 
 ### C3. Bidirekční test aktuátorů (okamžitá akce na komponentě)
-Sepnutí ventilátoru, cyklování solenoidu, test vstřikovače — na rozdíl od
-C1/C2 je to **okamžitá, ne trvalá** akce, ale hýbe to skutečnou součástkou.
-Extrahuj přesný command + jak appka akci ukončí/timeoutuje (bezpečnostní
-mechanismus appky samotné je cenná informace — kopíruj i tohle, ne jen
-"jak se to zapne").
-
----
+Sepnutí ventilátoru, cyklování solenoidu, test vstřikovače — na rozdíl od C1/C2 je to
+**okamžitá, ne trvalá** akce, ale hýbe to skutečnou součástkou. Extrahuj přesný
+command + jak appka akci ukončí/timeoutuje (bezpečnostní mechanismus appky samotné
+je cenná informace — kopíruj i tohle, ne jen "jak se to zapne").
 
 ## D. Odposlech (metoda, ne cíl — použitelná na C1–C3)
 
@@ -157,5 +155,5 @@ přehled trhu, nikdy mechanismus.
 | E2 | Imobilizér/klíče | Mimo scope | — | jen poznámka do přehledu |
 
 **První otázka AI u každé appky, kterou nahraješ, zůstává stejná:** "do
-které z těchto ~16 kategorií tahle konkrétní funkce patří?" — teď má ale
+které z těchto 17 kategorií tahle konkrétní funkce patří?" — teď má ale
 mnohem menší šanci, že narazí na něco, co nikam nezapadá.
