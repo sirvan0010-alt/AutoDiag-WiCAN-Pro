@@ -18,6 +18,8 @@
 
 The test uses a fake transport and a known SLCAN frame. It does not claim physical vehicle evidence.
 
+A dedicated `.github/workflows/android-core-ci.yml` now runs `:core:testDebugUnitTest` with JDK 17 and Gradle 8.9 on Android-source changes. CI execution is the next independent confirmation of compilation/test status; source inspection alone is not treated as a passing build.
+
 ## Evidence boundary
 
 These components prove the application-side SLCAN parsing/capture/replay path and its unit-test wiring. They do **not** prove that a physical WiCAN device is currently delivering CAN RX traffic to the application.
@@ -30,7 +32,7 @@ The previous production-wiring gap is closed at the core-library level by `Slcan
 
 `real WiCAN transport → real RX bytes → real capture session → persisted evidence artifact → replay → decoder test → vehicle verification`
 
-Do not promote any signal/PID/CAN mapping based solely on static APK extraction, parser tests, or synthetic capture tests.
+Do not promote any signal/PID/CAN mapping based solely on static APK extraction, parser tests, synthetic capture tests, or a successful compilation.
 
 ## External WiCAN context
 
