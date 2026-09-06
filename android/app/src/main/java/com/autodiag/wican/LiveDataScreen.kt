@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -28,10 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
-import com.autodiag.core.obd.LiveDataPoint
-import com.autodiag.core.obd.MeasurementAvailability
-import com.autodiag.core.obd.MeasurementOrigin
-import com.autodiag.core.obd.VerificationState
 import kotlinx.coroutines.delay
 import kotlin.math.sin
 
@@ -109,7 +104,7 @@ fun LiveDataScreen(onBack: () -> Unit) {
                             Text("%.1f %s".format(current, def.unit), style = MaterialTheme.typography.titleLarge)
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text("MEASURED · ${if (paused) "PAUSED" else "LIVE"} · UNVERIFIED", style = MaterialTheme.typography.labelSmall)
+                        Text("SIMULATED · ${if (paused) "PAUSED" else "LIVE"} · NOT VEHICLE DATA", style = MaterialTheme.typography.labelSmall)
                         Sparkline(history, definitions.filter { it.id in selected }.indexOf(def))
                     }
                 }
