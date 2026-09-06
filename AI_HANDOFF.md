@@ -40,6 +40,47 @@ AI **nesmí smazat** plánovanou funkci jen proto, že ji teď nelze implementov
 **READ FIRST.** Žádné vymyšlené CAN ID, PID, Tesla signály, Riso MΩ, SOH.
 `NOT_AVAILABLE` / `UNAVAILABLE` ≠ `ERROR` ≠ `FAIL`.
 
+## 📋 GOVERNANCE — POVINNÉ ČTENÍ PŘED PRACÍ
+
+Tři dokumenty v `docs/` jsou závazný rámec pro jakoukoli AI/vývojáře
+pracující na tomto repu nebo na `AutoDiag-WiCAN-Diagnostic-Data`. Přečti
+je před prvním commitem v této session:
+
+- **`docs/AI_ENGINEERING_AUDIT_MATRIX.md`** — 17 auditních oblastí
+  pokrývajících celý životní cyklus diagnostické informace
+  (zdroj → důkaz → candidate → validace → runtime → UI → test → CI →
+  release). Otevřený seznam — přibývají oblasti, ne jen se plní ty
+  stávající.
+- **`docs/AI_EXTRACTION_DEPTH_BY_CAPABILITY.md`** — 16 kategorií, do
+  jaké hloubky extrahovat data z referenčních appek (živá data vs. DTC
+  interpretace vs. long coding vs. odposlech — každá jinou hloubku a
+  jiný safety gate).
+- **`docs/AI_LEADERSHIP_REVIEW_2026-09-05.md`** — aktuální stav zjištění
+  k datu revize, s explicitním rozlišením ověřeno/odvozeno (viz níže).
+
+### Nejdůležitější jednotlivé pravidlo z těch tří dokumentů
+
+Každé zjištění o stavu repa (mrtvý kód, CI status, "appka X to dělá takhle")
+nese jeden z tagů:
+
+- **`[OVĚŘENO]`** — přímo přečteno v kódu/configu/CI logu v této session, s
+  uvedením jak (soubor, URL, commit SHA).
+- **`[ODVOZENO]`** — logický závěr z ověřených faktů, ne přímo pozorováno.
+- **`[TVRZENÍ DRUHÉ AI, NEOVĚŘENO]`** — přebíráno beze nezávislého ověření.
+  Smí se objevit v diskuzi, **nikdy jako vstup pro nevratnou akci** (smazání,
+  force-push, merge do main, promotion na `VERIFIED`).
+
+CI status navíc vždy váže na konkrétní commit SHA — "poslední CI běh" bez
+SHA se nepřijímá jako platné tvrzení.
+
+### WIP limit
+
+Než založíš další frontu práce (další výrobce appky, další feature),
+zkontroluj: je ta předchozí zmergovaná do `main`, otestovaná a uklizená?
+Pokud ne, dokonči ji první — souběžně smí pokračovat jen **statická
+extrakce** (APK → candidate JSON), nikdy zapojení nových candidates do
+běžícího runtime před dokončením předchozí fronty.
+
 ---
 
 ## 🟢 HOTOVO / AKTUÁLNĚ V `main`
@@ -207,8 +248,6 @@ Zdroj dat je oddělen od Android aplikace.
 Aktuální manifest `AutoDiag-WiCAN-Diagnostic-Data` má canonical candidate set **10 souborů**. `records.candidates` je proto **10**; `records.vehicles`, `records.ecus` a `records.signals` jsou **0**, protože manifest má počítat pouze production records, nikoli candidate-internal ECU/signal counts. Manifest obsahuje explicitní `record_count_policy`.
 
 S3XY/Tesla evidence zůstává schema/research evidence, pokud není v Diagnostic-Data explicitně zapsána s provenance a `unverified` stavem.
-
----
 
 ## SAFETY
 
