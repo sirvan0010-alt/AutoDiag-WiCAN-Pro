@@ -28,7 +28,9 @@ data class CapabilitySnapshot(
     val capabilities: Map<String, Capability>,
     val vinAudit: VinAudit = VinAudit(),
     val discoveredAtEpochMs: Long = System.currentTimeMillis(),
-    val scopeKey: String = "session"
+    val scopeKey: String = "session",
+    /** Standard SAE Mode 01 PIDs explicitly advertised by ECU supported-PID bitmaps. */
+    val mode01SupportedPids: Set<Int> = emptySet()
 )
 
 object CapabilityIds {
