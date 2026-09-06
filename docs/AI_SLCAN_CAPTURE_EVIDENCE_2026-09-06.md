@@ -3,27 +3,34 @@
 ## Verified implementation
 
 - `WiCanTransport` exposes `observeIncoming(): Flow<ByteArray>` and explicitly supports `TransportMode.SLCAN_RAW`.
-- `SlcanCanFrameStream` consumes transport byte chunks, timestamps receipt with `System.nanoTime()`, feeds them to `SlcanCodec.StreamDecoder`, and exposes decoded `CanFrame` values as a `SharedFlow`.
+- `SlcanCanFrameStream` consumes transport byte chunks, feeds them to `SlcanCodec.StreamDecoder`, and exposes decoded `CanFrame` values as a `SharedFlow`.
 - `SlcanCodec` validates classic SLCAN frame types `t/T/r/R`, identifier width, DLC, payload length, and hexadecimal payload bytes. Its stream decoder preserves partial TCP lines between chunks.
 - `CanCapture` provides bounded in-memory capture with relative monotonic timestamps and an explicit dropped-record counter. Default capacity is 50,000 records.
+- `SlcanCaptureController` now explicitly wires the live `SlcanCanFrameStream` into `CanCapture`, with opt-in start/stop lifecycle and immutable `CanCaptureSession` output.
 - `CanReplay` re-emits captured frames using their relative timing and supports replay speed scaling.
 - `RawCanMonitorState` provides a UI-neutral live monitor state, filtering by CAN ID, pause handling, bounded visible-frame history, and bus statistics.
 
+## Regression coverage
+
+`SlcanCaptureControllerTest` verifies the complete application-side sequence:
+
+`transport byte chunk → SLCAN decode → live frame stream → capture.record() → immutable session`
+
+The test uses a fake transport and a known SLCAN frame. It does not claim physical vehicle evidence.
+
 ## Evidence boundary
 
-These components prove the presence of an application-side SLCAN parsing/capture/replay path. They do **not** prove that a physical WiCAN device is currently delivering CAN RX traffic to the application.
+These components prove the application-side SLCAN parsing/capture/replay path and its unit-test wiring. They do **not** prove that a physical WiCAN device is currently delivering CAN RX traffic to the application.
 
 A transport connection or successful parser test is not vehicle evidence. Vehicle verification requires an actual captured raw frame session with source/transport metadata and subsequent replay/decoder tests.
 
-## Current implementation gap
+## Current gate
 
-A repository-wide search did not find a current call site constructing `CanCapture`. Therefore the capture recorder exists as a reusable component, but its production wiring into the live SLCAN stream is not yet established by source evidence.
+The previous production-wiring gap is closed at the core-library level by `SlcanCaptureController` and its regression test. The remaining evidence gate is physical/runtime:
 
-The next implementation gate is therefore:
+`real WiCAN transport → real RX bytes → real capture session → persisted evidence artifact → replay → decoder test → vehicle verification`
 
-`WiCanTransport.observeIncoming()` → `SlcanCanFrameStream` → `CanCapture.record()` → immutable evidence artifact → `CanReplay` regression test.
-
-Do not promote any signal/PID/CAN mapping based solely on static APK extraction or parser tests.
+Do not promote any signal/PID/CAN mapping based solely on static APK extraction, parser tests, or synthetic capture tests.
 
 ## External WiCAN context
 
