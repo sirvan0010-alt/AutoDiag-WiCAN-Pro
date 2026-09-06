@@ -31,5 +31,5 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Run core unit tests
-        run: gradle :core:testDebugUnitTest --no-daemon
+      - name: Run core unit tests and compile app
+        run: gradle :core:testDebugUnitTest :app:assembleDebug --no-daemon
