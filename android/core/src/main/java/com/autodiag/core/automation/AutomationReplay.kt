@@ -13,12 +13,11 @@ data class ReplayEvent(
 
 /** Replay is simulation-only and cannot dispatch vehicle commands. */
 object AutomationReplay {
-    fun run(rule: AutomationRule, samples: List<ReplaySample>): List<ReplayEvent> =
-        samples.sortedBy { it.timestampMs }.map { sample ->
-            val evaluation = AutomationRuleEvaluator.evaluate(
-                rule,
-                sample.signals.map { it.copy(timestampMs = sample.timestampMs) }
-            )
-            ReplayEvent(sample.timestampMs, evaluation)
+    fun run(rule: AutomationRule, samples: List<ReplaySample>): List<ReplayEvent> {
+        val detector = AutomationEdgeDetector()
+        return samples.sortedBy { it.timestampMs }.map { sample ->
+            val signals = sample.signals.map { it.copy(timestampMs = sample.timestampMs) }
+            ReplayEvent(sample.timestampMs, detector.evaluate(rule, signals))
         }
+    }
 }
