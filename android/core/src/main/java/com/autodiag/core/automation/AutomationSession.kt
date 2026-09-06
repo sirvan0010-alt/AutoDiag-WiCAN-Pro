@@ -3,14 +3,23 @@ package com.autodiag.core.automation
 /** Runtime session for deterministic, read-only automation processing. */
 class AutomationSession(
     private val rules: List<AutomationRule>,
-    cooldownMs: Long = 60_000L
+    cooldownMs: Long = 60_000L,
+    maxSignalAgeMs: Long = 30_000L
 ) {
     private val detectors = rules.associate { it.id to AutomationEdgeDetector() }
     private val limiter = NotificationRateLimiter(cooldownMs)
+    private val dataQualityGate = AutomationDataQualityGate(maxSignalAgeMs)
 
     fun process(sample: ReplaySample): List<AutomationNotification> {
         val notifications = mutableListOf<AutomationNotification>()
         for (rule in rules) {
+            val required = buildSet {
+                add(rule.triggerSignalId)
+                rule.conditions.forEach { add(it.signalId) }
+            }
+            val quality = dataQualityGate.validate(required, sample.signals, sample.timestampMs)
+            if (!quality.accepted) continue
+
             val detector = detectors[rule.id] ?: continue
             val evaluation = detector.evaluate(rule, sample.signals)
             if (rule.action.policy != AutomationPolicy.NOTIFY_ALERT) continue
@@ -19,5 +28,13 @@ class AutomationSession(
             AutomationNotificationAdapter.create(evaluation, sample.timestampMs)?.let(notifications::add)
         }
         return notifications
+    }
+
+    /** Ends the logical session so the next session can generate fresh entry edges. */
+    fun reset() {
+        rules.forEach { rule ->
+            detectors[rule.id]?.reset(rule.id)
+            limiter.reset(rule.id)
+        }
     }
 }
