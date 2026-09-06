@@ -71,8 +71,10 @@ class ConnectionViewModel(
     fun connectSlcan(host: String, port: Int = 23) = connect(host, port, TransportMode.SLCAN_RAW, false)
     fun connectSimulator() = connect("simulator", 0, TransportMode.SIMULATOR, true)
 
-    /** Creates the existing read-only Mode 01 engine over the live initialized session. */
-    fun createLiveDataEngine(): ObdLiveDataEngine? = session?.let { ObdLiveDataEngine(it) }
+    /** Creates the existing read-only Mode 01 engine bound to the current session slot. */
+    fun createLiveDataEngine(): ObdLiveDataEngine? = session?.let { current ->
+        ObdLiveDataEngine(current, sessionProvider = { session })
+    }
 
     fun setRawCanFilter(filter: String) = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(idFilter = filter)) }
     fun toggleRawCanPause() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(paused = !it.rawCanMonitor.paused)) }
