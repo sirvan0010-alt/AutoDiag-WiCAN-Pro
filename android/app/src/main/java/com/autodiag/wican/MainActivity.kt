@@ -45,10 +45,12 @@ import com.autodiag.wican.ui.theme.AutoDiagTheme
 import com.autodiag.wican.viewmodel.ConnectionPhase
 import com.autodiag.wican.viewmodel.ConnectionUiState
 import com.autodiag.wican.viewmodel.ConnectionViewModel
+import com.autodiag.wican.viewmodel.LiveDataViewModel
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private val connectionViewModel: ConnectionViewModel by viewModels { ConnectionViewModel.Factory() }
+    private val liveDataViewModel: LiveDataViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +58,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             AutoDiagTheme {
                 val conn by connectionViewModel.uiState.collectAsState()
+                val liveSession by connectionViewModel.liveDataSession.collectAsState()
+                var showLiveData by remember { mutableStateOf(false) }
+
+                LaunchedEffect(conn.phase) {
+                    if (conn.phase != ConnectionPhase.READY) showLiveData = false
+                }
+
                 if (conn.phase == ConnectionPhase.IDLE) {
                     DiscoveryScreen(
                         discovery,
@@ -63,10 +72,17 @@ class MainActivity : ComponentActivity() {
                         onConnectSlcan = { host, port -> connectionViewModel.connectSlcan(host, port) },
                         onConnectSimulator = { connectionViewModel.connectSimulator() }
                     )
+                } else if (showLiveData && liveSession != null && conn.mode != TransportMode.SLCAN_RAW) {
+                    LiveDataScreen(
+                        viewModel = liveDataViewModel,
+                        session = liveSession!!,
+                        supportedPids = setOf(0x0C),
+                        onBack = { showLiveData = false }
+                    )
                 } else {
                     ConnectionResultScreen(
                         conn,
-                        onDisconnect = { connectionViewModel.disconnect() },
+                        onDisconnect = { showLiveData = false; connectionViewModel.disconnect() },
                         onRetry = {
                             when (conn.mode) {
                                 TransportMode.SIMULATOR -> connectionViewModel.connectSimulator()
@@ -76,7 +92,8 @@ class MainActivity : ComponentActivity() {
                         },
                         onRawCanFilter = connectionViewModel::setRawCanFilter,
                         onRawCanPause = connectionViewModel::toggleRawCanPause,
-                        onRawCanClear = connectionViewModel::clearRawCan
+                        onRawCanClear = connectionViewModel::clearRawCan,
+                        onLiveData = { showLiveData = true }
                     )
                 }
             }
@@ -192,7 +209,8 @@ private fun ConnectionResultScreen(
     onRetry: () -> Unit,
     onRawCanFilter: (String) -> Unit,
     onRawCanPause: () -> Unit,
-    onRawCanClear: () -> Unit
+    onRawCanClear: () -> Unit,
+    onLiveData: () -> Unit
 ) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
@@ -233,6 +251,10 @@ private fun ConnectionResultScreen(
                         val caps = state.snapshot?.capabilities?.values?.toList().orEmpty()
                         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(caps, key = { it.id }) { CapabilityCard(it) } }
                         Spacer(Modifier.height(12.dp))
+                        if (state.mode == TransportMode.ELM327 && state.snapshot?.capabilities?.values?.any { it.id == "obd.mode01" && it.status == CapabilityStatus.AVAILABLE } == true) {
+                            Button(onClick = onLiveData, Modifier.fillMaxWidth()) { Text("Otevřít Live Data") }
+                            Spacer(Modifier.height(8.dp))
+                        }
                         OutlinedButton(onClick = onDisconnect, Modifier.fillMaxWidth()) { Text("Odpojit") }
                     }
                 }
