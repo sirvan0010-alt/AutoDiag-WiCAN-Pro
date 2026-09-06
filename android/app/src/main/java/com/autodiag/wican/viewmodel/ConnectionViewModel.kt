@@ -48,7 +48,7 @@ data class ConnectionUiState(
     val transportState: ConnectionState? = null,
     val transportMetrics: TransportMetrics = TransportMetrics(),
     val rawCanMonitor: RawCanMonitorState = RawCanMonitorState(),
-    /** PIDs positively established by discovery. No registry-wide guessing. */
+    /** PIDs positively established by Mode 01 bitmap discovery. */
     val supportedLiveDataPids: Set<Int> = emptySet()
 )
 
@@ -117,45 +117,21 @@ class ConnectionViewModel(
         metricsJob?.cancel()
         stopRawCanMonitor()
         job = viewModelScope.launch {
-            _uiState.value = ConnectionUiState(
-                phase = ConnectionPhase.CONNECTING,
-                mode = mode,
-                host = host,
-                port = port,
-                linkOnly = !runDiscovery
-            )
+            _uiState.value = ConnectionUiState(phase = ConnectionPhase.CONNECTING, mode = mode, host = host, port = port, linkOnly = !runDiscovery)
             runCatching {
-                if (mode != TransportMode.SIMULATOR) {
-                    require(host.isNotBlank()) { "IP adresa není vyplněna." }
-                }
+                if (mode != TransportMode.SIMULATOR) require(host.isNotBlank()) { "IP adresa není vyplněna." }
                 runCatching { session?.close() }
                 runCatching { transport?.disconnect() }
 
                 val t = transportFor(mode)
                 transport = t
                 observeMetrics(t)
-                t.connect(
-                    TransportConfig(
-                        host = host,
-                        port = port,
-                        mode = mode,
-                        autoReconnect = mode != TransportMode.SIMULATOR
-                    )
-                ).getOrThrow()
+                t.connect(TransportConfig(host = host, port = port, mode = mode, autoReconnect = mode != TransportMode.SIMULATOR)).getOrThrow()
                 _uiState.update { it.copy(transportState = t.state) }
 
                 if (!runDiscovery) {
                     startRawCanMonitor(t)
-                    _uiState.update {
-                        it.copy(
-                            phase = ConnectionPhase.READY,
-                            errorMessage = null,
-                            snapshot = null,
-                            linkOnly = true,
-                            supportedLiveDataPids = emptySet(),
-                            transportState = t.state
-                        )
-                    }
+                    _uiState.update { it.copy(phase = ConnectionPhase.READY, errorMessage = null, snapshot = null, linkOnly = true, supportedLiveDataPids = emptySet(), transportState = t.state) }
                     return@runCatching
                 }
 
@@ -166,28 +142,18 @@ class ConnectionViewModel(
 
                 _uiState.update { it.copy(phase = ConnectionPhase.DISCOVERING_CAPABILITIES) }
                 val snap = discovery.run(s)
-                val mode01Available = snap.capabilities[com.autodiag.core.capability.CapabilityIds.OBD_MODE_01]
-                    ?.status == com.autodiag.core.capability.CapabilityStatus.AVAILABLE
                 _uiState.update {
                     it.copy(
                         phase = ConnectionPhase.READY,
                         snapshot = snap,
                         errorMessage = null,
                         linkOnly = false,
-                        supportedLiveDataPids = if (mode01Available) setOf(0x0C) else emptySet(),
+                        supportedLiveDataPids = snap.obdMode01SupportedPids,
                         transportState = t.state
                     )
                 }
             }.onFailure { err ->
-                _uiState.update {
-                    it.copy(
-                        phase = ConnectionPhase.ERROR,
-                        errorMessage = humanize(err),
-                        snapshot = null,
-                        supportedLiveDataPids = emptySet(),
-                        transportState = transport?.state
-                    )
-                }
+                _uiState.update { it.copy(phase = ConnectionPhase.ERROR, errorMessage = humanize(err), snapshot = null, supportedLiveDataPids = emptySet(), transportState = transport?.state) }
                 stopRawCanMonitor()
                 runCatching { session?.close() }
                 runCatching { transport?.disconnect() }
