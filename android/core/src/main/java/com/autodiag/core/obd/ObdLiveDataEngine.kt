@@ -19,6 +19,10 @@ import kotlinx.coroutines.isActive
  * Commands remain serialized by Elm327Session. Poll failures are represented
  * as samples and do not terminate the stream. When supplied, evidenceStore
  * records every poll outcome without replacing earlier observations.
+ *
+ * sessionProvider is intentionally separate from the engine's lifetime. This
+ * prevents a reconnect from leaving the engine holding and polling a stale
+ * Elm327Session instance after ConnectionViewModel clears its session.
  */
 class ObdLiveDataEngine(
     private val session: Elm327Session,
@@ -32,7 +36,8 @@ class ObdLiveDataEngine(
     private val evidenceVerification: com.autodiag.core.diagnostic.EvidenceVerification = com.autodiag.core.diagnostic.EvidenceVerification.UNVERIFIED,
     private val evidenceEcuId: String? = null,
     private val evidenceSourceId: String? = null,
-    private val evidenceSource: EvidenceSource = EvidenceSource.OBD_MODE_01
+    private val evidenceSource: EvidenceSource = EvidenceSource.OBD_MODE_01,
+    private val sessionProvider: () -> Elm327Session? = { session }
 ) {
     data class SensorSample(
         val pid: Int,
@@ -67,10 +72,12 @@ class ObdLiveDataEngine(
         val now = nowEpochMs()
         val nextDue = activePlans.associate { it.pid to now }.toMutableMap()
         while (currentCoroutineContext().isActive) {
+            if (sessionProvider() == null) return@flow
             val current = nowEpochMs()
             var emitted = false
             for (plan in activePlans) {
                 if (!currentCoroutineContext().isActive) break
+                if (sessionProvider() == null) return@flow
                 if (current < (nextDue[plan.pid] ?: current)) continue
                 emit(poll(plan.pid))
                 emitted = true
@@ -90,7 +97,9 @@ class ObdLiveDataEngine(
         ).also { recordEvidence(it) }
 
         return try {
-            val response = session.commandDetailed("01${pid.toString(16).padStart(2, '0')}")
+            val activeSession = sessionProvider()
+                ?: return SensorSample(pid, definition.labelCs, null, definition.unit, "", nowEpochMs(), State.UNAVAILABLE, "ELM327 session is no longer active").also { recordEvidence(it) }
+            val response = activeSession.commandDetailed("01${pid.toString(16).padStart(2, '0')}")
             val timestamp = nowEpochMs()
             when (response.kind) {
                 Elm327ResponseKind.POSITIVE -> {
