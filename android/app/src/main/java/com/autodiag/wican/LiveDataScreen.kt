@@ -18,104 +18,126 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlin.math.sin
+import com.autodiag.core.obd.Elm327Session
+import com.autodiag.core.obd.ObdLiveDataEngine
+import com.autodiag.core.obd.ObdPidRegistry
+import com.autodiag.wican.viewmodel.LiveDataViewModel
 
-private data class LiveCardModel(
-    val id: String,
-    val label: String,
-    val unit: String,
-    val base: Double,
-    val amplitude: Double
-)
-
-/** Phase-5 UI shell. Real transport samples can be injected without changing the visual layer. */
+/** Real read-only Mode 01 UI. Values are never generated locally. */
 @Composable
-fun LiveDataScreen(onBack: () -> Unit) {
-    val definitions = remember {
-        listOf(
-            LiveCardModel("rpm", "Otáčky", "rpm", 1800.0, 180.0),
-            LiveCardModel("speed", "Rychlost", "km/h", 54.0, 4.0),
-            LiveCardModel("coolant", "Chladicí kapalina", "°C", 88.0, 1.5),
-            LiveCardModel("load", "Zatížení motoru", "%", 31.0, 6.0),
-            LiveCardModel("map", "MAP", "kPa", 101.0, 5.0),
-            LiveCardModel("iat", "Teplota sání", "°C", 31.0, 1.0),
-            LiveCardModel("throttle", "Škrticí klapka", "%", 18.0, 3.0),
-            LiveCardModel("voltage", "Napětí řídicí jednotky", "V", 14.1, 0.15)
-        )
-    }
-    var selected by remember { mutableStateOf(definitions.take(4).map { it.id }.toSet()) }
-    var paused by remember { mutableStateOf(false) }
-    var tick by remember { mutableStateOf(0) }
-    val history = remember { mutableStateListOf<List<Double>>() }
+fun LiveDataScreen(
+    viewModel: LiveDataViewModel,
+    session: Elm327Session,
+    supportedPids: Set<Int>,
+    onBack: () -> Unit
+) {
+    val samples by viewModel.samples.collectAsState()
+    val selectedPids by viewModel.selectedPids.collectAsState()
+    val running by viewModel.running.collectAsState()
+    val histories = remember { mutableStateMapOf<Int, List<Double>>() }
 
-    LaunchedEffect(paused) {
-        while (!paused) {
-            delay(200)
-            tick++
-            val values = definitions.filter { it.id in selected }.map { it.base + it.amplitude * sin(tick / 8.0 + it.id.hashCode() % 7) }
-            history.add(values)
-            while (history.size > 120) history.removeAt(0)
+    DisposableEffect(session, supportedPids) {
+        viewModel.start(session, supportedPids)
+        onDispose { viewModel.stop() }
+    }
+
+    LaunchedEffect(samples) {
+        samples.filter { it.state == ObdLiveDataEngine.State.LIVE && it.value != null }.forEach { sample ->
+            val old = histories[sample.pid].orEmpty()
+            histories[sample.pid] = (old + sample.value!!).takeLast(120)
         }
     }
+
+    val availableDefinitions = ObdPidRegistry.definitions.values.sortedBy { it.pid }
+    val liveCount = samples.count { it.state == ObdLiveDataEngine.State.LIVE && it.value != null }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text("SEOBD · Live Data", style = MaterialTheme.typography.headlineSmall)
-                Text("${selected.size}/16 hodnot · adaptivní vzorkování", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (running) "Skutečná data z vozidla · Mode 01 · ${liveCount} aktivních hodnot"
+                    else "Polling zastaven · žádná syntetická data",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             OutlinedButton(onClick = onBack) { Text("Zpět") }
         }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { paused = !paused }) { Text(if (paused) "Pokračovat" else "Pauza") }
-            OutlinedButton(onClick = { selected = emptySet() }) { Text("Zrušit výběr") }
+            Button(onClick = { if (running) viewModel.stop() else viewModel.start(session, supportedPids) }) {
+                Text(if (running) "Pauza" else "Pokračovat")
+            }
+            OutlinedButton(onClick = { viewModel.stop() }) { Text("Zastavit") }
         }
         Spacer(Modifier.height(10.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 Text("Výběr signálů", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(6.dp))
-                definitions.forEach { def ->
-                    FilterChip(
-                        selected = def.id in selected,
-                        onClick = { if (def.id in selected || selected.size < 16) selected = if (def.id in selected) selected - def.id else selected + def.id },
-                        label = { Text("${def.label} (${def.unit})") },
-                        modifier = Modifier.padding(end = 6.dp)
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    availableDefinitions.forEach { def ->
+                        val supported = def.pid in supportedPids
+                        FilterChip(
+                            selected = def.pid in selectedPids,
+                            enabled = supported,
+                            onClick = { viewModel.setSelected(def.pid, def.pid !in selectedPids) },
+                            label = { Text("${def.labelCs} (${def.unit})") }
+                        )
+                    }
                 }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Ověřené pro tuto relaci: ${supportedPids.sorted().joinToString { "0x%02X".format(it) }.ifBlank { "žádné" }}. Neověřené PID se nečtou.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
-            items(definitions.filter { it.id in selected }, key = { it.id }) { def ->
-                val current = def.base + def.amplitude * sin(tick / 8.0 + def.id.hashCode() % 7)
+            items(samples.filter { it.pid in selectedPids }, key = { it.pid }) { sample ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(def.label, style = MaterialTheme.typography.titleMedium)
-                            Text("%.1f %s".format(current, def.unit), style = MaterialTheme.typography.titleLarge)
+                            Text(sample.labelCs, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                sample.value?.let { "%.2f %s".format(it, sample.unit ?: "") } ?: "—",
+                                style = MaterialTheme.typography.titleLarge
+                            )
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text("SIMULATED · ${if (paused) "PAUSED" else "LIVE"} · NOT VEHICLE DATA", style = MaterialTheme.typography.labelSmall)
-                        Sparkline(history, definitions.filter { it.id in selected }.indexOf(def))
+                        Text(
+                            "${sample.state.name} · PID 01%02X · raw ${sample.rawHex.ifBlank { "—" }}".format(sample.pid),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                        sample.error?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        Sparkline(histories[sample.pid].orEmpty())
+                    }
+                }
+            }
+            if (samples.isEmpty()) {
+                item {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("Čekám na první odpověď ECU…", style = MaterialTheme.typography.titleMedium)
+                            Text("UI nevytváří náhradní hodnoty. Zobrazí se pouze skutečná odpověď Mode 01.")
+                        }
                     }
                 }
             }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
-                        Text("Komunikační kvalita", style = MaterialTheme.typography.titleMedium)
-                        Text("Cíl 10 Hz · UI vzorkování 5 Hz · latence: — · timeout: 0 %")
-                        Text("Simulovaný náhled: hodnoty nejsou prezentovány jako měření vozidla.", style = MaterialTheme.typography.bodySmall)
+                        Text("Komunikační stav", style = MaterialTheme.typography.titleMedium)
+                        Text("Zdroj: existující Elm327Session → ObdLiveDataEngine")
+                        Text("Režim: read-only · bez syntetických hodnot · bez druhého polling loopu")
                     }
                 }
             }
@@ -124,8 +146,7 @@ fun LiveDataScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun Sparkline(history: List<List<Double>>, index: Int) {
-    val values = history.mapNotNull { it.getOrNull(index) }
+private fun Sparkline(values: List<Double>) {
     Canvas(Modifier.fillMaxWidth().height(64.dp)) {
         if (values.size < 2) return@Canvas
         val min = values.minOrNull() ?: return@Canvas
