@@ -12,17 +12,18 @@ class AutomationSession(
 
     fun process(sample: ReplaySample): List<AutomationNotification> {
         val notifications = mutableListOf<AutomationNotification>()
-        val normalizedSignals = sample.signals.map { it.copy(timestampMs = sample.timestampMs) }
+        // Preserve source timestamps so the quality gate can reject stale/future data.
+        val signals = sample.signals
         for (rule in rules) {
             val required = buildSet {
                 add(rule.triggerSignalId)
                 rule.conditions.forEach { add(it.signalId) }
             }
-            val quality = dataQualityGate.validate(required, normalizedSignals, sample.timestampMs)
+            val quality = dataQualityGate.validate(required, signals, sample.timestampMs)
             if (!quality.accepted) continue
 
             val detector = detectors[rule.id] ?: continue
-            val evaluation = detector.evaluate(rule, normalizedSignals)
+            val evaluation = detector.evaluate(rule, signals)
             if (rule.action.policy != AutomationPolicy.NOTIFY_ALERT) continue
             if (!evaluation.triggered) continue
             if (!limiter.allow(rule.id, sample.timestampMs)) continue
