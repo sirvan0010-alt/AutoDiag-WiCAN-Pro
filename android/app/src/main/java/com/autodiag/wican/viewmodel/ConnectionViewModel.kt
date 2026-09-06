@@ -8,6 +8,7 @@ import com.autodiag.core.can.SlcanCanFrameStream
 import com.autodiag.core.capability.CapabilityDiscovery
 import com.autodiag.core.capability.CapabilitySnapshot
 import com.autodiag.core.obd.Elm327Session
+import com.autodiag.core.obd.ObdLiveDataEngine
 import com.autodiag.core.transport.ConnectionState
 import com.autodiag.core.transport.SimulatorWiCanTransport
 import com.autodiag.core.transport.TcpWiCanTransport
@@ -46,7 +47,9 @@ data class ConnectionUiState(
     val linkOnly: Boolean = false,
     val transportState: ConnectionState? = null,
     val transportMetrics: TransportMetrics = TransportMetrics(),
-    val rawCanMonitor: RawCanMonitorState = RawCanMonitorState()
+    val rawCanMonitor: RawCanMonitorState = RawCanMonitorState(),
+    /** PIDs positively established by discovery. No registry-wide guessing. */
+    val supportedLiveDataPids: Set<Int> = emptySet()
 )
 
 /** ELM327 performs discovery; SLCAN establishes a raw TCP link and can feed the live CAN monitor. */
@@ -67,6 +70,9 @@ class ConnectionViewModel(
     fun connectElm327(host: String, port: Int = 3333) = connect(host, port, TransportMode.ELM327, true)
     fun connectSlcan(host: String, port: Int = 23) = connect(host, port, TransportMode.SLCAN_RAW, false)
     fun connectSimulator() = connect("simulator", 0, TransportMode.SIMULATOR, true)
+
+    /** Creates the existing read-only Mode 01 engine over the live initialized session. */
+    fun createLiveDataEngine(): ObdLiveDataEngine? = session?.let { ObdLiveDataEngine(it) }
 
     fun setRawCanFilter(filter: String) = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(idFilter = filter)) }
     fun toggleRawCanPause() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(paused = !it.rawCanMonitor.paused)) }
@@ -144,6 +150,7 @@ class ConnectionViewModel(
                             errorMessage = null,
                             snapshot = null,
                             linkOnly = true,
+                            supportedLiveDataPids = emptySet(),
                             transportState = t.state
                         )
                     }
@@ -157,12 +164,15 @@ class ConnectionViewModel(
 
                 _uiState.update { it.copy(phase = ConnectionPhase.DISCOVERING_CAPABILITIES) }
                 val snap = discovery.run(s)
+                val mode01Available = snap.capabilities[com.autodiag.core.capability.CapabilityIds.OBD_MODE_01]
+                    ?.status == com.autodiag.core.capability.CapabilityStatus.AVAILABLE
                 _uiState.update {
                     it.copy(
                         phase = ConnectionPhase.READY,
                         snapshot = snap,
                         errorMessage = null,
                         linkOnly = false,
+                        supportedLiveDataPids = if (mode01Available) setOf(0x0C) else emptySet(),
                         transportState = t.state
                     )
                 }
@@ -172,6 +182,7 @@ class ConnectionViewModel(
                         phase = ConnectionPhase.ERROR,
                         errorMessage = humanize(err),
                         snapshot = null,
+                        supportedLiveDataPids = emptySet(),
                         transportState = transport?.state
                     )
                 }
