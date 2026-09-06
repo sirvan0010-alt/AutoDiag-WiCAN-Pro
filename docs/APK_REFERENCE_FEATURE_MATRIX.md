@@ -46,6 +46,23 @@ These are candidates for our EV telemetry model, history store and graph engine.
 
 Useful product-scope references include broad vehicle profiles, ECU diagnostics, live data, custom/extended data and logging. The project should reproduce capabilities where protocol evidence permits, but use its own modern UI and evidence model.
 
+## Tessie 16.0.29 reference
+
+Static extraction of the supplied Tessie XAPK established a distinct Tesla Fleet/Direct Telemetry data path rather than a conventional CAN/OBD PID decoder:
+
+- `streaming.tessie.com/{VIN}` WebSocket telemetry endpoint observed
+- Fleet telemetry configuration/status/cache endpoints observed
+- `vehicle_state.*`, `charge_state.*`, `drive_state.*`, `climate_state.*`, `gui_settings.*` and `vehicle_config.*` field families observed
+- Explicit energy/powertrain identifiers observed for pack voltage/current, module temperatures, lifetime energy, AC/DC charging energy, motor voltage/current/torque, inverter state/temperature and isolation resistance
+- Battery-health identifiers include `batteryHealth`, `health_percent`, `original_capacity` and `new_battery_capacity_`; this is app-derived candidate evidence, not vehicle-verified SOH
+- Raw vehicle-data export as zipped CSV is exposed by the app
+- A broad command surface is present, including charging/climate/locking and a `command/flash` identifier; command existence is recorded only and no write/flash mechanism is promoted
+- An OBD profiler feature exists in the UI/API surface, but no OBD byte decoder contract was established by this static extraction
+
+Tessie evidence is therefore useful for the Tesla telemetry/canonical-data model and capability discovery, but it must not be converted into CAN IDs, ECU bindings, PID byte offsets, scaling or vehicle verification without independent evidence.
+
+Provenance: `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/analysis.json`; candidate: `data/candidates/tessie_16_0_29_fleet_telemetry.json`.
+
 ## Remote-control reference
 
 The supplied remote-control application is relevant to the future control/service architecture only. It must not cause the read-only diagnostic transport to become write-capable implicitly.
