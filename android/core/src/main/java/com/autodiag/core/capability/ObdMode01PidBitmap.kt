@@ -9,10 +9,14 @@ object ObdMode01PidBitmap {
     data class Block(val basePid: Int, val supportedPids: Set<Int>, val rawHex: String)
 
     fun parse(body: String): List<Block> {
-        val bytes = Regex("(?i)(?<![0-9A-F])[0-9A-F]{2}(?![0-9A-F])")
-            .findAll(body)
-            .map { it.value.toInt(16) }
-            .toList()
+        val bytes = body
+            .split(Regex("\\s+"))
+            .flatMap { token ->
+                val clean = token.trim().uppercase()
+                if (clean.isNotEmpty() && clean.length % 2 == 0 && clean.all { it in '0'..'9' || it in 'A'..'F' }) {
+                    clean.chunked(2).map { it.toInt(16) }
+                } else emptyList()
+            }
         if (bytes.size < 6) return emptyList()
 
         val blocks = mutableListOf<Block>()
@@ -42,6 +46,6 @@ object ObdMode01PidBitmap {
     fun supportedDecoderPids(body: String, decoderPids: Set<Int>): Set<Int> =
         parse(body).flatMap { it.supportedPids }.toSet().intersect(decoderPids)
 
-    fun advertisesRange(body: String, basePid: Int): Boolean =
-        parse(body).any { it.basePid == basePid && basePid + 0x20 in it.supportedPids }
+    fun advertisesRange(body: String, nextBasePid: Int): Boolean =
+        parse(body).any { it.basePid == nextBasePid - 0x20 && nextBasePid in it.supportedPids }
 }
