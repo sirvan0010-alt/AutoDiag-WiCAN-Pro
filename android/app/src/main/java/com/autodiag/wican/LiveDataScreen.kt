@@ -136,7 +136,7 @@ private fun Sparkline(history: List<List<Double>>, index: Int) {
             val x2 = i * step
             val y1 = size.height - ((values[i - 1] - min) / range * size.height).toFloat()
             val y2 = size.height - ((values[i] - min) / range * size.height).toFloat()
-            drawLine(Offset(x1, y1), Offset(x2, y2), strokeWidth = 3f)
+            drawLine(start = Offset(x1, y1), end = Offset(x2, y2), strokeWidth = 3f)
         }
     }
 }
