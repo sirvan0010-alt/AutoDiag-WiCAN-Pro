@@ -18,22 +18,21 @@ class CapabilityDiscovery {
         results[CapabilityIds.COMMUNICATION] = probeCommunication(session).also { adapterInfo = it.detail }
         results[CapabilityIds.OBD_PROTOCOL] = probeProtocol(session)
 
-        // One Mode 09 request is intentionally shared by the VIN capability
-        // and the ECU consistency audit. This preserves the full response,
-        // including CAN headers, so a mismatch can be attributed to an ECU.
         val vinProbe = probeVin(session)
         results[CapabilityIds.OBD_VIN] = vinProbe.capability
         vin = vinProbe.referenceVin
         vinAudit = VinAudit(referenceVin = vin, ecuRecords = vinProbe.ecuRecords)
 
         results[CapabilityIds.OBD_MODE_03] = probeMode03(session)
-        results[CapabilityIds.OBD_MODE_01] = probeMode01(session)
+        val mode01 = probeMode01(session)
+        results[CapabilityIds.OBD_MODE_01] = mode01.capability
 
         return CapabilitySnapshot(
             vehicleIdentity = VehicleIdentity(vin = vin, adapterInfo = adapterInfo),
             capabilities = results,
             vinAudit = vinAudit,
-            scopeKey = if (!vin.isNullOrBlank()) "vin:$vin" else "session"
+            scopeKey = if (!vin.isNullOrBlank()) "vin:$vin" else "session",
+            mode01SupportedPids = mode01.supportedPids
         )
     }
 
@@ -89,8 +88,7 @@ class CapabilityDiscovery {
         } else if (reference != null) {
             VinProbe(
                 Capability(CapabilityIds.OBD_VIN, "VIN", if (mismatchText == null) CapabilityStatus.AVAILABLE else CapabilityStatus.PARTIAL,
-                    reference, mismatchText ?: "VIN bylo načteno z odpovědi vozidla.",
-                    if (mismatchText == null) VerificationState.PARTIALLY_VERIFIED else VerificationState.PARTIALLY_VERIFIED),
+                    reference, mismatchText ?: "VIN bylo načteno z odpovědi vozidla.", VerificationState.PARTIALLY_VERIFIED),
                 reference, records
             )
         } else {
@@ -121,17 +119,71 @@ class CapabilityDiscovery {
         Capability(CapabilityIds.OBD_MODE_03, "Chybové kódy (Mode 03)", CapabilityStatus.ERROR, t.message, "Dotaz Mode 03 selhal.")
     }
 
-    private suspend fun probeMode01(session: Elm327Session): Capability = try {
-        val body = session.command("010C")
+    private data class Mode01Probe(
+        val capability: Capability,
+        val supportedPids: Set<Int>
+    )
+
+    private suspend fun probeMode01(session: Elm327Session): Mode01Probe = try {
+        val supported = discoverSupportedMode01Pids(session)
+        val rpmResponse = session.command("010C")
+        val rpmAvailable = !looksLikeNoData(rpmResponse) &&
+            rpmResponse.contains("41 0C", ignoreCase = true).let { it || rpmResponse.replace(" ", "").contains("410C", ignoreCase = true) }
+        val usable = if (rpmAvailable) supported + 0x0C else supported
         when {
-            body.contains("UNABLE TO CONNECT", true) || body.contains("NOT CONNECTED", true) ->
-                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.UNAVAILABLE, body.take(80), "Vozidlo údaj neposkytlo. Základní PID Mode 01 nebyl dostupný.")
-            looksLikeNoData(body) ->
-                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.UNAVAILABLE, body.take(80), "Vozidlo údaj neposkytlo. Základní PID 010C v této konfiguraci nevrátil data.")
-            else -> Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.AVAILABLE, body.lineSequence().firstOrNull()?.trim()?.take(80), "Vozidlo odpovědělo na základní PID Mode 01.", VerificationState.PARTIALLY_VERIFIED)
+            usable.isNotEmpty() -> Mode01Probe(
+                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.AVAILABLE,
+                    "${usable.size} podporovaných PID", "ECU deklarovala podporované standardní PIDy přes Mode 01 bitmapy.", VerificationState.PARTIALLY_VERIFIED),
+                usable
+            )
+            rpmAvailable -> Mode01Probe(
+                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.PARTIAL,
+                    rpmResponse.lineSequence().firstOrNull()?.trim()?.take(80), "PID 010C odpověděl, ale ECU neposkytla čitelnou supported-PID bitmapu.", VerificationState.PARTIALLY_VERIFIED),
+                setOf(0x0C)
+            )
+            else -> Mode01Probe(
+                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.UNAVAILABLE,
+                    rpmResponse.take(80), "Vozidlo údaj neposkytlo. Nebyla potvrzena dostupnost standardních Mode 01 PIDů."),
+                emptySet()
+            )
         }
     } catch (t: Throwable) {
-        Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.ERROR, t.message, "Dotaz Mode 01 selhal.")
+        Mode01Probe(
+            Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.ERROR, t.message, "Dotaz Mode 01 selhal."),
+            emptySet()
+        )
+    }
+
+    /** Reads SAE supported-PID pages: 0100, 0120, 0140, 0160, 0180, 01A0, 01C0. */
+    private suspend fun discoverSupportedMode01Pids(session: Elm327Session): Set<Int> {
+        val supported = linkedSetOf<Int>()
+        var basePid = 0x00
+        repeat(7) {
+            val response = session.command("01${basePid.toString(16).padStart(2, '0')}")
+            val bytes = parseMode01Payload(response, basePid)
+            if (bytes == null || bytes.size < 4) return@repeat
+            val bitmap = (bytes[0].toLong() shl 24) or
+                (bytes[1].toLong() shl 16) or
+                (bytes[2].toLong() shl 8) or bytes[3].toLong()
+            for (bit in 0 until 32) {
+                if ((bitmap and (1L shl (31 - bit))) != 0L) supported += basePid + bit + 1
+            }
+            if ((bitmap and 1L) == 0L) return@repeat
+            basePid += 0x20
+        }
+        return supported
+    }
+
+    private fun parseMode01Payload(response: String, requestedPid: Int): List<Int>? {
+        val normalized = response.uppercase().replace("SEARCHING...", "")
+        val lines = normalized.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith(">") }
+        val line = lines.firstOrNull { line ->
+            val compact = line.replace(Regex("[^0-9A-F]"), "")
+            compact.startsWith("41${requestedPid.toString(16).padStart(2, '0').uppercase()}")
+        } ?: return null
+        val tokens = line.split(Regex("[^0-9A-F]+"), RegexOption.IGNORE_CASE).filter { it.length == 2 }
+        if (tokens.size < 6) return null
+        return tokens.drop(2).take(4).mapNotNull { it.toIntOrNull(16) }
     }
 
     companion object {
