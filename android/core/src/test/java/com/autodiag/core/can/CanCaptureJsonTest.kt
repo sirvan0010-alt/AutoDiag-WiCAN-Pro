@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 
 class CanCaptureJsonTest {
     @Test
-    fun encode_preserves_capture_metadata_and_frame_evidence() {
+    fun encode_and_decode_preserve_capture_evidence() {
         val frame = CanFrame(
             id = 0x123,
             data = byteArrayOf(0x2A, 0x55),
@@ -21,12 +21,13 @@ class CanCaptureJsonTest {
         )
 
         val json = CanCaptureJson.encode(session)
+        val decoded = CanCaptureJson.decode(json)
 
         assertContains(json, "autodiag-can-capture-v1")
-        assertContains(json, "\"startedAtNanos\":9000")
-        assertContains(json, "\"droppedRecords\":2")
         assertContains(json, "\"canId\":291")
         assertContains(json, "\"data\":\"2A55\"")
-        assertEquals(1, session.frameCount)
+        assertEquals(session.startedAtNanos, decoded.startedAtNanos)
+        assertEquals(session.droppedRecords, decoded.droppedRecords)
+        assertEquals(session.records, decoded.records)
     }
 }
