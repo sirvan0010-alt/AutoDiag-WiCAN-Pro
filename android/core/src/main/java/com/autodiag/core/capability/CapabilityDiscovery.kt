@@ -1,6 +1,7 @@
 package com.autodiag.core.capability
 
 import com.autodiag.core.obd.Elm327Session
+import com.autodiag.core.obd.ObdPidRegistry
 
 /**
  * Read-only capability discovery. Every value is derived from an ECU/adapter
@@ -18,22 +19,21 @@ class CapabilityDiscovery {
         results[CapabilityIds.COMMUNICATION] = probeCommunication(session).also { adapterInfo = it.detail }
         results[CapabilityIds.OBD_PROTOCOL] = probeProtocol(session)
 
-        // One Mode 09 request is intentionally shared by the VIN capability
-        // and the ECU consistency audit. This preserves the full response,
-        // including CAN headers, so a mismatch can be attributed to an ECU.
         val vinProbe = probeVin(session)
         results[CapabilityIds.OBD_VIN] = vinProbe.capability
         vin = vinProbe.referenceVin
         vinAudit = VinAudit(referenceVin = vin, ecuRecords = vinProbe.ecuRecords)
 
         results[CapabilityIds.OBD_MODE_03] = probeMode03(session)
-        results[CapabilityIds.OBD_MODE_01] = probeMode01(session)
+        val mode01Probe = probeMode01(session)
+        results[CapabilityIds.OBD_MODE_01] = mode01Probe.capability
 
         return CapabilitySnapshot(
             vehicleIdentity = VehicleIdentity(vin = vin, adapterInfo = adapterInfo),
             capabilities = results,
             vinAudit = vinAudit,
-            scopeKey = if (!vin.isNullOrBlank()) "vin:$vin" else "session"
+            scopeKey = if (!vin.isNullOrBlank()) "vin:$vin" else "session",
+            obdMode01SupportedPids = mode01Probe.supportedDecoderPids
         )
     }
 
@@ -90,7 +90,7 @@ class CapabilityDiscovery {
             VinProbe(
                 Capability(CapabilityIds.OBD_VIN, "VIN", if (mismatchText == null) CapabilityStatus.AVAILABLE else CapabilityStatus.PARTIAL,
                     reference, mismatchText ?: "VIN bylo načteno z odpovědi vozidla.",
-                    if (mismatchText == null) VerificationState.PARTIALLY_VERIFIED else VerificationState.PARTIALLY_VERIFIED),
+                    VerificationState.PARTIALLY_VERIFIED),
                 reference, records
             )
         } else {
@@ -121,17 +121,49 @@ class CapabilityDiscovery {
         Capability(CapabilityIds.OBD_MODE_03, "Chybové kódy (Mode 03)", CapabilityStatus.ERROR, t.message, "Dotaz Mode 03 selhal.")
     }
 
-    private suspend fun probeMode01(session: Elm327Session): Capability = try {
-        val body = session.command("010C")
+    private data class Mode01Probe(
+        val capability: Capability,
+        val supportedDecoderPids: Set<Int>
+    )
+
+    private suspend fun probeMode01(session: Elm327Session): Mode01Probe = try {
+        val responses = mutableListOf<String>()
+        val first = session.command("0100")
+        responses += first
+        if (!looksLikeNoData(first) && ObdMode01PidBitmap.parse(first).isNotEmpty()) {
+            if (ObdMode01PidBitmap.advertisesRange(first, 0x20)) {
+                val second = session.command("0120")
+                responses += second
+                if (!looksLikeNoData(second) && ObdMode01PidBitmap.advertisesRange(second, 0x40)) {
+                    responses += session.command("0140")
+                }
+            }
+        }
+
+        val combined = responses.joinToString("\n")
+        val supported = ObdMode01PidBitmap.supportedDecoderPids(combined, ObdPidRegistry.definitions.keys)
         when {
-            body.contains("UNABLE TO CONNECT", true) || body.contains("NOT CONNECTED", true) ->
-                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.UNAVAILABLE, body.take(80), "Vozidlo údaj neposkytlo. Základní PID Mode 01 nebyl dostupný.")
-            looksLikeNoData(body) ->
-                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.UNAVAILABLE, body.take(80), "Vozidlo údaj neposkytlo. Základní PID 010C v této konfiguraci nevrátil data.")
-            else -> Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.AVAILABLE, body.lineSequence().firstOrNull()?.trim()?.take(80), "Vozidlo odpovědělo na základní PID Mode 01.", VerificationState.PARTIALLY_VERIFIED)
+            responses.all(::looksLikeNoData) -> Mode01Probe(
+                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.UNAVAILABLE, combined.take(160), "Vozidlo neposkytlo Mode 01 supported-PID bitmapu."),
+                emptySet()
+            )
+            supported.isNotEmpty() -> Mode01Probe(
+                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.AVAILABLE,
+                    "Dekódovatelné ECU-inzerované PID: ${supported.sorted().joinToString { "0x%02X".format(it) }}",
+                    "PIDy jsou vystaveny pouze tehdy, když je ECU inzeruje v Mode 01 bitmapě a AutoDiag pro ně má explicitní dekodér.",
+                    VerificationState.PARTIALLY_VERIFIED),
+                supported
+            )
+            else -> Mode01Probe(
+                Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.PARTIAL, combined.take(160), "Mode 01 odpověděl, ale žádný z inzerovaných PIDů zatím nemá podporovaný dekodér."),
+                emptySet()
+            )
         }
     } catch (t: Throwable) {
-        Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.ERROR, t.message, "Dotaz Mode 01 selhal.")
+        Mode01Probe(
+            Capability(CapabilityIds.OBD_MODE_01, "Živá data (Mode 01)", CapabilityStatus.ERROR, t.message, "Dotaz na Mode 01 supported-PID bitmapu selhal."),
+            emptySet()
+        )
     }
 
     companion object {
