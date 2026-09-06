@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 class LiveDataViewModel : ViewModel() {
     private val _samples = MutableStateFlow<List<ObdLiveDataEngine.SensorSample>>(emptyList())
     val samples: StateFlow<List<ObdLiveDataEngine.SensorSample>> = _samples.asStateFlow()
-    private val _selectedPids = MutableStateFlow(listOf(0x0C))
+    private val _selectedPids = MutableStateFlow<List<Int>>(emptyList())
     val selectedPids: StateFlow<List<Int>> = _selectedPids.asStateFlow()
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
@@ -26,7 +26,7 @@ class LiveDataViewModel : ViewModel() {
     private var pollJob: Job? = null
 
     fun setSelected(pid: Int, selected: Boolean) {
-        if (!ObdPidRegistry.isSupported(pid)) return
+        if (!ObdPidRegistry.isSupported(pid) || pid !in _supportedPids.value) return
         _selectedPids.update { current -> when {
             selected && pid !in current && current.size < 16 -> current + pid
             !selected -> current - pid
@@ -39,16 +39,26 @@ class LiveDataViewModel : ViewModel() {
         stop()
         val allowed = supportedPids.filter(ObdPidRegistry::isSupported).toSet()
         _supportedPids.value = allowed
+        val preferred = buildList {
+            if (0x0C in allowed) add(0x0C)
+            allowed.asSequence().filter { it != 0x0C }.sorted().take(15).forEach(::add)
+        }
+        _selectedPids.value = preferred
+        _samples.value = emptyList()
+        if (preferred.isEmpty()) return
         pollJob = viewModelScope.launch {
             _running.value = true
-            val engine = ObdLiveDataEngine(session)
-            engine.stream(
-                supportedPids = allowed,
-                plans = _selectedPids.value.map { LiveDataPidPolicy.plan(it) }
-            ).collect { sample ->
-                _samples.update { old -> (old.filterNot { it.pid == sample.pid } + sample).sortedBy { it.pid } }
+            try {
+                val engine = ObdLiveDataEngine(session)
+                engine.stream(
+                    supportedPids = allowed,
+                    plans = preferred.map { LiveDataPidPolicy.plan(it) }
+                ).collect { sample ->
+                    _samples.update { old -> (old.filterNot { it.pid == sample.pid } + sample).sortedBy { it.pid } }
+                }
+            } finally {
+                _running.value = false
             }
-            _running.value = false
         }
     }
 
