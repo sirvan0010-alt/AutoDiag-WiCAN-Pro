@@ -4,7 +4,8 @@ package com.autodiag.core.automation
 class AutomationSession(
     private val rules: List<AutomationRule>,
     cooldownMs: Long = 60_000L,
-    maxSignalAgeMs: Long = 30_000L
+    maxSignalAgeMs: Long = 30_000L,
+    private val auditSink: (AutomationAuditEvent) -> Unit = {}
 ) {
     private val detectors = rules.associate { it.id to AutomationEdgeDetector() }
     private val limiter = NotificationRateLimiter(cooldownMs)
@@ -24,6 +25,8 @@ class AutomationSession(
 
             val detector = detectors[rule.id] ?: continue
             val evaluation = detector.evaluate(rule, signals)
+            auditSink(AutomationAudit.from(rule, evaluation, sample.timestampMs))
+
             if (rule.action.policy != AutomationPolicy.NOTIFY_ALERT) continue
             if (!evaluation.triggered) continue
             if (!limiter.allow(rule.id, sample.timestampMs)) continue
