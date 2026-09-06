@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.autodiag.core.obd.Elm327Session
 import com.autodiag.core.obd.LiveDataPidPolicy
+import com.autodiag.core.obd.LiveDataStore
 import com.autodiag.core.obd.ObdLiveDataEngine
 import com.autodiag.core.obd.ObdPidRegistry
 import kotlinx.coroutines.Job
@@ -23,6 +24,7 @@ class LiveDataViewModel : ViewModel() {
     val running: StateFlow<Boolean> = _running.asStateFlow()
     private val _supportedPids = MutableStateFlow<Set<Int>>(emptySet())
     val supportedPids: StateFlow<Set<Int>> = _supportedPids.asStateFlow()
+    private val historyStore = LiveDataStore()
     private var pollJob: Job? = null
 
     fun setSelected(pid: Int, selected: Boolean) {
@@ -49,7 +51,7 @@ class LiveDataViewModel : ViewModel() {
         pollJob = viewModelScope.launch {
             _running.value = true
             try {
-                val engine = ObdLiveDataEngine(session)
+                val engine = ObdLiveDataEngine(session, store = historyStore)
                 engine.stream(
                     supportedPids = allowed,
                     plans = preferred.map { LiveDataPidPolicy.plan(it) }
