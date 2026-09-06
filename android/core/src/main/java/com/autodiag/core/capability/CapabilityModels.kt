@@ -18,7 +18,6 @@ data class Capability(
     val displayName: String,
     val status: CapabilityStatus,
     val detail: String? = null,
-    /** User-facing explanation. Never invents vehicle values. */
     val userMessage: String? = null,
     val verification: VerificationState = VerificationState.UNVERIFIED
 )
@@ -28,7 +27,9 @@ data class CapabilitySnapshot(
     val capabilities: Map<String, Capability>,
     val vinAudit: VinAudit = VinAudit(),
     val discoveredAtEpochMs: Long = System.currentTimeMillis(),
-    val scopeKey: String = "session"
+    val scopeKey: String = "session",
+    /** Decoder-compatible PIDs explicitly advertised by Mode 01 bitmap responses. */
+    val obdMode01SupportedPids: Set<Int> = emptySet()
 )
 
 object CapabilityIds {
@@ -42,9 +43,6 @@ object CapabilityIds {
     const val HV_ISOLATION_STATUS = "hv.isolation_status"
     const val HV_ISOLATION_NUMERIC = "hv.isolation_numeric"
     const val DTC_ALERTS = "diagnostics.dtc_alerts"
-
-    // Vehicle-system capability IDs. These describe diagnostic scope; an ID
-    // being present never implies that a write/actuator operation is safe.
     const val TESLA_POWERTRAIN = "tesla.powertrain"
     const val TESLA_BRAKE_ELECTRONICS = "tesla.brake_electronics"
     const val TESLA_BCM = "tesla.bcm"
