@@ -6,6 +6,7 @@ class AutomationSession(
     cooldownMs: Long = 60_000L,
     maxSignalAgeMs: Long = 30_000L
 ) {
+    private val detectors = rules.associate { it.id to AutomationEdgeDetector() }
     private val limiter = NotificationRateLimiter(cooldownMs)
     private val dataQualityGate = AutomationDataQualityGate(maxSignalAgeMs)
 
@@ -20,7 +21,8 @@ class AutomationSession(
             val quality = dataQualityGate.validate(required, normalizedSignals, sample.timestampMs)
             if (!quality.accepted) continue
 
-            val evaluation = AutomationRuleEvaluator.evaluate(rule, normalizedSignals)
+            val detector = detectors[rule.id] ?: continue
+            val evaluation = detector.evaluate(rule, normalizedSignals)
             if (rule.action.policy != AutomationPolicy.NOTIFY_ALERT) continue
             if (!evaluation.triggered) continue
             if (!limiter.allow(rule.id, sample.timestampMs)) continue
@@ -29,8 +31,11 @@ class AutomationSession(
         return notifications
     }
 
-    /** Ends the logical session and clears notification cooldown state. */
+    /** Ends the logical session and clears edge/cooldown state. */
     fun reset() {
-        rules.forEach { rule -> limiter.reset(rule.id) }
+        rules.forEach { rule ->
+            detectors[rule.id]?.reset(rule.id)
+            limiter.reset(rule.id)
+        }
     }
 }
