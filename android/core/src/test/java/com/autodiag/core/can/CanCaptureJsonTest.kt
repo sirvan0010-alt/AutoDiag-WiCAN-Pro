@@ -10,8 +10,8 @@ class CanCaptureJsonTest {
         val frame = CanFrame(
             id = 0x123,
             data = byteArrayOf(0x2A, 0x55),
-            extended = false,
-            remote = false,
+            isExtended = false,
+            isRemote = false,
             timestampNanos = 10_000L
         )
         val session = CanCaptureSession(
