@@ -9,9 +9,7 @@ data class SemanticSignal(
     val source: String? = null
 )
 
-enum class ComparisonOperator {
-    LT, LTE, GT, GTE, EQ, NEQ
-}
+enum class ComparisonOperator { LT, LTE, GT, GTE, EQ, NEQ }
 
 data class Condition(
     val signalId: String,
@@ -19,11 +17,7 @@ data class Condition(
     val threshold: Double
 )
 
-enum class AutomationPolicy {
-    READ_LOG_ANALYZE,
-    NOTIFY_ALERT,
-    WRITE_COMMAND
-}
+enum class AutomationPolicy { READ_LOG_ANALYZE, NOTIFY_ALERT, WRITE_COMMAND }
 
 data class AutomationAction(
     val id: String,
@@ -49,23 +43,21 @@ data class AutomationEvaluation(
     val reason: String
 )
 
-/** Read-only evaluator. WRITE_COMMAND is deliberately never executed here. */
+/** Read-only evaluator. WRITE_COMMAND is deliberately never executable here. */
 object AutomationRuleEvaluator {
     fun evaluate(rule: AutomationRule, signals: List<SemanticSignal>): AutomationEvaluation {
         val values = signals.associate { it.id to it.value }
         val triggerValue = values[rule.triggerSignalId]
         val trigger = compare(triggerValue, rule.triggerOperator, rule.triggerThreshold)
-        val conditions = rule.conditions.all {
-            compare(values[it.signalId], it.operator, it.threshold)
-        }
-        val enabled = rule.enabled
-        val triggered = enabled && trigger && conditions
+        val conditions = rule.conditions.all { compare(values[it.signalId], it.operator, it.threshold) }
+        val writeBlocked = rule.action.policy == AutomationPolicy.WRITE_COMMAND
+        val triggered = rule.enabled && trigger && conditions && !writeBlocked
         val reason = when {
-            !enabled -> "RULE_DISABLED"
+            !rule.enabled -> "RULE_DISABLED"
             triggerValue == null -> "TRIGGER_VALUE_UNAVAILABLE"
             !trigger -> "TRIGGER_NOT_SATISFIED"
             !conditions -> "CONDITION_NOT_SATISFIED"
-            rule.action.policy == AutomationPolicy.WRITE_COMMAND -> "WRITE_COMMAND_REQUIRES_SEPARATE_SAFETY_GATE"
+            writeBlocked -> "WRITE_COMMAND_REQUIRES_SEPARATE_SAFETY_GATE"
             else -> "TRIGGERED"
         }
         return AutomationEvaluation(rule.id, triggered, trigger && conditions, values, reason)
