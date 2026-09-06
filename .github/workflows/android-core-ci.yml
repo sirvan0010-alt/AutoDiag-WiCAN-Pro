@@ -9,12 +9,13 @@ on:
     paths:
       - 'android/**'
       - '.github/workflows/android-core-ci.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  core-tests:
+  android-validation:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -31,5 +32,5 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Run core unit tests
-        run: gradle :core:testDebugUnitTest --no-daemon
+      - name: Run core unit tests and compile app
+        run: gradle :core:testDebugUnitTest :app:assembleDebug --no-daemon
