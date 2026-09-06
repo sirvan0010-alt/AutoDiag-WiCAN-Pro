@@ -15,8 +15,8 @@ class AutomationSessionTest {
             enabled = true
         )
         val session = AutomationSession(listOf(rule), cooldownMs = 60_000)
-        val low = { t: Long -> ReplaySample(t, listOf(SemanticSignal("battery.usable_soc", 15.0))) }
-        val high = { t: Long -> ReplaySample(t, listOf(SemanticSignal("battery.usable_soc", 30.0))) }
+        val low = { t: Long -> ReplaySample(t, listOf(SemanticSignal("battery.usable_soc", 15.0, t))) }
+        val high = { t: Long -> ReplaySample(t, listOf(SemanticSignal("battery.usable_soc", 30.0, t))) }
         assertEquals(1, session.process(low(100_000)).size)
         assertEquals(0, session.process(low(110_000)).size)
         assertEquals(0, session.process(high(120_000)).size)
@@ -34,7 +34,7 @@ class AutomationSessionTest {
             enabled = true
         )
         val session = AutomationSession(listOf(rule), cooldownMs = 60_000)
-        val sample = { t: Long -> ReplaySample(t, listOf(SemanticSignal("battery.usable_soc", 15.0))) }
+        val sample = { t: Long -> ReplaySample(t, listOf(SemanticSignal("battery.usable_soc", 15.0, t))) }
         assertEquals(1, session.process(sample(100_000)).size)
         session.reset()
         assertEquals(1, session.process(sample(110_000)).size)
