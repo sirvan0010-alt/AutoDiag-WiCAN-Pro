@@ -7,7 +7,7 @@ import org.junit.Test
 
 class CanFrameTest {
     @Test fun framePreservesIdAndPayload() {
-        val frame = CanFrame(0x7E8, byteArrayOf(0x41, 0x0C, 0x1A, 0xF8))
+        val frame = CanFrame(0x7E8, byteArrayOf(0x41, 0x0C, 0x1A, 0xF8.toByte()))
         assertEquals(0x7E8L, frame.id)
         assertEquals(4, frame.dataLength)
         assertEquals("41 0C 1A F8", frame.hex())
