@@ -15,6 +15,9 @@ class ObdPidRegistryTest {
         assertEquals(0.0, Mode01Decoder.decode("41 0C 00 00")!!.value!!, 0.01)
         assertEquals(1726.0, Mode01Decoder.decode("41 0C 1A F8")!!.value!!, 0.01)
     }
+    @Test fun rpmDecodesFromCanHeaderPrefixedResponse() {
+        assertEquals(1726.0, Mode01Decoder.decode("7E8 06 41 0C 1A F8")!!.value!!, 0.01)
+    }
     @Test fun coolantTemperatureUsesMinus40() {
         val d = Mode01Decoder.decode("41 05 5A")!!
         assertEquals(50.0, d.value!!, 0.01)
