@@ -59,9 +59,27 @@ Static extraction of the supplied Tessie XAPK established a distinct Tesla Fleet
 - A broad command surface is present, including charging/climate/locking and a `command/flash` identifier; command existence is recorded only and no write/flash mechanism is promoted
 - An OBD profiler feature exists in the UI/API surface, but no OBD byte decoder contract was established by this static extraction
 
-Tessie evidence is therefore useful for the Tesla telemetry/canonical-data model and capability discovery, but it must not be converted into CAN IDs, ECU bindings, PID byte offsets, scaling or vehicle verification without independent evidence.
+### Tessie automation evidence
 
-Provenance: `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/analysis.json`; candidate: `data/candidates/tessie_16_0_29_fleet_telemetry.json`.
+The supplied Tessie 16.0.29 static extraction also contains a first-class automation model and screen (`package:tessie/models/automation.dart`, `package:tessie/screens/home/automation_screen.dart`, `/automation`) with an explicit "If This / Then That" vocabulary. Observed triggers include:
+
+- `belowBatterylevelthreshold`
+- `whenDrivingEnds`
+- `whenPluggedIn`
+- `whenUnpluggedAtALocation`
+- `whenTheSetSpeedIsExceeded`
+- `whenMovementIsDetectedBySentry`
+- `whenAnAlarmIsTriggeredBySentry`
+
+Observed vehicle action identifiers near the automation surface include starting/stopping climate, enabling/disabling Sentry, locking/unlocking, rear-trunk actuation and HomeLink. Static presence proves action vocabulary/UI integration, not universal support for every trigger, vehicle or subscription.
+
+This establishes a strong reference architecture for AutoDiag automation as `Trigger -> Conditions -> Action`, while keeping acquisition, authorization and execution as separate layers. A concrete candidate is `battery below threshold -> verify parked/Sentry state -> disable Sentry`, but the exact threshold semantics are not reconstructed from strings alone and must remain unverified until behavioral evidence exists.
+
+For Tesla Fleet API control, the implementation must use an authorized Vehicle Command path with the required virtual-key/signing boundary; undocumented raw CAN/UDS writes or authentication bypass are not implied by the Tessie extraction. See `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/automation-trigger-action-static-analysis.json` for the detailed evidence record.
+
+Tessie evidence is therefore useful for the Tesla telemetry/canonical-data model, capability discovery and automation architecture, but it must not be converted into CAN IDs, ECU bindings, PID byte offsets, scaling or vehicle verification without independent evidence.
+
+Provenance: `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/analysis.json`; automation provenance: `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/automation-trigger-action-static-analysis.json`; candidate: `data/candidates/tessie_16_0_29_fleet_telemetry.json`.
 
 ## Remote-control reference
 
@@ -77,3 +95,4 @@ The supplied remote-control application is relevant to the future control/servic
 6. Unknown scaling stays raw/unknown instead of being guessed.
 7. Read-only diagnostics remains the priority path.
 8. Experimental control features live under `docs/experimental/` and isolated control APIs.
+9. Automation must remain a separate trigger/condition/action layer; a reference APK's automation vocabulary does not itself authorize vehicle writes.
