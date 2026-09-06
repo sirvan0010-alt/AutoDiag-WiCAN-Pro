@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 class LiveDataViewModel : ViewModel() {
     private val _samples = MutableStateFlow<List<ObdLiveDataEngine.SensorSample>>(emptyList())
     val samples: StateFlow<List<ObdLiveDataEngine.SensorSample>> = _samples.asStateFlow()
-    private val _selectedPids = MutableStateFlow(ObdPidRegistry.definitions.values.take(8).map { it.pid })
+    private val _selectedPids = MutableStateFlow<List<Int>>(emptyList())
     val selectedPids: StateFlow<List<Int>> = _selectedPids.asStateFlow()
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
@@ -30,14 +30,26 @@ class LiveDataViewModel : ViewModel() {
         }}
     }
 
+    /** Starts the existing engine only with PIDs positively established by discovery. */
     fun start(engine: ObdLiveDataEngine, supportedPids: Set<Int>) {
         pollJob?.cancel()
+        val allowed = supportedPids.filter { ObdPidRegistry.isSupported(it) }.toSet()
+        val selected = _selectedPids.value.filter { it in allowed }.ifEmpty { allowed.toList().sorted() }
+        _selectedPids.value = selected
+        _samples.value = emptyList()
+        if (selected.isEmpty()) {
+            _running.value = false
+            return
+        }
         pollJob = viewModelScope.launch {
             _running.value = true
-            engine.stream(supportedPids, _selectedPids.value.map { LiveDataPidPolicy.plan(it) }).collect { sample ->
-                _samples.update { old -> (old.filterNot { it.pid == sample.pid } + sample).sortedBy { it.pid } }
+            try {
+                engine.stream(allowed, selected.map { LiveDataPidPolicy.plan(it) }).collect { sample ->
+                    _samples.update { old -> (old.filterNot { it.pid == sample.pid } + sample).sortedBy { it.pid } }
+                }
+            } finally {
+                _running.value = false
             }
-            _running.value = false
         }
     }
 
