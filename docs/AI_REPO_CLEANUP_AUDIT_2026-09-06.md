@@ -4,39 +4,52 @@
 
 Evidence-first cleanup audit. No production decoder, vehicle mapping, or verification status is changed by this audit.
 
+## Current HEAD
+
+`main` currently points to `ab768a79c120b46fcf24475dc140bb094642bd67`.
+
 ## Verified
 
-- The Android build is rooted at `android/settings.gradle.kts`.
-- The active Android modules are `:app`, `:core`, and `:simulator`.
-- Repository governance requires current-GitHub verification and prohibits irreversible cleanup based only on an unverified second-AI claim.
-- Repository searches performed in this session found no textual references establishing a root-level `core/` tree as an active Gradle source set.
+- The Android build is rooted at `android/settings.gradle.kts` and declares `:app`, `:core`, and `:simulator`.
+- The active Android core is under `android/core/src/main/java/com/autodiag/core` and uses package `com.autodiag.core`.
+- The root-level `core/` tree is separate and uses package `com.autodiag.wican.core`.
+- The root-level tree contains 12 Kotlin source files across automation, CAN, capture, diagnostics, OBD and transport.
+- Repository search found no current textual imports/references of `com.autodiag.wican.core`.
+- Git history shows recent `feat(core): ...` commits touching the root `core/` path on 2026-09-05.
+- The active Android core already contains SLCAN/CAN capture infrastructure including `SlcanCodec.kt`, `SlcanCanFrameStream.kt`, `CanCapture.kt`, `CanCaptureCsv.kt`, `CanReplay.kt`, `RawCanMonitorState.kt`, plus corresponding tests.
 
-## Inference
+## Correct conclusion about root `core/`
 
-The root-level `core/` tree is a strong duplicate/dead-code candidate because the active Gradle project is under `android/` and declares `:core`, which resolves to `android/core`.
+The root-level `core/` tree is **not an active Gradle module**, but it also cannot currently be classified as disposable historical debris. It is a distinct implementation that was modified by recent commits and therefore requires provenance/build-intent resolution.
 
-This is an inference, not deletion authorization.
+**Disposition: `BLOCKED: provenance/build-intent resolution required`.**
 
-## Required before deletion
+Do not delete it merely because the Android settings do not include it.
 
-1. Enumerate every file under root `core/`.
-2. Enumerate every file under `android/core`.
-3. Compare paths and contents where names overlap.
-4. Search repository imports/package names and build references.
-5. Check Git history for provenance of root `core/`.
-6. Confirm no scripts, CI, documentation generators, or packaging tasks consume root `core/`.
-7. Only then consider deletion in a separate small commit.
+## Required next actions
 
-## WiCAN capture track
+1. Inspect the recent root-core commits and their diffs.
+2. Compare semantic ownership of root-core CAN/capture/diagnostics/transport code against `android/core`.
+3. Determine whether unique root-core work was intended for migration, archival or abandonment.
+4. Search CI/scripts/docs for path-based references.
+5. If proven obsolete, delete or archive it in a dedicated cleanup commit. Otherwise migrate any unique useful implementation into the active Android module first.
 
-WiCAN PRO supports ELM327 and `slcan/socketCAN`; recent firmware releases also document improved CAN-monitor/ATMA handling and ELM327 UDP logging. These external facts are contextual only and do not promote AutoDiag candidates to vehicle-verified status.
+## SLCAN finding
 
-AutoDiag evidence chain remains:
+The active Android core already has a SLCAN parser/stream/capture/replay foundation. The next engineering gate is **raw transport capture → immutable evidence → deterministic replay**, not another parallel parser.
+
+`SlcanCodec` accepts classic SLCAN frame types `t/T/r/R`, validates identifier width, DLC and payload length, supports remote frames and preserves partial TCP chunks through `StreamDecoder`. This proves parser behavior only; it does not prove vehicle reception or signal meaning.
+
+External WiCAN issue #739 documents a case where WiCAN CAN Monitor showed live traffic while USB SLCAN host RX was empty. Therefore:
+
+`transport connected != CAN RX proven`
+
+and
+
+`SLCAN parser accepted frame != vehicle signal proven`.
+
+## Governance
 
 `RAW CAPTURE -> STATIC EVIDENCE -> CANDIDATE -> MAPPING -> DECODER -> TESTED -> VEHICLE VERIFIED -> PRODUCTION`
 
-No CAN ID, signal scale, Tesla signal, HV value, or Riso value is promoted merely because it appears in an APK or external firmware documentation.
-
-## Next audit action
-
-Continue root `core/` provenance/dependency enumeration and SLCAN capture architecture before destructive cleanup.
+No CAN ID, signal scale, Tesla mapping, HV value or Riso value is promoted merely from APK evidence or external firmware documentation.
