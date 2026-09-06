@@ -3,8 +3,10 @@ package com.autodiag.wican.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.autodiag.core.can.CanCaptureSession
 import com.autodiag.core.can.RawCanMonitorState
 import com.autodiag.core.can.SlcanCanFrameStream
+import com.autodiag.core.can.SlcanCaptureController
 import com.autodiag.core.capability.CapabilityDiscovery
 import com.autodiag.core.capability.CapabilitySnapshot
 import com.autodiag.core.obd.Elm327Session
@@ -57,12 +59,16 @@ class ConnectionViewModel(
     private val _uiState = MutableStateFlow(ConnectionUiState())
     val uiState: StateFlow<ConnectionUiState> = _uiState.asStateFlow()
 
+    private val _rawCanCapture = MutableStateFlow<CanCaptureSession?>(null)
+    val rawCanCapture: StateFlow<CanCaptureSession?> = _rawCanCapture.asStateFlow()
+
     private var transport: WiCanTransport? = null
     private var session: Elm327Session? = null
     private var job: Job? = null
     private var metricsJob: Job? = null
     private var rawCanStream: SlcanCanFrameStream? = null
     private var rawCanJob: Job? = null
+    private var rawCanCaptureController: SlcanCaptureController? = null
 
     fun connectElm327(host: String, port: Int = 3333) = connect(host, port, TransportMode.ELM327, true)
     fun connectSlcan(host: String, port: Int = 23) = connect(host, port, TransportMode.SLCAN_RAW, false)
@@ -71,6 +77,21 @@ class ConnectionViewModel(
     fun setRawCanFilter(filter: String) = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(idFilter = filter)) }
     fun toggleRawCanPause() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(paused = !it.rawCanMonitor.paused)) }
     fun clearRawCan() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.clear()) }
+
+    /** Starts an explicit, read-only in-memory SLCAN capture from the live RX stream. */
+    fun startRawCanCapture() {
+        rawCanCaptureController?.start()
+        _rawCanCapture.value = rawCanCaptureController?.snapshot()
+    }
+
+    /** Stops the explicit capture and publishes the immutable session for replay/export work. */
+    fun stopRawCanCapture(): CanCaptureSession? {
+        val result = rawCanCaptureController?.stop()
+        _rawCanCapture.value = result
+        return result
+    }
+
+    fun isRawCanCapturing(): Boolean = rawCanCaptureController?.isCapturing == true
 
     private fun transportFor(mode: TransportMode): WiCanTransport = when (mode) {
         TransportMode.SIMULATOR -> SimulatorWiCanTransport()
@@ -89,7 +110,11 @@ class ConnectionViewModel(
     private fun startRawCanMonitor(t: WiCanTransport) {
         rawCanStream?.stop()
         rawCanJob?.cancel()
+        rawCanCaptureController?.stop()
+        rawCanCaptureController = null
+        _rawCanCapture.value = null
         rawCanStream = SlcanCanFrameStream(t, viewModelScope)
+        rawCanCaptureController = SlcanCaptureController(rawCanStream!!, scope = viewModelScope)
         rawCanJob = viewModelScope.launch {
             rawCanStream!!.frames.collect { frame ->
                 _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.onFrame(frame)) }
@@ -100,6 +125,8 @@ class ConnectionViewModel(
     private fun stopRawCanMonitor() {
         rawCanJob?.cancel()
         rawCanJob = null
+        _rawCanCapture.value = rawCanCaptureController?.stop()
+        rawCanCaptureController = null
         rawCanStream?.stop()
         rawCanStream = null
     }
