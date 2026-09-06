@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
                     LiveDataScreen(
                         viewModel = liveDataViewModel,
                         session = liveSession!!,
-                        supportedPids = setOf(0x0C),
+                        supportedPids = conn.snapshot?.mode01SupportedPids.orEmpty(),
                         onBack = { showLiveData = false }
                     )
                 } else {
