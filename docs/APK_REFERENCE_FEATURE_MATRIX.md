@@ -61,25 +61,45 @@ Static extraction of the supplied Tessie XAPK established a distinct Tesla Fleet
 
 ### Tessie automation evidence
 
-The supplied Tessie 16.0.29 static extraction also contains a first-class automation model and screen (`package:tessie/models/automation.dart`, `package:tessie/screens/home/automation_screen.dart`, `/automation`) with an explicit "If This / Then That" vocabulary. Observed triggers include:
+The supplied Tessie 16.0.29 static extraction contains a first-class automation model and screen (`package:tessie/models/automation.dart`, `package:tessie/screens/home/automation_screen.dart`, `/automation`) with an explicit If-This/Then-That vocabulary. The extraction also exposes `AutomationType`, `AutomationAction`, `createAutomation`, `addOrUpdateAutomation`, `removeAutomation`, `automations`, `editAutomation` and `automation_timezone`.
 
-- `belowBatterylevelthreshold`
-- `whenDrivingEnds`
-- `whenPluggedIn`
-- `whenUnpluggedAtALocation`
-- `whenTheSetSpeedIsExceeded`
-- `whenMovementIsDetectedBySentry`
-- `whenAnAlarmIsTriggeredBySentry`
+Observed support/capability gates include `supportsAutomation`, `_doesVehicleSupportAutomation`, `_isAutomationActionSupported` and `canAutomationUseOnDeparture`. These identifiers are strong evidence that automation capability and action support are evaluated separately; exact boolean logic is not reconstructed from static strings alone.
 
-Observed vehicle action identifiers near the automation surface include starting/stopping climate, enabling/disabling Sentry, locking/unlocking, rear-trunk actuation and HomeLink. Static presence proves action vocabulary/UI integration, not universal support for every trigger, vehicle or subscription.
+Observed trigger identifiers are broader than the initial pass:
 
-This establishes a strong reference architecture for AutoDiag automation as `Trigger -> Conditions -> Action`, while keeping acquisition, authorization and execution as separate layers. A concrete candidate is `battery below threshold -> verify parked/Sentry state -> disable Sentry`, but the exact threshold semantics are not reconstructed from strings alone and must remain unverified until behavioral evidence exists.
+- battery: `belowBatterylevelthreshold`, `whenAtOrBelowTheSetLevel`
+- driving: `whenDrivingBegins`, `whenDrivingEnds`
+- charging: `whenChargingBegins`, `whenChargingEnds`, `whenCharging`, `whenPluggedIn`, `whenChargersArentProvidingPower`
+- location: `whenEnteringALocation`, `whenLeavingALocation`, `whenUnpluggedAtALocation`
+- speed/distance: `whenTheSetSpeedIsExceeded`, `whenTheSetOdometerIsExceeded`
+- tires/security: `whenAnyTireIsBelowTheSetPressure`, `whenDoorsAreLeftUnlocked`
+- Sentry: `whenMovementIsDetectedBySentry`, `whenAnAlarmIsTriggeredBySentry`
+- weather/body: precipitation while a window/door/trunk is open
+- climate/Dog Mode: Dog Mode or Climate Keep related trigger text
 
-For Tesla Fleet API control, the implementation must use an authorized Vehicle Command path with the required virtual-key/signing boundary; undocumented raw CAN/UDS writes or authentication bypass are not implied by the Tessie extraction. See `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/automation-trigger-action-static-analysis.json` for the detailed evidence record.
+Observed action vocabulary includes climate start/stop, Sentry enable/disable, lock/unlock, charging start/stop, charge-limit and charging-amp changes, scheduled charging, seat heat/cool, steering-wheel heat, climate-keeper mode, charge-port operations, rear-trunk operations, window vent/close, lights flash, HomeLink and software-update schedule/cancel identifiers. Presence in the binary proves vocabulary/integration, not that every action is valid for every trigger, vehicle or subscription tier.
+
+The extraction contains `/activity/commands?source=automation`. This is strong evidence that automation-originated command execution is represented in command activity with an automation source marker. It does not establish the exact create/update/delete backend JSON schema, trigger polling/evaluation interval, retry policy or action ordering semantics.
+
+Timezone is a first-class automation concern: `automation_timezone` plus strings describing configuration in the current timezone and behavior when the timezone changes. AutoDiag should therefore persist timezone semantics with the automation rather than assuming device-local time at execution.
+
+The extraction also contains sensitive-action confirmation language and transport text indicating actions may be sent over Bluetooth, Wi-Fi and cellular. This is reference evidence only; it does not authorize AutoDiag to reproduce proprietary transport behavior.
+
+Reference architecture for AutoDiag automation is therefore:
+
+`Trigger -> Conditions -> Vehicle capability gate -> Authorization gate -> Action -> Execution audit`
+
+A concrete candidate remains:
+
+`battery below threshold -> parked + Sentry enabled + not charging -> disable Sentry`
+
+The exact battery threshold comparison/storage semantics and runtime wake/retry behavior remain unverified and must not be hard-coded from static strings.
+
+For Tesla Fleet API control, use an authorized Vehicle Command path with the required virtual-key/signing boundary. Tesla documents `signed_command` as the generic command endpoint and states that unsigned commands are rejected; direct legacy `/command` use is deprecated for vehicles requiring the Tesla Vehicle Command Protocol. Undocumented raw CAN/UDS writes or authentication bypass are not implied by the Tessie extraction.
 
 Tessie evidence is therefore useful for the Tesla telemetry/canonical-data model, capability discovery and automation architecture, but it must not be converted into CAN IDs, ECU bindings, PID byte offsets, scaling or vehicle verification without independent evidence.
 
-Provenance: `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/analysis.json`; automation provenance: `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/automation-trigger-action-static-analysis.json`; candidate: `data/candidates/tessie_16_0_29_fleet_telemetry.json`.
+Provenance: `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/analysis.json`; automation provenance: `AutoDiag-WiCAN-Diagnostic-Data/provenance/apk-extraction/tessie-16.0.29/automation-trigger-action-static-analysis.json` and `automation-type-action-deep-analysis.json`; candidate: `data/candidates/tessie_16_0_29_fleet_telemetry.json`.
 
 ## Remote-control reference
 
@@ -96,3 +116,4 @@ The supplied remote-control application is relevant to the future control/servic
 7. Read-only diagnostics remains the priority path.
 8. Experimental control features live under `docs/experimental/` and isolated control APIs.
 9. Automation must remain a separate trigger/condition/action layer; a reference APK's automation vocabulary does not itself authorize vehicle writes.
+10. Automation capability, authorization and execution must be independently gated and auditable.
