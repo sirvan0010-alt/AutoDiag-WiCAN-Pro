@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autodiag.core.capability.Capability
 import com.autodiag.core.capability.CapabilityStatus
 import com.autodiag.core.capability.VinAudit
@@ -45,10 +46,12 @@ import com.autodiag.wican.ui.theme.AutoDiagTheme
 import com.autodiag.wican.viewmodel.ConnectionPhase
 import com.autodiag.wican.viewmodel.ConnectionUiState
 import com.autodiag.wican.viewmodel.ConnectionViewModel
+import com.autodiag.wican.viewmodel.LiveDataViewModel
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private val connectionViewModel: ConnectionViewModel by viewModels { ConnectionViewModel.Factory() }
+    private val liveDataViewModel: LiveDataViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,7 +68,9 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     ConnectionResultScreen(
-                        conn,
+                        conn = conn,
+                        connectionViewModel = connectionViewModel,
+                        liveDataViewModel = liveDataViewModel,
                         onDisconnect = { connectionViewModel.disconnect() },
                         onRetry = {
                             when (conn.mode) {
@@ -187,52 +192,72 @@ private fun DiscoveryScreen(
 
 @Composable
 private fun ConnectionResultScreen(
-    state: ConnectionUiState,
+    conn: ConnectionUiState,
+    connectionViewModel: ConnectionViewModel,
+    liveDataViewModel: LiveDataViewModel,
     onDisconnect: () -> Unit,
     onRetry: () -> Unit,
     onRawCanFilter: (String) -> Unit,
     onRawCanPause: () -> Unit,
     onRawCanClear: () -> Unit
 ) {
+    var showLiveData by remember(conn.phase, conn.mode) { mutableStateOf(false) }
+
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Text("Spojení", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Text("${state.phase.labelCs} · ${state.host ?: "—"}:${state.port ?: "—"} · ${state.mode ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Transport: ${state.mode ?: "—"} · ${state.transportState ?: "—"} · RX ${state.transportMetrics.rxBytes} B · TX ${state.transportMetrics.txBytes} B", style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.height(12.dp))
-            when (state.phase) {
+            when (conn.phase) {
                 ConnectionPhase.CONNECTING, ConnectionPhase.INITIALIZING_ELM, ConnectionPhase.DISCOVERING_CAPABILITIES -> {
                     Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(); Spacer(Modifier.height(12.dp)); Text(state.phase.labelCs)
+                        CircularProgressIndicator(); Spacer(Modifier.height(12.dp)); Text(conn.phase.labelCs)
                     }
                 }
                 ConnectionPhase.ERROR -> {
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("Spojení selhalo", style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.height(8.dp)); Text(state.errorMessage ?: "Neznámá chyba")
-                            Spacer(Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = onRetry) { Text("Zkusit znovu") }; OutlinedButton(onClick = onDisconnect) { Text("Zpět") } }
-                        }
+                    Text("Spojení selhalo", style = MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.height(8.dp))
+                    Text(conn.errorMessage ?: "Neznámá chyba")
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onRetry) { Text("Zkusit znovu") }
+                        OutlinedButton(onClick = onDisconnect) { Text("Zpět") }
                     }
                 }
                 ConnectionPhase.READY -> {
-                    if (state.linkOnly && state.mode == TransportMode.SLCAN_RAW) {
+                    if (conn.linkOnly && conn.mode == TransportMode.SLCAN_RAW) {
                         RawCanMonitorScreen(
-                            state = state.rawCanMonitor,
+                            state = conn.rawCanMonitor,
                             onFilterChanged = onRawCanFilter,
                             onPauseToggle = onRawCanPause,
                             onClear = onRawCanClear,
                             onDisconnect = onDisconnect
                         )
+                    } else if (showLiveData) {
+                        LiveDataScreen(
+                            viewModel = liveDataViewModel,
+                            engine = remember(conn.phase, conn.mode) { connectionViewModel.createLiveDataEngine() },
+                            supportedPids = conn.supportedLiveDataPids,
+                            onBack = { showLiveData = false }
+                        )
                     } else {
-                        if (state.mode == TransportMode.SIMULATOR) Text("SIMULÁTOR – syntetická data, ne data z vozidla", style = MaterialTheme.typography.labelLarge)
-                        state.snapshot?.vehicleIdentity?.vin?.let { vin -> Text("VIN vozidla", style = MaterialTheme.typography.labelMedium); Text(vin, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
-                        state.snapshot?.vinAudit?.let { VinAuditCard(it) }
+                        Text("Spojení", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        Text("${conn.mode ?: ""} · ${conn.host ?: "—"}:${conn.port ?: "—"}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("RX ${conn.transportMetrics.rxBytes} B · TX ${conn.transportMetrics.txBytes} B", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(10.dp))
+                        conn.snapshot?.vehicleIdentity?.vin?.let { vin ->
+                            Text("VIN vozidla", style = MaterialTheme.typography.labelMedium)
+                            Text(vin, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        conn.snapshot?.vinAudit?.let { VinAuditCard(it) }
                         Spacer(Modifier.height(8.dp))
-                        val caps = state.snapshot?.capabilities?.values?.toList().orEmpty()
-                        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(caps, key = { it.id }) { CapabilityCard(it) } }
-                        Spacer(Modifier.height(12.dp))
+                        if (conn.supportedLiveDataPids.isNotEmpty()) {
+                            Button(onClick = { showLiveData = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Otevřít skutečná Live Data")
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(conn.snapshot?.capabilities?.values?.toList().orEmpty(), key = { it.id }) { CapabilityCard(it) }
+                        }
+                        Spacer(Modifier.height(10.dp))
                         OutlinedButton(onClick = onDisconnect, Modifier.fillMaxWidth()) { Text("Odpojit") }
                     }
                 }
@@ -269,7 +294,13 @@ private fun CapabilityCard(cap: Capability) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(cap.displayName, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                Text(when (cap.status) { CapabilityStatus.AVAILABLE -> "Dostupné"; CapabilityStatus.PARTIAL -> "Částečně"; CapabilityStatus.UNAVAILABLE -> "Nedostupné"; CapabilityStatus.UNKNOWN -> "Neznámé"; CapabilityStatus.ERROR -> "Chyba" })
+                Text(when (cap.status) {
+                    CapabilityStatus.AVAILABLE -> "Dostupné"
+                    CapabilityStatus.PARTIAL -> "Částečně"
+                    CapabilityStatus.UNAVAILABLE -> "Nedostupné"
+                    CapabilityStatus.UNKNOWN -> "Neznámé"
+                    CapabilityStatus.ERROR -> "Chyba"
+                })
             }
             cap.detail?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             cap.userMessage?.let { InfoTooltip(it) }
