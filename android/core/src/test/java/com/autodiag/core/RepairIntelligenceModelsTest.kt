@@ -31,26 +31,74 @@ class RepairIntelligenceModelsTest {
     }
 
     @Test
-    fun dtcDoesNotBecomeAutomaticPartVerdict() {
-        val source = RepairSource(
-            id = "community-example",
-            provider = "example",
-            label = "Example",
-            sourceType = "community",
-            access = SourceAccess.COMMUNITY,
-            verification = VerificationState.VERIFIED
-        )
-        val dtc = DtcKnowledgeEntry("P0000", "Test", "Test explanation")
-        val intelligence = RepairIntelligenceResolver.resolve(
-            dtc = dtc,
-            sources = listOf(source),
-            parts = listOf(
+    fun partiallyVerifiedCandidateIsNotDeterministicPartVerdict() {
+        val intelligence = RepairIntelligence(
+            dtcCode = "P0000",
+            candidateParts = listOf(
                 RepairPart(
                     component = "candidate",
                     confidence = VerificationState.PARTIALLY_VERIFIED
                 )
+            ),
+            sources = listOf(
+                RepairSource(
+                    id = "example-source",
+                    provider = "example",
+                    label = "Example",
+                    sourceType = "test",
+                    access = SourceAccess.COMMUNITY,
+                    verification = VerificationState.VERIFIED
+                )
             )
         )
         assertFalse(intelligence.hasDeterministicPartVerdict())
+    }
+
+    @Test
+    fun verifiedCandidateStillRequiresVerifiedSource() {
+        val intelligence = RepairIntelligence(
+            dtcCode = "P0000",
+            candidateParts = listOf(
+                RepairPart(
+                    component = "candidate",
+                    confidence = VerificationState.VERIFIED
+                )
+            ),
+            sources = listOf(
+                RepairSource(
+                    id = "unverified-source",
+                    provider = "example",
+                    label = "Example",
+                    sourceType = "test",
+                    access = SourceAccess.COMMUNITY,
+                    verification = VerificationState.PARTIALLY_VERIFIED
+                )
+            )
+        )
+        assertFalse(intelligence.hasDeterministicPartVerdict())
+    }
+
+    @Test
+    fun verifiedCandidateWithVerifiedSourceCanBeDeterministic() {
+        val intelligence = RepairIntelligence(
+            dtcCode = "P0000",
+            candidateParts = listOf(
+                RepairPart(
+                    component = "candidate",
+                    confidence = VerificationState.VERIFIED
+                )
+            ),
+            sources = listOf(
+                RepairSource(
+                    id = "verified-source",
+                    provider = "example",
+                    label = "Example",
+                    sourceType = "test",
+                    access = SourceAccess.COMMUNITY,
+                    verification = VerificationState.VERIFIED
+                )
+            )
+        )
+        assertTrue(intelligence.hasDeterministicPartVerdict())
     }
 }
