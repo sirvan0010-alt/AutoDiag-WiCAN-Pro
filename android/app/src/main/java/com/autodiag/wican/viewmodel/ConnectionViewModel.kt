@@ -57,6 +57,11 @@ class ConnectionViewModel(
     private val _uiState = MutableStateFlow(ConnectionUiState())
     val uiState: StateFlow<ConnectionUiState> = _uiState.asStateFlow()
 
+    // The single initialized ELM session is owned here and exposed read-only so
+    // LiveDataViewModel can reuse it. No second transport/session is created.
+    private val _liveDataSession = MutableStateFlow<Elm327Session?>(null)
+    val liveDataSession: StateFlow<Elm327Session?> = _liveDataSession.asStateFlow()
+
     private var transport: WiCanTransport? = null
     private var session: Elm327Session? = null
     private var job: Job? = null
@@ -108,6 +113,7 @@ class ConnectionViewModel(
         job?.cancel()
         metricsJob?.cancel()
         stopRawCanMonitor()
+        _liveDataSession.value = null
         job = viewModelScope.launch {
             _uiState.value = ConnectionUiState(
                 phase = ConnectionPhase.CONNECTING,
@@ -166,7 +172,9 @@ class ConnectionViewModel(
                         transportState = t.state
                     )
                 }
+                _liveDataSession.value = s
             }.onFailure { err ->
+                _liveDataSession.value = null
                 _uiState.update {
                     it.copy(
                         phase = ConnectionPhase.ERROR,
@@ -189,6 +197,7 @@ class ConnectionViewModel(
         job?.cancel()
         metricsJob?.cancel()
         stopRawCanMonitor()
+        _liveDataSession.value = null
         viewModelScope.launch {
             runCatching { session?.close() }
             runCatching { transport?.disconnect() }
@@ -199,6 +208,7 @@ class ConnectionViewModel(
     }
 
     override fun onCleared() {
+        _liveDataSession.value = null
         stopRawCanMonitor()
         super.onCleared()
     }
