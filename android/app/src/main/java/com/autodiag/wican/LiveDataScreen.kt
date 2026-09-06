@@ -16,9 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.autodiag.core.obd.ObdLiveDataEngine
@@ -39,6 +40,10 @@ fun LiveDataScreen(
     LaunchedEffect(engine, supportedPids) {
         if (engine != null) viewModel.start(engine, supportedPids)
         else viewModel.stop()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.stop() }
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
