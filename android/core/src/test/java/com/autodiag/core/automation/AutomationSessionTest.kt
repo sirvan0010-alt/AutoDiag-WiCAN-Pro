@@ -39,4 +39,22 @@ class AutomationSessionTest {
         session.reset()
         assertEquals(1, session.process(sample(110_000)).size)
     }
+
+    @Test
+    fun staleSignalIsRejectedBeforeTriggerEvaluation() {
+        val rule = AutomationRule(
+            id = "battery.low.notify",
+            triggerSignalId = "battery.usable_soc",
+            triggerOperator = ComparisonOperator.LTE,
+            triggerThreshold = 20.0,
+            action = AutomationAction("lowBattery", AutomationPolicy.NOTIFY_ALERT),
+            enabled = true
+        )
+        val session = AutomationSession(listOf(rule), maxSignalAgeMs = 30_000)
+        val stale = ReplaySample(
+            100_000,
+            listOf(SemanticSignal("battery.usable_soc", 15.0, 60_000))
+        )
+        assertEquals(0, session.process(stale).size)
+    }
 }
