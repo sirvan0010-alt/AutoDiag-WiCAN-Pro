@@ -51,8 +51,7 @@ class OutlanderPhevEvidenceSessionTest {
 
     @Test fun missingOptionalValuesRemainNull() {
         val restored = OutlanderPhevEvidenceSession.fromJson(
-            "{\"sessionId\":\"minimal\",\"startedAtEpochMs\":42,\"samples\":[{" +
-                "\"timestampEpochMs\":43,\"request\":\"21 01\",\"response\":\"\",\"adapterStatus\":\"NO_DATA\"}]}"
+            "{\"sessionId\":\"minimal\",\"startedAtEpochMs\":42,\"samples\":[{\"timestampEpochMs\":43,\"request\":\"21 01\",\"response\":\"\",\"adapterStatus\":\"NO_DATA\"}]}"
         )
         val sample = restored.snapshot().single()
         assertNull(sample.response)
