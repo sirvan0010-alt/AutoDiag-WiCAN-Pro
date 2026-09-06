@@ -128,7 +128,7 @@ class CapabilityDiscovery {
         val supported = discoverSupportedMode01Pids(session)
         val rpmResponse = session.command("010C")
         val rpmAvailable = !looksLikeNoData(rpmResponse) &&
-            rpmResponse.contains("41 0C", ignoreCase = true).let { it || rpmResponse.replace(" ", "").contains("410C", ignoreCase = true) }
+            rpmResponse.replace(" ", "").contains("410C", ignoreCase = true)
         val usable = if (rpmAvailable) supported + 0x0C else supported
         when {
             usable.isNotEmpty() -> Mode01Probe(
@@ -154,36 +154,19 @@ class CapabilityDiscovery {
         )
     }
 
-    /** Reads SAE supported-PID pages: 0100, 0120, 0140, 0160, 0180, 01A0, 01C0. */
+    /** Reads SAE supported-PID pages and stops when the ECU clears the continuation bit. */
     private suspend fun discoverSupportedMode01Pids(session: Elm327Session): Set<Int> {
         val supported = linkedSetOf<Int>()
         var basePid = 0x00
-        repeat(7) {
+        while (basePid <= 0xC0) {
             val response = session.command("01${basePid.toString(16).padStart(2, '0')}")
-            val bytes = parseMode01Payload(response, basePid)
-            if (bytes == null || bytes.size < 4) return@repeat
-            val bitmap = (bytes[0].toLong() shl 24) or
-                (bytes[1].toLong() shl 16) or
-                (bytes[2].toLong() shl 8) or bytes[3].toLong()
-            for (bit in 0 until 32) {
-                if ((bitmap and (1L shl (31 - bit))) != 0L) supported += basePid + bit + 1
-            }
-            if ((bitmap and 1L) == 0L) return@repeat
+            val bytes = Mode01SupportedPidBitmapDecoder.parsePayload(response, basePid) ?: break
+            if (bytes.size < 4) break
+            supported += Mode01SupportedPidBitmapDecoder.supportedPids(bytes, basePid)
+            if (!Mode01SupportedPidBitmapDecoder.hasContinuation(bytes)) break
             basePid += 0x20
         }
         return supported
-    }
-
-    private fun parseMode01Payload(response: String, requestedPid: Int): List<Int>? {
-        val normalized = response.uppercase().replace("SEARCHING...", "")
-        val lines = normalized.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith(">") }
-        val line = lines.firstOrNull { line ->
-            val compact = line.replace(Regex("[^0-9A-F]"), "")
-            compact.startsWith("41${requestedPid.toString(16).padStart(2, '0').uppercase()}")
-        } ?: return null
-        val tokens = line.split(Regex("[^0-9A-F]+"), RegexOption.IGNORE_CASE).filter { it.length == 2 }
-        if (tokens.size < 6) return null
-        return tokens.drop(2).take(4).mapNotNull { it.toIntOrNull(16) }
     }
 
     companion object {
