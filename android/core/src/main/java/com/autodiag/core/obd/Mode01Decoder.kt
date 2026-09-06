@@ -30,6 +30,7 @@ object Mode01Decoder {
             if (value != null) ObdValueAvailability.AVAILABLE else ObdValueAvailability.UNAVAILABLE, def)
     }
 
+    /** Extracts Mode 01 response bytes from plain ELM327 or header-prefixed output. */
     fun extractDataBytes(response: String): List<Int>? {
         val upper = response.uppercase().replace("SEARCHING...", "").trim()
         if (upper.isEmpty()) return null
@@ -37,10 +38,14 @@ object Mode01Decoder {
             upper.contains("UNABLE TO CONNECT") || upper.contains("NOT CONNECTED") ||
             (upper.contains("BUS INIT") && upper.contains("ERROR")) ||
             (upper.contains("?") && upper.replace(Regex("[^0-9A-F?]"), "").length < 8)) return null
-        val lines = upper.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith(">") }
-        val line = lines.firstOrNull { it.replace(" ", "").startsWith("41") } ?: lines.lastOrNull() ?: return null
-        val hex = line.replace(Regex("[^0-9A-F]"), " ").trim().split(Regex("\\s+")).filter { it.length == 2 }
-        if (hex.isEmpty()) return null
-        return hex.mapNotNull { it.toIntOrNull(16) }
+
+        for (line in upper.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith(">") }) {
+            val compact = line.replace(Regex("[^0-9A-F]"), "")
+            val match = Regex("41([0-9A-F]{2})([0-9A-F]{2,})").find(compact) ?: continue
+            val bytes = listOf(0x41, match.groupValues[1].toInt(16)) +
+                match.groupValues[2].chunked(2).mapNotNull { it.toIntOrNull(16) }
+            if (bytes.size >= 2) return bytes
+        }
+        return null
     }
 }
