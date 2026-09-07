@@ -7,6 +7,7 @@ import com.autodiag.core.can.RawCanMonitorState
 import com.autodiag.core.can.SlcanCanFrameStream
 import com.autodiag.core.capability.CapabilityDiscovery
 import com.autodiag.core.capability.CapabilitySnapshot
+import com.autodiag.core.diagnostic.DiagnosticEvidenceStore
 import com.autodiag.core.obd.Elm327Session
 import com.autodiag.core.obd.ObdLiveDataEngine
 import com.autodiag.core.transport.ConnectionState
@@ -60,6 +61,9 @@ class ConnectionViewModel(
     private val _uiState = MutableStateFlow(ConnectionUiState())
     val uiState: StateFlow<ConnectionUiState> = _uiState.asStateFlow()
 
+    /** Session-scoped in-memory evidence sink shared by the live-data runtime path. */
+    private val evidenceStore = DiagnosticEvidenceStore()
+
     private var transport: WiCanTransport? = null
     private var session: Elm327Session? = null
     private var job: Job? = null
@@ -73,8 +77,15 @@ class ConnectionViewModel(
 
     /** Creates the existing read-only Mode 01 engine bound to the current session slot. */
     fun createLiveDataEngine(): ObdLiveDataEngine? = session?.let { current ->
-        ObdLiveDataEngine(current, sessionProvider = { session })
+        ObdLiveDataEngine(
+            current,
+            evidenceStore = evidenceStore,
+            sessionProvider = { session }
+        )
     }
+
+    /** Returns the evidence collected by the current Android session without promoting it to verified data. */
+    fun evidenceSnapshot() = evidenceStore.snapshot()
 
     fun setRawCanFilter(filter: String) = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(idFilter = filter)) }
     fun toggleRawCanPause() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(paused = !it.rawCanMonitor.paused)) }
