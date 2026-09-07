@@ -6,6 +6,7 @@ import org.json.JSONObject
 /** Stable JSON representation for versioned/exportable automation rules. */
 object AutomationRuleJson {
     fun encode(rule: AutomationRule): String = JSONObject().apply {
+        AutomationRuleValidator.requireValid(rule)
         put("id", rule.id)
         put("version", rule.version)
         put("triggerSignalId", rule.triggerSignalId)
@@ -41,18 +42,20 @@ object AutomationRuleJson {
                 ))
             }
         }
-        return AutomationRule(
-            id = root.getString("id"),
-            version = root.optInt("version", 1),
-            triggerSignalId = root.getString("triggerSignalId"),
-            triggerOperator = ComparisonOperator.valueOf(root.getString("triggerOperator")),
-            triggerThreshold = root.getDouble("triggerThreshold"),
-            conditions = conditions,
-            action = AutomationAction(
-                action.getString("id"),
-                AutomationPolicy.valueOf(action.getString("policy"))
-            ),
-            enabled = root.optBoolean("enabled", false)
+        return AutomationRuleValidator.requireValid(
+            AutomationRule(
+                id = root.getString("id"),
+                version = root.optInt("version", 1),
+                triggerSignalId = root.getString("triggerSignalId"),
+                triggerOperator = ComparisonOperator.valueOf(root.getString("triggerOperator")),
+                triggerThreshold = root.getDouble("triggerThreshold"),
+                conditions = conditions,
+                action = AutomationAction(
+                    action.getString("id"),
+                    AutomationPolicy.valueOf(action.getString("policy"))
+                ),
+                enabled = root.optBoolean("enabled", false)
+            )
         )
     }
 }
