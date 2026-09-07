@@ -34,33 +34,61 @@ Safety-sensitive operations remain explicitly classified as service/configuratio
 
 ## CAN signal extraction status
 
-The current Tesla Model 3/Y CAN evidence is maintained in the private diagnostic-data repository, not in the runtime implementation:
+Doplněk k sekci "Integration path" výše. Sleduje se tady stav statické
+extrakce CAN signálů pro Model 3/Y — ne jako duplicitní zdroj pravdy, ale
+jako čitelný souhrn toho, co je jinak roztroušené v `provenance/apk-extraction/`
+v `AutoDiag-WiCAN-Diagnostic-Data`.
 
-`provenance/apk-extraction/tesla/tesla-model3y-can-signal-source-matrix-2026-09-06.json`
+**Canonical source:** `AutoDiag-WiCAN-Diagnostic-Data`,
+`provenance/apk-extraction/tesla/tesla-model3y-can-signal-source-matrix-2026-09-06.json`.
+The matrix is maintained in the private diagnostic-data repository; this public
+section is a readable summary and is not a second source of truth.
 
-Status: **`CANDIDATE_ONLY` / `NO_PROMOTION`**. The matrix explicitly separates three transport branches:
+### Transportní větve
 
-1. **Third-party CAN on SAE J1962** — first read-only feasibility path for applicable Model 3/Y configurations.
-2. **DoIP/Ethernet** — separate diagnostic branch; applicability and WiCAN PRO support must be established independently.
-3. **Tesla BLE vehicle-command** — fallback branch; it is not assumed necessary for Model 3/Y read-only CAN data.
+Tesla nabízí tři různé diagnostické cesty, nikdy nemíchané do jedné vrstvy:
 
-Tesla's R5 service document confirms a third-party CAN interface on the OBD-II connector for specified Model 3/Y production ranges and regions. Older configurations can also have a separate DoIP diagnostic port, so physical port and vehicle configuration are part of the applicability gate.
-
-The current candidate signal queue is:
-
-| Signal/domain | Current status | Rule |
+| Transport | Stav | Poznámka |
 |---|---|---|
-| SOC | `CANDIDATE / UNVERIFIED` | CAN message/field mapping requires vehicle capture |
-| HV_V | `CANDIDATE / UNVERIFIED` | no production decoder without byte/scale evidence |
-| HV_A | `CANDIDATE / UNVERIFIED` | no production decoder without byte/scale evidence |
-| BATT_TEMP | `CANDIDATE / UNVERIFIED` | thermal field and scaling require capture |
-| charging | `CANDIDATE / UNVERIFIED` | voltage/current/power/status fields require capture |
-| drive | `CANDIDATE / UNVERIFIED` | drive/status/speed mapping requires capture |
-| SOH | `UNKNOWN / NO_CAN_MAPPING_ESTABLISHED` | do not derive SOH from other battery values |
+| CAN přes J1962 | první testovaná větev | oficiální Tesla dokumentace potvrzuje 3rd-party CAN na J1962 pro konkrétní Model 3/Y konfigurace a výrobní rozsahy |
+| DoIP/Ethernet (UDS) | zatím ne | Tesla dokumentuje přechod na DoIP u novějších konfigurací; vlastní applicability gate, až přijde na řadu |
+| BLE (Tesla RoutableMessage) | fallback | vlastní session/auth vrstva, vyšší implementační náklad než CAN |
 
-The matrix requires model, production date, region, diagnostic-port configuration, raw capture, message ID, bit/byte layout, scale/offset/unit and repeatability before promotion. Its safety scope is read-only evidence/feasibility; writes, security access, key/immobilizer operations and coding/flashing remain unimplemented.
+Tesla R5 service document confirms the third-party CAN interface for specified
+Model 3/Y production ranges and regions. It also warns that older configurations
+can have a separate DoIP diagnostic port, so model, production date, region and
+physical port configuration remain part of the applicability gate.
 
-WiCAN PRO's documented CAN/OBD capabilities make the J1962 CAN branch technically plausible, but that hardware capability does not by itself verify any Tesla signal mapping.
+### Candidate signály (Model 3/Y, CAN větev)
+
+Žádná z položek níž není `VERIFIED`. Všechny čekají na vehicle capture/replay.
+
+| Veličina | Zdroj CAN ID (candidate) | Stav |
+|---|---|---|
+| SOC | `0x292` | candidate |
+| HV pack voltage/current | `0x132` | candidate |
+| BMS status | `0x212` | candidate |
+| BMS thermal status | `0x312` | candidate |
+| Charging/UI | `0x333` | candidate |
+| Charge-line V/A/W | `0x264` | candidate |
+| SOH | — | **UNKNOWN, žádná CAN cesta zatím nenalezena** |
+
+SOH se řeší jako samostatný problém — až po ověření prvních šesti položek se
+zkoumá, jestli je dostupné přes diagnostickou UDS větev nebo jinou servisní
+cestu, ne přes stejný CAN mechanismus jako živá data.
+
+### Co z tohohle plyne pro implementaci
+
+- Candidate CAN ID výše se **nesmí** zapojit do žádného runtime kódu
+  (`ObdLiveDataEngine` ani jiného), dokud neprojdou stejným schvalovacím
+  řetězcem jako Mitsubishi Outlander signály (candidate → vehicle capture → replay → verified).
+- Veřejně publikovaná Tesla dokumentace s konkrétním ID/bity/délkou/endianitou/
+  faktorem/offsetem/jednotkou je silnější evidence než komunitní DBC — pokud
+  jsou k dispozici obě, upřednostni oficiální zdroj a zaznamenej to do `source`
+  pole candidate záznamu.
+- Neplatí předpoklad, že každý veřejně publikovaný Tesla DBC signál je
+  dostupný na každé konfiguraci Modelu 3/Y na stejném portu — to se ověřuje
+  per generace/výrobní rozsah, ne paušálně.
 
 ## Data storage rule
 
