@@ -37,10 +37,19 @@ object Mode01Decoder {
             upper.contains("UNABLE TO CONNECT") || upper.contains("NOT CONNECTED") ||
             (upper.contains("BUS INIT") && upper.contains("ERROR")) ||
             (upper.contains("?") && upper.replace(Regex("[^0-9A-F?]"), "").length < 8)) return null
+
         val lines = upper.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith(">") }
-        val line = lines.firstOrNull { it.replace(" ", "").startsWith("41") } ?: lines.lastOrNull() ?: return null
-        val hex = line.replace(Regex("[^0-9A-F]"), " ").trim().split(Regex("\\s+")).filter { it.length == 2 }
+        val line = lines.firstOrNull { line ->
+            line.replace(" ", "").startsWith("41") ||
+                line.split(Regex("\\s+")).any { it == "41" }
+        } ?: lines.lastOrNull() ?: return null
+
+        val hex = line.replace(Regex("[^0-9A-F]"), " ")
+            .trim().split(Regex("\\s+")).filter { it.length == 2 }
         if (hex.isEmpty()) return null
-        return hex.mapNotNull { it.toIntOrNull(16) }
+        val bytes = hex.mapNotNull { it.toIntOrNull(16) }
+        val modeIndex = bytes.indexOf(0x41)
+        if (modeIndex < 0) return null
+        return bytes.drop(modeIndex)
     }
 }
