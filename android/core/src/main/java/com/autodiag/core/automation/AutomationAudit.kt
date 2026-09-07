@@ -36,4 +36,29 @@ object AutomationAudit {
             evaluation.reason
         )
     }
+
+    /** Records a rejected evaluation so stale/missing data is auditable too. */
+    fun fromQualityFailure(
+        rule: AutomationRule,
+        timestampMs: Long,
+        quality: DataQualityResult
+    ): AutomationAuditEvent {
+        val missing = quality.missingSignalIds.joinToString(",")
+        val stale = quality.staleSignalIds.joinToString(",")
+        val details = buildList {
+            if (missing.isNotEmpty()) add("missing=$missing")
+            if (stale.isNotEmpty()) add("stale=$stale")
+        }.joinToString(";")
+        return AutomationAuditEvent(
+            ruleId = rule.id,
+            ruleVersion = rule.version,
+            timestampMs = timestampMs,
+            observedValues = emptyMap(),
+            conditionResults = emptyMap(),
+            actionId = rule.action.id,
+            policy = rule.action.policy,
+            outcome = "DATA_QUALITY_REJECTED",
+            error = listOf(quality.reason, details).filter { it.isNotEmpty() }.joinToString(";")
+        )
+    }
 }
