@@ -7,6 +7,15 @@ class AutomationSession(
     maxSignalAgeMs: Long = 30_000L,
     private val auditSink: (AutomationAuditEvent) -> Unit = {}
 ) {
+    init {
+        require(cooldownMs >= 0L) { "cooldownMs must be non-negative" }
+        require(maxSignalAgeMs >= 0L) { "maxSignalAgeMs must be non-negative" }
+        rules.forEach(AutomationRuleValidator::requireValid)
+        require(rules.map { it.id }.distinct().size == rules.size) {
+            "Automation rule IDs must be unique"
+        }
+    }
+
     private val detectors = rules.associate { it.id to AutomationEdgeDetector() }
     private val limiter = NotificationRateLimiter(cooldownMs)
     private val dataQualityGate = AutomationDataQualityGate(maxSignalAgeMs)
