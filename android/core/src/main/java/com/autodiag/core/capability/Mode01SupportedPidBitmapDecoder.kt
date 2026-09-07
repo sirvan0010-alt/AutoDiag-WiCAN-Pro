@@ -31,10 +31,17 @@ object Mode01SupportedPidBitmapDecoder {
     fun supportedPids(bitmap: List<Int>, basePid: Int): Set<Int> {
         if (bitmap.size < 4 || basePid !in 0..0xE0 || basePid % 0x20 != 0) return emptySet()
         val value = (bitmap[0].toLong() shl 24) or
-            (bitmap[1].toLong() shl 16) or (bitmap[2].toLong() shl 8) or bitmap[3].toLong()
-        return (0 until 32)
-            .filter { bit -> (value and (1L shl (31 - bit))) != 0L }
-            .mapTo(linkedSetOf()) { basePid + bit + 1 }
+            (bitmap[1].toLong() shl 16) or
+            (bitmap[2].toLong() shl 8) or
+            bitmap[3].toLong()
+        val supported = linkedSetOf<Int>()
+        for (bit in 0 until 32) {
+            val mask = 1L shl (31 - bit)
+            if ((value and mask) != 0L) {
+                supported += basePid + bit + 1
+            }
+        }
+        return supported
     }
 
     fun hasContinuation(bitmap: List<Int>): Boolean =
