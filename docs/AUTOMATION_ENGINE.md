@@ -4,6 +4,12 @@
 
 The Automation Engine turns verified read-only vehicle data into repeatable rules, scheduled tests, remote telemetry and notifications. It is intentionally separate from CAN/OBD transport and vehicle decoding.
 
+## Current implementation boundary
+
+The current Android core implements the deterministic rule/evaluation layer, replay, trigger edge detection, notification cooldowns, data-quality gating and audit events. Standard OBD Mode 01 data can be promoted into semantic signals only through the explicit `ObdSemanticSignalAdapter`; only the registered SAE J1979 PID set is promoted. Manufacturer-specific signals require their own verified vehicle-profile adapter.
+
+The current implementation does **not** prove a live vehicle producer for Tesla/Fleet Telemetry, nor does it promote undocumented Tesla CAN/UDS identifiers. Tessie-derived Tesla strings are replay/evidence candidates until an independent producer and protocol evidence are available.
+
 ## Action classes
 
 - `READ / LOG / ANALYZE` — acquire data, persist captures, calculate metrics and analyze replay sessions.
@@ -12,7 +18,11 @@ The Automation Engine turns verified read-only vehicle data into repeatable rule
 
 ## Rule model
 
-Rules are data, not UI-only state. They should be exportable/versionable as JSON or YAML and reference stable semantic signals rather than undocumented CAN IDs.
+Rules are data, not UI-only state. They are exportable/versionable as JSON and reference stable semantic signals rather than undocumented CAN IDs.
+
+## Data quality gate
+
+Before a rule is evaluated, every required trigger/condition signal must be present, have a non-null value and carry a valid timestamp no older than the configured maximum age. Future timestamps are rejected. A rejected sample produces an explicit `DATA_QUALITY_REJECTED` audit event containing only rule metadata, the rejection reason and stale/missing signal IDs; credentials and secrets are never included.
 
 ## Dry-run / replay
 
@@ -78,7 +88,7 @@ Every alert/report finding must state why it exists and which diagnostic pillar 
 
 ## Auditability
 
-Every execution records rule ID/version, timestamp, vehicle identity scope, capability snapshot, input values, condition results, actions attempted, notification result and errors/timeouts.
+Every evaluated rule records rule ID/version, timestamp, observed values, condition results, action/policy and outcome. Data-quality rejections are also recorded as `DATA_QUALITY_REJECTED` with missing/stale signal IDs. Vehicle identity, capability snapshots and command results belong to higher integration layers and are not fabricated by the core rule engine.
 
 ## Safety boundaries
 
@@ -92,9 +102,11 @@ Every execution records rule ID/version, timestamp, vehicle identity scope, capa
 1. Rule data model
 2. Replay/dry-run evaluator
 3. Notification abstraction and rate limiting
-4. Session manager
-5. Scheduled read-only telemetry
-6. Automatic Health Check orchestrator
-7. MQTT/Home Assistant integration
-8. UI rule editor
-9. Only after separate safety review: experimental write subsystem
+4. Data-quality gate and audit trail
+5. Session manager
+6. Connect verified live producers to semantic signals
+7. Scheduled read-only telemetry
+8. Automatic Health Check orchestrator
+9. MQTT/Home Assistant integration
+10. UI rule editor
+11. Only after separate safety review: experimental write subsystem
