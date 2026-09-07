@@ -1,5 +1,6 @@
 package com.autodiag.core.obd
 
+import com.autodiag.core.diagnostic.DiagnosticEvidenceStore
 import com.autodiag.core.transport.ConnectionState
 import com.autodiag.core.transport.TransportConfig
 import com.autodiag.core.transport.TransportMetrics
@@ -27,7 +28,12 @@ class ObdLiveDataEngineIntegrationTest {
     fun `mode01 pid is requested and decoded into live sample`() = runBlocking {
         val transport = FakeElmTransport()
         val session = Elm327Session(transport)
-        val engine = ObdLiveDataEngine(session, nowEpochMs = { 1_000L })
+        val evidenceStore = DiagnosticEvidenceStore()
+        val engine = ObdLiveDataEngine(
+            session,
+            nowEpochMs = { 1_000L },
+            evidenceStore = evidenceStore
+        )
 
         val samples = engine.stream(
             supportedPids = setOf(0x0C),
@@ -47,6 +53,13 @@ class ObdLiveDataEngineIntegrationTest {
         assertEquals("rpm", samples.single().unit)
         assertEquals(ObdLiveDataEngine.State.LIVE, samples.single().state)
         assertTrue(samples.single().rawHex.contains("41 0C 1A F8"))
+
+        val evidence = evidenceStore.snapshot()
+        assertEquals(1, evidence.size)
+        assertEquals("obd.mode01.pid.0C", evidence.single().key)
+        assertEquals(1726.0, evidence.single().value)
+        assertEquals("rpm", evidence.single().unit)
+        assertTrue(evidence.single().provenance.rawRepresentation.orEmpty().contains("41 0C 1A F8"))
     }
 
     private class FakeElmTransport : WiCanTransport {
