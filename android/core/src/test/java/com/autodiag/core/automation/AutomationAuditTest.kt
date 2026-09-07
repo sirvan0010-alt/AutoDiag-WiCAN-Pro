@@ -18,7 +18,16 @@ class AutomationAuditTest {
         val session = AutomationSession(listOf(rule), auditSink = events::add)
 
         session.process(
-            ReplaySample(100_000, listOf(SemanticSignal("battery.usable_soc", 15.0, 100_000)))
+            ReplaySample(
+                100_000L,
+                listOf(
+                    SemanticSignal(
+                        id = "battery.usable_soc",
+                        value = 15.0,
+                        timestampMs = 100_000L
+                    )
+                )
+            )
         )
 
         assertEquals(1, events.size)
