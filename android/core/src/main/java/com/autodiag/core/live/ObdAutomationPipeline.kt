@@ -2,10 +2,13 @@ package com.autodiag.core.live
 
 import com.autodiag.core.automation.AutomationNotification
 import com.autodiag.core.automation.AutomationSession
+import com.autodiag.core.obd.LiveDataFreshness
+import com.autodiag.core.obd.LiveDataQuality
 import com.autodiag.core.obd.LiveDataSample
 import com.autodiag.core.obd.ObdLiveDataEngine
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 
 /**
  * Read-only runtime pipeline from decoded OBD live data to automation.
@@ -20,9 +23,9 @@ class ObdAutomationPipeline(
     fun process(sample: LiveDataSample): List<AutomationNotification> =
         ObdAutomationBridge.process(sample, session)
 
-    fun processStream(samples: Flow<ObdLiveDataEngine.SensorSample>): Flow<AutomationNotification> =
-        samples.mapNotNullToNotifications { sensor ->
-            if (sensor.state != ObdLiveDataEngine.State.LIVE) return@mapNotNullToNotifications null
+    fun processStream(samples: Flow<ObdLiveDataEngine.SensorSample>): Flow<AutomationNotification> = flow {
+        samples.collect { sensor ->
+            if (sensor.state != ObdLiveDataEngine.State.LIVE) return@collect
             process(
                 LiveDataSample(
                     pid = sensor.pid,
@@ -31,18 +34,11 @@ class ObdAutomationPipeline(
                     unit = sensor.unit,
                     rawHex = sensor.rawHex,
                     timestampEpochMs = sensor.timestampEpochMs,
-                    quality = com.autodiag.core.obd.LiveDataQuality.GOOD,
-                    freshness = com.autodiag.core.obd.LiveDataFreshness.FRESH,
+                    quality = LiveDataQuality.GOOD,
+                    freshness = LiveDataFreshness.FRESH,
                     error = sensor.error
                 )
-            )
+            ).forEach { emit(it) }
         }
-}
-
-private fun <T, R> Flow<T>.mapNotNullToNotifications(
-    transform: suspend (T) -> List<AutomationNotification>?
-): Flow<AutomationNotification> = kotlinx.coroutines.flow.flow {
-    collect { value ->
-        transform(value)?.forEach { emit(it) }
     }
 }
