@@ -127,6 +127,7 @@ class ConnectionViewModel(
         job?.cancel()
         metricsJob?.cancel()
         stopRawCanMonitor()
+        evidenceStore.clear()
         job = viewModelScope.launch {
             _uiState.value = ConnectionUiState(phase = ConnectionPhase.CONNECTING, mode = mode, host = host, port = port, linkOnly = !runDiscovery)
             runCatching {
