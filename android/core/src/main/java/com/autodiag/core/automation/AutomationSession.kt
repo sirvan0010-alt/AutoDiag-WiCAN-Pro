@@ -30,7 +30,10 @@ class AutomationSession(
                 rule.conditions.forEach { add(it.signalId) }
             }
             val quality = dataQualityGate.validate(required, signals, sample.timestampMs)
-            if (!quality.accepted) continue
+            if (!quality.accepted) {
+                auditSink(AutomationAudit.fromQualityFailure(rule, sample.timestampMs, quality))
+                continue
+            }
 
             val detector = detectors[rule.id] ?: continue
             val evaluation = detector.evaluate(rule, signals)
