@@ -31,7 +31,13 @@ class ObdLiveDataEngineIntegrationTest {
 
         val samples = engine.stream(
             supportedPids = setOf(0x0C),
-            plans = listOf(LiveDataPollPlan(pid = 0x0C, intervalMs = 60_000L))
+            plans = listOf(
+                LiveDataPollPlan(
+                    pid = 0x0C,
+                    priority = LiveDataPriority.HIGH,
+                    intervalMs = 60_000L
+                )
+            )
         ).take(1).toList()
 
         assertEquals(listOf("010C\r"), transport.sentCommands)
