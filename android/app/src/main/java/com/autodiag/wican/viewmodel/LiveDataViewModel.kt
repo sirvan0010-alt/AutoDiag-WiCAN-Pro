@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 
 /** Bridges the single READY ELM session to the real read-only Mode 01 engine. */
 class LiveDataViewModel : ViewModel() {
+    private val historyStore = LiveDataStore()
     private val _samples = MutableStateFlow<List<ObdLiveDataEngine.SensorSample>>(emptyList())
     val samples: StateFlow<List<ObdLiveDataEngine.SensorSample>> = _samples.asStateFlow()
     private val _selectedPids = MutableStateFlow<List<Int>>(emptyList())
@@ -24,7 +25,6 @@ class LiveDataViewModel : ViewModel() {
     val running: StateFlow<Boolean> = _running.asStateFlow()
     private val _supportedPids = MutableStateFlow<Set<Int>>(emptySet())
     val supportedPids: StateFlow<Set<Int>> = _supportedPids.asStateFlow()
-    private val historyStore = LiveDataStore()
     private var pollJob: Job? = null
 
     fun setSelected(pid: Int, selected: Boolean) {
@@ -47,6 +47,7 @@ class LiveDataViewModel : ViewModel() {
         }
         _selectedPids.value = preferred
         _samples.value = emptyList()
+        historyStore.clear()
         if (preferred.isEmpty()) return
         pollJob = viewModelScope.launch {
             _running.value = true
