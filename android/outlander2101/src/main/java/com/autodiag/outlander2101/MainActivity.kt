@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     @Volatile private var polling = false
     private val history = mutableListOf<Float>()
     private val handler = Handler(Looper.getMainLooper())
+    private val isoTp = IsoTpDecoder()
 
     private val poller = object : Runnable {
         override fun run() {
@@ -39,88 +40,42 @@ class MainActivity : Activity() {
     }
 
     private val reconnecter = object : Runnable {
-        override fun run() {
-            if (!running) connect()
-        }
+        override fun run() { if (!running) connect() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(28, 28, 28, 20)
-        }
-        button = Button(this).apply {
-            text = "2101"
-            isEnabled = false
-        }
-        status = TextView(this).apply {
-            text = "WiCAN: PŘIPOJOVÁNÍ…"
-            textSize = 16f
-        }
-        value = TextView(this).apply {
-            text = "—"
-            textSize = 42f
-            setPadding(0, 24, 0, 12)
-        }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(28, 28, 28, 20) }
+        button = Button(this).apply { text = "2101"; isEnabled = false }
+        status = TextView(this).apply { text = "WiCAN: PŘIPOJOVÁNÍ…"; textSize = 16f }
+        value = TextView(this).apply { text = "—"; textSize = 42f; setPadding(0, 24, 0, 12) }
         graph = GraphView()
-        root.addView(button)
-        root.addView(status)
-        root.addView(value)
-        root.addView(graph, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(button); root.addView(status); root.addView(value); root.addView(graph, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
-
-        button.setOnClickListener {
-            if (!running) return@setOnClickListener
-            startPolling()
-        }
+        button.setOnClickListener { if (running) startPolling() }
         connect()
     }
 
     private fun connect() {
         if (running) return
-        runOnUiThread {
-            status.text = "WiCAN: PŘIPOJOVÁNÍ…"
-            button.isEnabled = false
-        }
+        runOnUiThread { status.text = "WiCAN: PŘIPOJOVÁNÍ…"; button.isEnabled = false }
         Thread {
             try {
                 val s = Socket()
                 s.connect(InetSocketAddress("192.168.0.10", 35000), 4000)
-                socket = s
-                output = s.getOutputStream()
-                running = true
-                sendRaw("ATZ")
-                Thread.sleep(700)
-                sendRaw("ATE0")
-                sendRaw("ATL0")
-                sendRaw("ATS0")
-                sendRaw("ATH1")
-                sendRaw("ATSP6")
-                sendRaw("ATAT1")
-                sendRaw("ATAL")
-                sendRaw("ATST32")
-                sendRaw("ATSH761")
-                runOnUiThread {
-                    status.text = "WiCAN: PŘIPOJENO • 2101: AKTIVNÍ"
-                    button.isEnabled = true
-                }
-                // Start measuring automatically as soon as WiCAN is ready.
-                startPolling()
-                readLoop()
-            } catch (e: Exception) {
-                disconnectAndRetry()
-            }
+                socket = s; output = s.getOutputStream(); running = true; isoTp.reset()
+                sendRaw("ATZ"); Thread.sleep(700)
+                sendRaw("ATE0"); sendRaw("ATL0"); sendRaw("ATS0"); sendRaw("ATH1")
+                sendRaw("ATSP6"); sendRaw("ATAT1"); sendRaw("ATAL"); sendRaw("ATST32"); sendRaw("ATSH761")
+                runOnUiThread { status.text = "WiCAN: PŘIPOJENO • 2101: AKTIVNÍ"; button.isEnabled = true }
+                startPolling(); readLoop()
+            } catch (_: Exception) { disconnectAndRetry() }
         }.start()
     }
 
     private fun startPolling() {
         if (!running) return
-        polling = true
-        handler.removeCallbacks(poller)
-        sendRaw("2101")
-        handler.postDelayed(poller, 1000)
-        runOnUiThread { status.text = "WiCAN: PŘIPOJENO • 2101: AKTIVNÍ" }
+        polling = true; handler.removeCallbacks(poller); sendRaw("2101"); handler.postDelayed(poller, 1000)
     }
 
     private fun readLoop() {
@@ -128,30 +83,17 @@ class MainActivity : Activity() {
             val reader = BufferedReader(InputStreamReader(socket!!.getInputStream()))
             while (running) {
                 val line = reader.readLine() ?: break
-                parseLine(line)
+                val payload = isoTp.accept(line) ?: continue
+                decodeWatchdog2101(payload)
             }
-        } catch (_: Exception) {
-            // Socket loss is handled below.
-        }
+        } catch (_: Exception) { }
         disconnectAndRetry()
     }
 
-    private fun parseLine(line: String) {
-        val clean = line.trim().replace(" ", "").replace("\r", "")
-        if (clean.isEmpty() || clean == ">" || clean.equals("OK", true)) return
-        if (!clean.startsWith("762", true)) return
-        val payload = clean.substring(3).replace(":", "")
-        if (payload.length < 4) return
-        val bytes = ArrayList<Int>()
-        var i = 0
-        while (i + 1 < payload.length) {
-            val b = payload.substring(i, i + 2).toIntOrNull(16) ?: break
-            bytes.add(b)
-            i += 2
-        }
+    private fun decodeWatchdog2101(bytes: List<Int>) {
+        // Watchdog Lz3/a evidence: response indices 78..79, UInt16 BE, kOhm.
+        // Keep the evidence-gated decoder: short/incomplete 21 01 payloads are ignored.
         if (bytes.size <= 79) return
-
-        // Evidence candidate: response indices 78..79, UInt16 BE, kOhm.
         val risoKOhm = (bytes[78] * 256 + bytes[79]).toFloat()
         runOnUiThread {
             history.add(risoKOhm)
@@ -163,63 +105,36 @@ class MainActivity : Activity() {
     }
 
     private fun sendRaw(command: String) {
-        try {
-            output?.write((command + "\r").toByteArray())
-            output?.flush()
-        } catch (_: Exception) {
-            disconnectAndRetry()
-        }
+        try { output?.write((command + "\r").toByteArray()); output?.flush() }
+        catch (_: Exception) { disconnectAndRetry() }
     }
 
     private fun disconnectAndRetry() {
-        if (!running && socket == null) {
-            scheduleReconnect()
-            return
-        }
-        running = false
-        polling = false
-        handler.removeCallbacks(poller)
+        if (!running && socket == null) { scheduleReconnect(); return }
+        running = false; polling = false; isoTp.reset(); handler.removeCallbacks(poller)
         try { socket?.close() } catch (_: Exception) {}
-        socket = null
-        output = null
-        runOnUiThread {
-            button.isEnabled = false
-            status.text = "WiCAN: ODPOJENO • čekám na adaptér…"
-        }
+        socket = null; output = null
+        runOnUiThread { button.isEnabled = false; status.text = "WiCAN: ODPOJENO • čekám na adaptér…" }
         scheduleReconnect()
     }
 
-    private fun scheduleReconnect() {
-        handler.removeCallbacks(reconnecter)
-        handler.postDelayed(reconnecter, 3000)
-    }
+    private fun scheduleReconnect() { handler.removeCallbacks(reconnecter); handler.postDelayed(reconnecter, 3000) }
 
     override fun onDestroy() {
-        running = false
-        polling = false
-        handler.removeCallbacks(poller)
-        handler.removeCallbacks(reconnecter)
+        running = false; polling = false; handler.removeCallbacks(poller); handler.removeCallbacks(reconnecter)
         try { socket?.close() } catch (_: Exception) {}
-        socket = null
-        output = null
-        super.onDestroy()
+        socket = null; output = null; super.onDestroy()
     }
 
     private inner class GraphView : View(this) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         override fun onDraw(c: Canvas) {
-            super.onDraw(c)
-            if (history.size < 2) return
-            val min = history.minOrNull() ?: return
-            val maxV = max(history.maxOrNull() ?: min, min + 1f)
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 4f
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val step = w / max(1, history.size - 1)
+            super.onDraw(c); if (history.size < 2) return
+            val min = history.minOrNull() ?: return; val maxV = max(history.maxOrNull() ?: min, min + 1f)
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f
+            val w = width.toFloat(); val h = height.toFloat(); val step = w / max(1, history.size - 1)
             for (i in 1 until history.size) {
-                val x1 = (i - 1) * step
-                val x2 = i * step
+                val x1 = (i - 1) * step; val x2 = i * step
                 val y1 = h - ((history[i - 1] - min) / (maxV - min)) * (h - 20f) - 10f
                 val y2 = h - ((history[i] - min) / (maxV - min)) * (h - 20f) - 10f
                 c.drawLine(x1, y1, x2, y2, paint)
