@@ -10,8 +10,6 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -23,10 +21,13 @@ class MainActivity : Activity() {
     private lateinit var value: TextView
     private lateinit var graph: GraphView
     private lateinit var button: Button
+
     private var socket: Socket? = null
     private var output: OutputStream? = null
+    private var connectedPort = -1
     @Volatile private var running = false
     @Volatile private var polling = false
+
     private val history = mutableListOf<Float>()
     private val handler = Handler(Looper.getMainLooper())
     private val isoTp = IsoTpDecoder()
@@ -35,108 +36,265 @@ class MainActivity : Activity() {
         override fun run() {
             if (!running || !polling) return
             sendRaw("2101")
-            handler.postDelayed(this, 1000)
+            handler.postDelayed(this, 1200)
         }
     }
 
     private val reconnecter = object : Runnable {
-        override fun run() { if (!running) connect() }
+        override fun run() {
+            if (!running) connect()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(28, 28, 28, 20) }
-        button = Button(this).apply { text = "2101"; isEnabled = false }
-        status = TextView(this).apply { text = "WiCAN: PŘIPOJOVÁNÍ…"; textSize = 16f }
-        value = TextView(this).apply { text = "—"; textSize = 42f; setPadding(0, 24, 0, 12) }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(28, 28, 28, 20)
+        }
+
+        val title = TextView(this).apply {
+            text = "Outlander PHEV • HV IZOLACE"
+            textSize = 24f
+        }
+        button = Button(this).apply {
+            text = "HV IZOLACE"
+            isEnabled = false
+        }
+        status = TextView(this).apply {
+            text = "WiCAN: PŘIPOJOVÁNÍ…"
+            textSize = 16f
+        }
+        value = TextView(this).apply {
+            text = "— kΩ"
+            textSize = 42f
+            setPadding(0, 24, 0, 12)
+        }
         graph = GraphView()
-        root.addView(button); root.addView(status); root.addView(value); root.addView(graph, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        root.addView(title)
+        root.addView(button)
+        root.addView(status)
+        root.addView(value)
+        root.addView(graph, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
-        button.setOnClickListener { if (running) startPolling() }
+
+        button.setOnClickListener {
+            if (running) startPolling()
+        }
+
         connect()
     }
 
     private fun connect() {
         if (running) return
-        runOnUiThread { status.text = "WiCAN: PŘIPOJOVÁNÍ…"; button.isEnabled = false }
+
+        runOnUiThread {
+            status.text = "WiCAN: PŘIPOJOVÁNÍ…"
+            button.isEnabled = false
+        }
+
         Thread {
-            try {
-                val s = Socket()
-                s.connect(InetSocketAddress("192.168.0.10", 35000), 4000)
-                socket = s; output = s.getOutputStream(); running = true; isoTp.reset()
-                sendRaw("ATZ"); Thread.sleep(700)
-                sendRaw("ATE0"); sendRaw("ATL0"); sendRaw("ATS0"); sendRaw("ATH1")
-                sendRaw("ATSP6"); sendRaw("ATAT1"); sendRaw("ATAL"); sendRaw("ATST32"); sendRaw("ATSH761")
-                runOnUiThread { status.text = "WiCAN: PŘIPOJENO • 2101: AKTIVNÍ"; button.isEnabled = true }
-                startPolling(); readLoop()
-            } catch (_: Exception) { disconnectAndRetry() }
+            var lastError: Exception? = null
+            for (port in intArrayOf(35000, 3333)) {
+                try {
+                    val s = Socket()
+                    s.tcpNoDelay = true
+                    s.soTimeout = 15000
+                    s.connect(InetSocketAddress("192.168.0.10", port), 4000)
+
+                    socket = s
+                    output = s.getOutputStream()
+                    connectedPort = port
+                    running = true
+                    polling = false
+                    isoTp.reset()
+
+                    // WiCAN ELM327 mode: explicit ISO 15765-4 CAN 11-bit/500 kbit/s.
+                    sendCommand("ATZ", 1200)
+                    sendCommand("ATE0", 120)
+                    sendCommand("ATL0", 120)
+                    sendCommand("ATS0", 120)
+                    sendCommand("ATH1", 120)
+                    sendCommand("ATCAF1", 120)
+                    sendCommand("ATSP6", 120)
+                    sendCommand("ATAT1", 120)
+                    sendCommand("ATST64", 120)
+
+                    // BMU ISO-TP flow-control configuration documented for 0x761/0x762.
+                    sendCommand("ATFCSH761", 120)
+                    sendCommand("ATFCSD300000", 120)
+                    sendCommand("ATFCSM1", 120)
+                    sendCommand("ATSH761", 120)
+
+                    runOnUiThread {
+                        status.text = "WiCAN: PŘIPOJENO • TCP $connectedPort • BMU 761→762"
+                        button.isEnabled = true
+                    }
+
+                    readLoop()
+                    return
+                } catch (e: Exception) {
+                    lastError = e
+                    try { socket?.close() } catch (_: Exception) {}
+                    socket = null
+                    output = null
+                    running = false
+                    polling = false
+                }
+            }
+
+            if (lastError != null) disconnectAndRetry()
         }.start()
+    }
+
+    private fun sendCommand(command: String, waitMs: Long) {
+        sendRaw(command)
+        try { Thread.sleep(waitMs) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
     }
 
     private fun startPolling() {
         if (!running) return
-        polling = true; handler.removeCallbacks(poller); sendRaw("2101"); handler.postDelayed(poller, 1000)
+        polling = true
+        history.clear()
+        isoTp.reset()
+        runOnUiThread {
+            value.text = "— kΩ"
+            graph.invalidate()
+            status.text = "HV IZOLACE: měřím 21 01…"
+        }
+        handler.removeCallbacks(poller)
+        sendRaw("2101")
+        handler.postDelayed(poller, 1200)
     }
 
     private fun readLoop() {
+        val input = socket?.getInputStream() ?: return
+        val line = StringBuilder()
+
         try {
-            val reader = BufferedReader(InputStreamReader(socket!!.getInputStream()))
             while (running) {
-                val line = reader.readLine() ?: break
-                val payload = isoTp.accept(line) ?: continue
-                decodeWatchdog2101(payload)
+                val b = input.read()
+                if (b < 0) break
+                when (b) {
+                    '\r'.code, '\n'.code -> {
+                        if (line.isNotEmpty()) {
+                            processLine(line.toString())
+                            line.setLength(0)
+                        }
+                    }
+                    else -> {
+                        // ELM/WiCAN is ASCII. Keep only printable protocol characters.
+                        if (b in 0x20..0x7E) line.append(b.toChar())
+                        if (line.length > 512) line.setLength(0)
+                    }
+                }
             }
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+            // reconnect below
+        }
+
         disconnectAndRetry()
     }
 
+    private fun processLine(line: String) {
+        val normalized = line.trim()
+        if (normalized.isEmpty() || normalized == ">") return
+
+        // Ignore AT command echo/OK/error text. Only CAN frames with response ID 762
+        // enter the ISO-TP decoder.
+        val payload = isoTp.accept(normalized) ?: return
+        decodeWatchdog2101(payload)
+    }
+
     private fun decodeWatchdog2101(bytes: List<Int>) {
-        // Watchdog Lz3/a evidence: response indices 78..79, UInt16 BE, kOhm.
-        // Keep the evidence-gated decoder: short/incomplete 21 01 payloads are ignored.
-        if (bytes.size <= 79) return
+        // PHEV Watchdog Lz3/a direct APK evidence:
+        // 21 01 -> isolation resistance = UInt16 BE response tokens 78..79, kΩ.
+        // This decoder is deliberately evidence-gated; it never invents a value
+        // for a payload that does not contain the proven field.
+        if (bytes.size <= 79) {
+            runOnUiThread {
+                if (polling) status.text = "HV IZOLACE: 21 01 přijato • čekám na úplnou odpověď"
+            }
+            return
+        }
+
         val risoKOhm = (bytes[78] * 256 + bytes[79]).toFloat()
+        if (risoKOhm <= 0f || risoKOhm > 65535f) return
+
         runOnUiThread {
             history.add(risoKOhm)
-            if (history.size > 120) history.removeAt(0)
+            if (history.size > 180) history.removeAt(0)
             value.text = String.format(Locale.US, "%.0f kΩ", risoKOhm)
             graph.invalidate()
-            status.text = "WiCAN: PŘIPOJENO • 2101: AKTIVNÍ • ${history.size} vzorků"
+            status.text = "HV IZOLACE: ŽIVÁ DATA • ${history.size} vzorků"
         }
     }
 
     private fun sendRaw(command: String) {
-        try { output?.write((command + "\r").toByteArray()); output?.flush() }
-        catch (_: Exception) { disconnectAndRetry() }
+        try {
+            output?.write((command + "\r").toByteArray(Charsets.US_ASCII))
+            output?.flush()
+        } catch (_: Exception) {
+            disconnectAndRetry()
+        }
     }
 
     private fun disconnectAndRetry() {
-        if (!running && socket == null) { scheduleReconnect(); return }
-        running = false; polling = false; isoTp.reset(); handler.removeCallbacks(poller)
+        running = false
+        polling = false
+        isoTp.reset()
+        handler.removeCallbacks(poller)
         try { socket?.close() } catch (_: Exception) {}
-        socket = null; output = null
-        runOnUiThread { button.isEnabled = false; status.text = "WiCAN: ODPOJENO • čekám na adaptér…" }
+        socket = null
+        output = null
+        connectedPort = -1
+
+        runOnUiThread {
+            button.isEnabled = false
+            status.text = "WiCAN: ODPOJENO • automatický reconnect…"
+        }
         scheduleReconnect()
     }
 
-    private fun scheduleReconnect() { handler.removeCallbacks(reconnecter); handler.postDelayed(reconnecter, 3000) }
+    private fun scheduleReconnect() {
+        handler.removeCallbacks(reconnecter)
+        handler.postDelayed(reconnecter, 3000)
+    }
 
     override fun onDestroy() {
-        running = false; polling = false; handler.removeCallbacks(poller); handler.removeCallbacks(reconnecter)
+        running = false
+        polling = false
+        handler.removeCallbacks(poller)
+        handler.removeCallbacks(reconnecter)
         try { socket?.close() } catch (_: Exception) {}
-        socket = null; output = null; super.onDestroy()
+        socket = null
+        output = null
+        super.onDestroy()
     }
 
     private inner class GraphView : View(this) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
         override fun onDraw(c: Canvas) {
-            super.onDraw(c); if (history.size < 2) return
-            val min = history.minOrNull() ?: return; val maxV = max(history.maxOrNull() ?: min, min + 1f)
-            paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f
-            val w = width.toFloat(); val h = height.toFloat(); val step = w / max(1, history.size - 1)
+            super.onDraw(c)
+            if (history.size < 2) return
+
+            val minValue = history.minOrNull() ?: return
+            val maxValue = max(history.maxOrNull() ?: minValue, minValue + 1f)
+            val w = width.toFloat()
+            val h = height.toFloat()
+            val step = w / max(1, history.size - 1)
+
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 4f
+
             for (i in 1 until history.size) {
-                val x1 = (i - 1) * step; val x2 = i * step
-                val y1 = h - ((history[i - 1] - min) / (maxV - min)) * (h - 20f) - 10f
-                val y2 = h - ((history[i] - min) / (maxV - min)) * (h - 20f) - 10f
+                val x1 = (i - 1) * step
+                val x2 = i * step
+                val y1 = h - ((history[i - 1] - minValue) / (maxValue - minValue)) * (h - 20f) - 10f
+                val y2 = h - ((history[i] - minValue) / (maxValue - minValue)) * (h - 20f) - 10f
                 c.drawLine(x1, y1, x2, y2, paint)
             }
         }
