@@ -203,18 +203,28 @@ class MainActivity : Activity() {
     }
 
     private fun decodeWatchdog2101(bytes: List<Int>) {
-        // PHEV Watchdog Lz3/a direct APK evidence:
-        // 21 01 -> isolation resistance = UInt16 BE response tokens 78..79, kΩ.
-        // Do not invent a value for a payload that does not contain the proven field.
+        val hexDump = bytes.joinToString(" ") { "%02X".format(it) }
+
+        // Direct PHEV Watchdog evidence: Lz3/a 21 01 isolation resistance
+        // is UInt16 BE at response token indices 78..79, unit kOhm.
+        // Never manufacture a value when the vehicle payload is shorter.
         if (bytes.size <= 79) {
             runOnUiThread {
-                if (polling) status.text = "HV IZOLACE: 21 01 přijato • čekám na úplnou odpověď"
+                if (polling) {
+                    status.text = "HV IZOLACE: ${bytes.size} B • RAW: $hexDump"
+                    value.text = "— kΩ"
+                }
             }
             return
         }
 
         val risoKOhm = (bytes[78] * 256 + bytes[79]).toFloat()
-        if (risoKOhm <= 0f || risoKOhm > 65535f) return
+        if (risoKOhm <= 0f || risoKOhm > 65535f) {
+            runOnUiThread {
+                if (polling) status.text = "HV IZOLACE: offset 78/79 mimo platný rozsah • RAW: $hexDump"
+            }
+            return
+        }
 
         runOnUiThread {
             history.add(risoKOhm)
