@@ -1,11 +1,11 @@
 package com.autodiag.outlander2101
 
 /**
- * ISO-TP reassembler for ELM327/WiCAN textual CAN frames.
+ * ISO-TP reassembly for ELM327/WiCAN textual CAN frames.
  *
- * WiCAN is configured for CAN 11-bit / 500 kbit/s and the BMU response is
- * expected on 0x762. The ELM327 flow-control configuration is handled by the
- * transport, so this class only reassembles received frames.
+ * Reassembles 0x762 responses to the BMU 0x761 request. The completed
+ * application payload is returned to the caller; no decoded value is
+ * invented when the payload does not match a proven Watchdog layout.
  */
 class IsoTpDecoder(private val responseId: String = "762") {
     private var expectedLength = -1
@@ -19,13 +19,9 @@ class IsoTpDecoder(private val responseId: String = "762") {
     }
 
     fun accept(line: String): List<Int>? {
-        val clean = line
-            .trim()
-            .replace(" ", "")
-            .replace("\t", "")
-            .uppercase()
-
+        val clean = line.trim().replace(" ", "").replace("\t", "").uppercase()
         if (!clean.startsWith(responseId)) return null
+
         val hex = clean.substring(responseId.length)
         if (hex.length < 2) return null
 
@@ -40,16 +36,13 @@ class IsoTpDecoder(private val responseId: String = "762") {
 
         val pci = bytes[0]
         return when (pci and 0xF0) {
-            // ISO-TP Single Frame
             0x00 -> {
                 val len = pci and 0x0F
                 if (bytes.size < len + 1) return null
                 reset()
-                payload.addAll(bytes.drop(1).take(len))
-                payload.toList()
+                bytes.drop(1).take(len)
             }
 
-            // ISO-TP First Frame
             0x10 -> {
                 if (bytes.size < 2) return null
                 expectedLength = ((pci and 0x0F) shl 8) or bytes[1]
@@ -57,13 +50,12 @@ class IsoTpDecoder(private val responseId: String = "762") {
                 payload.addAll(bytes.drop(2).take(expectedLength))
                 nextSequence = 1
                 if (payload.size >= expectedLength) {
-                    val result = payload.take(expectedLength)
+                    val complete = payload.take(expectedLength)
                     reset()
-                    result
+                    complete
                 } else null
             }
 
-            // ISO-TP Consecutive Frame
             0x20 -> {
                 if (expectedLength < 0) return null
                 if ((pci and 0x0F) != nextSequence) {
@@ -73,9 +65,9 @@ class IsoTpDecoder(private val responseId: String = "762") {
                 payload.addAll(bytes.drop(1))
                 nextSequence = (nextSequence + 1) and 0x0F
                 if (payload.size >= expectedLength) {
-                    val result = payload.take(expectedLength)
+                    val complete = payload.take(expectedLength)
                     reset()
-                    result
+                    complete
                 } else null
             }
 
