@@ -111,7 +111,6 @@ class MainActivity : Activity() {
                     polling = false
                     isoTp.reset()
 
-                    // WiCAN ELM327 mode: explicit ISO 15765-4 CAN 11-bit/500 kbit/s.
                     sendCommand("ATZ", 1200)
                     sendCommand("ATE0", 120)
                     sendCommand("ATL0", 120)
@@ -121,8 +120,6 @@ class MainActivity : Activity() {
                     sendCommand("ATSP6", 120)
                     sendCommand("ATAT1", 120)
                     sendCommand("ATST64", 120)
-
-                    // BMU ISO-TP flow-control configuration documented for 0x761/0x762.
                     sendCommand("ATFCSH761", 120)
                     sendCommand("ATFCSD300000", 120)
                     sendCommand("ATFCSM1", 120)
@@ -134,7 +131,7 @@ class MainActivity : Activity() {
                     }
 
                     readLoop()
-                    return
+                    break
                 } catch (e: Exception) {
                     lastError = e
                     try { socket?.close() } catch (_: Exception) {}
@@ -145,7 +142,7 @@ class MainActivity : Activity() {
                 }
             }
 
-            if (lastError != null) disconnectAndRetry()
+            if (lastError != null && !running) disconnectAndRetry()
         }.start()
     }
 
@@ -185,7 +182,6 @@ class MainActivity : Activity() {
                         }
                     }
                     else -> {
-                        // ELM/WiCAN is ASCII. Keep only printable protocol characters.
                         if (b in 0x20..0x7E) line.append(b.toChar())
                         if (line.length > 512) line.setLength(0)
                     }
@@ -202,8 +198,6 @@ class MainActivity : Activity() {
         val normalized = line.trim()
         if (normalized.isEmpty() || normalized == ">") return
 
-        // Ignore AT command echo/OK/error text. Only CAN frames with response ID 762
-        // enter the ISO-TP decoder.
         val payload = isoTp.accept(normalized) ?: return
         decodeWatchdog2101(payload)
     }
@@ -211,8 +205,7 @@ class MainActivity : Activity() {
     private fun decodeWatchdog2101(bytes: List<Int>) {
         // PHEV Watchdog Lz3/a direct APK evidence:
         // 21 01 -> isolation resistance = UInt16 BE response tokens 78..79, kΩ.
-        // This decoder is deliberately evidence-gated; it never invents a value
-        // for a payload that does not contain the proven field.
+        // Do not invent a value for a payload that does not contain the proven field.
         if (bytes.size <= 79) {
             runOnUiThread {
                 if (polling) status.text = "HV IZOLACE: 21 01 přijato • čekám na úplnou odpověď"
