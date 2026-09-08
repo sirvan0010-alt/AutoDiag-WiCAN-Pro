@@ -159,7 +159,7 @@ class MainActivity : Activity() {
         runOnUiThread {
             value.text = "— kΩ"
             graph.invalidate()
-            status.text = "HV IZOLACE: měřím 21 01…"
+            status.text = "HV IZOLACE: Watchdog 21 01…"
         }
         handler.removeCallbacks(poller)
         sendRaw("2101")
@@ -204,24 +204,22 @@ class MainActivity : Activity() {
 
     private fun decodeWatchdog2101(bytes: List<Int>) {
         val hexDump = bytes.joinToString(" ") { "%02X".format(it) }
+        val result = Watchdog2101Decoder.decode(bytes)
 
-        // Direct PHEV Watchdog evidence: Lz3/a 21 01 isolation resistance
-        // is UInt16 BE at response token indices 78..79, unit kOhm.
-        // Never manufacture a value when the vehicle payload is shorter.
-        if (bytes.size <= 79) {
+        if (result == null) {
             runOnUiThread {
                 if (polling) {
-                    status.text = "HV IZOLACE: ${bytes.size} B • RAW: $hexDump"
+                    status.text = "Watchdog 21 01: ${bytes.size} B • bez prokázaného HV isolation layoutu"
                     value.text = "— kΩ"
                 }
             }
             return
         }
 
-        val risoKOhm = (bytes[78] * 256 + bytes[79]).toFloat()
+        val risoKOhm = result.value
         if (risoKOhm <= 0f || risoKOhm > 65535f) {
             runOnUiThread {
-                if (polling) status.text = "HV IZOLACE: offset 78/79 mimo platný rozsah • RAW: $hexDump"
+                if (polling) status.text = "Watchdog: hodnota mimo platný rozsah • RAW: $hexDump"
             }
             return
         }
@@ -231,7 +229,7 @@ class MainActivity : Activity() {
             if (history.size > 180) history.removeAt(0)
             value.text = String.format(Locale.US, "%.0f kΩ", risoKOhm)
             graph.invalidate()
-            status.text = "HV IZOLACE: ŽIVÁ DATA • ${history.size} vzorků"
+            status.text = "HV IZOLACE: ${result.variant} • ŽIVÁ DATA • ${history.size} vzorků"
         }
     }
 
