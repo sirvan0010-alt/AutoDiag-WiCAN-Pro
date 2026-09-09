@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
                         TransportMode.SLCAN_RAW -> conn.host?.let { connectionViewModel.connectSlcan(it, conn.port ?: 23) }
                         else -> conn.host?.let { connectionViewModel.connectElm327(it, conn.port ?: 3333) }
                     }
-                }, connectionViewModel::setRawCanFilter, connectionViewModel::toggleRawCanPause, connectionViewModel::clearRawCan, connectionViewModel::startOutlanderLiveMeasurement, connectionViewModel::stopOutlanderLiveMeasurement, connectionViewModel::setOutlanderSamplingInterval)
+                }, connectionViewModel::setRawCanFilter, connectionViewModel::toggleRawCanPause, connectionViewModel::clearRawCan, connectionViewModel::startOutlanderLiveMeasurement, connectionViewModel::stopOutlanderLiveMeasurement, connectionViewModel::setOutlanderSamplingInterval, { LiveDataScreen(connectionViewModel.liveDataEngine(), it) })
             }
         }
     }
@@ -77,8 +77,14 @@ private fun ConnectionResultScreen(
     onRawCanClear: () -> Unit,
     onStartOutlanderMeasurement: () -> Unit,
     onStopOutlanderMeasurement: () -> Unit,
-    onOutlanderSamplingInterval: (Long) -> Unit
+    onOutlanderSamplingInterval: (Long) -> Unit,
+    onLiveData: (@Composable (onBack: () -> Unit) -> Unit)
 ) {
+    var showLiveData by remember { mutableStateOf(false) }
+    if (showLiveData && state.phase == ConnectionPhase.READY && !state.linkOnly) {
+        onLiveData { showLiveData = false }
+        return
+    }
     Scaffold { padding -> Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
         Text("Spojení", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         Text("${state.phase.labelCs} · ${state.host ?: "—"}:${state.port ?: "—"} · ${state.mode ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -91,6 +97,8 @@ private fun ConnectionResultScreen(
                 if (state.mode == TransportMode.SIMULATOR) Text("SIMULÁTOR – syntetická data, ne data z vozidla", style = MaterialTheme.typography.labelLarge)
                 state.snapshot?.vehicleIdentity?.vin?.let { Text("VIN vozidla", style = MaterialTheme.typography.labelMedium); Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
                 state.snapshot?.vinAudit?.let { VinAuditCard(it) }
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { showLiveData = true }, modifier = Modifier.fillMaxWidth()) { Text("Live Data · Mode 01") }
                 Spacer(Modifier.height(8.dp))
                 OutlanderPhevResistanceCard(
                     isolation = state.outlanderIsolation,
