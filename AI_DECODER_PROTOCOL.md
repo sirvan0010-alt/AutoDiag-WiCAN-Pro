@@ -1,107 +1,41 @@
 # AI Decoder Selection & Evidence Protocol
 
-Povinné čtení před implementací nebo úpravou jakéhokoli decoderu v tomto
-repozitáři. Doplňuje `docs/AI_APK_EXTRACTION_GUIDE.md` (jak extrahovat) a
-`docs/AI_EXTRACTION_DEPTH_BY_CAPABILITY.md` (do jaké hloubky) o poslední
-krok: jak z několika nalezených kandidátů vybrat ten, který skutečně sedí
-na to, co vozidlo doopravdy posílá.
+Povinné čtení před implementací nebo úpravou jakéhokoli decoderu v tomto repozitáři. Doplňuje `docs/AI_APK_EXTRACTION_GUIDE.md` a `docs/AI_EXTRACTION_DEPTH_BY_CAPABILITY.md` o poslední krok: výběr decoderu pouze tehdy, když jeho evidence a struktura odpovídají skutečné odpovědi vozidla.
 
-**Vznik tohoto dokumentu:** Mitsubishi Outlander PHEV, `21 01`. Watchdog
-decoder pro variantu `Lz3/a` byl extrahovaný ze zdrojové appky naprosto
-správně — a přesto byl špatný, protože skutečná odpověď vozidla měla 55
-bajtů, zatímco decoder vyžadoval `bytes[78..79]` (minimálně 80). Chyba
-nebyla ve extrakci. Chyba byla v tom, že se decoder nasadil bez ověření,
-že strukturálně vůbec může sedět na to, co přišlo z vozidla.
+## Základní pravidla
 
-## ⚠️ Vztah k WRITE operacím
+- Decoder, který pouze produkuje rozumné číslo, není automaticky validní.
+- READ/decode governance nenahrazuje přísnější bezpečnostní gate pro WRITE operace.
+- Vrstvy se nesmí míchat: `TRANSPORT → CAN/ISO-TP → DIAGNOSTIC RESPONSE → APPLICATION DECODER`.
+- Request `≠` response layout.
+- ISO-TP musí být kompletně rekonstruováno před dekódováním.
+- Deklarovaná délka ISO-TP je tvrdá podmínka.
+- Pokud decoder čte `bytes[78..79]`, musí platit `payload.size >= 80`.
+- `internal resistance` ≠ `HV isolation resistance` ≠ `resistance difference`.
+- Při strukturálním nebo sémantickém nesouladu je výsledek `NO_VERIFIED_DECODER_MATCH`, nikoli odhad.
 
-Tento protokol řeší READ/decode cestu (kategorie A/B v
-`AI_EXTRACTION_DEPTH_BY_CAPABILITY.md`). **Nenahrazuje**, jen doplňuje
-přísnější bezpečnostní hradlo pro WRITE operace (long coding, servisní
-resety, aktuátor testy — kategorie C/D, `DtcClearPolicy` a obdobné gate
-mechanismy). Špatně vybraný READ decoder zobrazí špatné číslo. Špatně
-vybraný WRITE příkaz může fyzicky poškodit modul. WRITE cesta vyžaduje
-navíc explicitní potvrzení a security-access gate, i když projde vším
-níže.
+## Hierarchie evidence
 
----
+| Úroveň | Evidence |
+|---|---|
+| A | přímá exekuovatelná/dekompilovaná evidence, request/response, offsety, scaling |
+| B | stejný decoder nezávisle nalezený ve více appek |
+| C | runtime CAN/WiCAN/ISO-TP capture ze skutečného vozidla |
+| D | dokumentace a komunitní výzkum |
+| E | AI inference — vždy `INFERRED` |
 
-## 1. Účel
+B posiluje důvěru, ale samo o sobě neprokazuje aplikovatelnost na konkrétní vozidlo. D nesmí tiše přebít A. Runtime evidence musí být porovnána byte-za-byte s očekávaným vstupem decoderu.
 
-Repozitář obsahuje nezávisle extrahované implementace z více appek pro
-stejný diagnostický požadavek/PID/DID/signál. AI nesmí vybrat decoder jen
-proto, že vypadá věrohodně. Cíl je decoder, který je zároveň:
+## Povinný postup před implementací
 
-1. technicky správně extrahovaný,
-2. podložený nejsilnější dostupnou evidencí,
-3. strukturálně kompatibilní se skutečnou transportní/protokolovou odpovědí,
-4. kompatibilní se správnou vozidlo/ECU variantou,
-5. deterministický a reprodukovatelný,
-6. bezpečně odmítnutelný, když evidence nesedí.
+1. Přečti architekturu a evidence dokumentaci.
+2. Najdi VŠECHNY relevantní extrahované appky.
+3. Z každé vytáhni request, CAN ID, addressing, ISO-TP handling, offsety, délku, typ, byte order, scaling, jednotku, variantu a chyby.
+4. Vytvoř matici všech kandidátů.
+5. Porovnej ji se skutečným CAN/ISO-TP capture.
+6. Teprve potom implementuj vlastní decoder jako samostatnou implementaci varianty, nikoli jako slepou kopii zdroje.
 
-Decoder, co vyprodukuje rozumně vypadající číslo, **není** tím pádem
-validní.
-
-## 2. Než se cokoliv implementuje
-
-1. Přečti architekturu a evidence dokumentaci repozitáře.
-2. Najdi VŠECHNY extrahované appky relevantní k požadovanému signálu, ne
-   jen tu první, co ho obsahuje.
-3. Z každé vytáhni: request, CAN ID, ISO-TP handling, byte offsety, délkové
-   podmínky, scaling, jednotku, variant detection, error/timeout handling.
-4. Postav srovnávací matici VŠECH kandidátů (sekce 7) **předtím**, než se
-   napíše produkční kód.
-
-## 3. Hierarchie evidence
-
-| Úroveň | Co to je | Poznámka |
-|---|---|---|
-| **A — přímá exekuovatelná evidence** | dekompilovaný kód appky, skutečné request/response konstrukce, offsety, scaling | nejsilnější |
-| **B — opakovaná nezávislá evidence** | stejný decoder nalezený nezávisle ve 2+ appkách | posiluje důvěru, **neprokazuje** aplikovatelnost na konkrétní vozidlo |
-| **C — runtime evidence** | zachycené CAN rámce, WiCAN odpovědi, ISO-TP trace ze skutečného vozidla | musí se porovnat byte-za-byte s očekávaným vstupem decoderu |
-| **D — dokumentace/komunita** | servisní manuály, komunitní capture | podpůrné, **nesmí tiše přebít** úroveň A |
-| **E — AI inference** | odhad AI | musí být označeno `INFERRED`, nikdy prezentováno jako ověřené |
-
-## 4. Čtyři vrstvy se nikdy nemíchají
-
-```
-TRANSPORT → CAN/ISO-TP → DIAGNOSTIC RESPONSE → APPLICATION DECODER
-```
-
-Správně extrahovaný decoder je k ničemu, pokud transportní/ISO-TP vrstva
-dodá špatný nebo neúplný payload.
-
-## 5. Request ≠ response layout
-
-Že dvě appky posílají stejný `21 01`, **neprokazuje**, že používají stejný
-decoder odpovědi. Vždy porovnávej: request CAN ID, response CAN ID,
-addressing mode, ISO-TP mód, očekávanou délku payloadu, byte offsety,
-byte order, scaling, jednotku, generaci vozidla, ECU variantu.
-
-## 6. Délka payloadu je tvrdá podmínka
-
-Pokud decoder čte `bytes[78]`/`bytes[79]`, **nesmí se spustit**, dokud
-`payload.size >= 80`. To samo o sobě nestačí — musí se ověřit i skutečná
-struktura payloadu, ne jen jeho délka.
-
-```
-Očekáváno (Lz3/a): payload >= 80 B, pole = bytes[78..79]
-Pozorováno (skutečné vozidlo): payload = 55 B
-
-Výsledek: DECODER NENÍ APLIKOVATELNÝ
-```
-
-**Nikdy:** zkusit jiný offset, hádat pole, použít blízkou hodnotu, nebo
-reinterpretovat jiné pole jako hledaný signál.
-
-## 7. Nikdy nezaměňuj příbuzná pole
-
-`internal resistance` ≠ `HV isolation resistance` ≠ `max/min internal
-resistance` ≠ `resistance difference`. Pokud repozitář obsahuje víc z
-těchto polí, zůstávají oddělené signály, dokud evidence explicitně
-neprokáže, že jde o totéž.
-
-## 8. Matice kandidátů (povinná před implementací)
+### Kandidátní matice
 
 | Candidate | App | Request | CAN | Payload | Offset | Type | Scale | Unit | Variant | Evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -109,134 +43,57 @@ neprokáže, že jde o totéž.
 | B | App 2 | 21 01 | 761→762 | 72+ | 71 | UInt8 | 0.02 | MΩ | Ld4a | Direct |
 | C | App 3 | 21 01 | ? | 40+ | 38 | UInt8 | 0.1 | MΩ | Le4a | Direct |
 
-AI nesmí vybrat kandidáta, dokud tahle tabulka neexistuje.
+Při jiné signalizaci musí být tabulka samozřejmě sestavena z reálných kandidátů daného signálu; příklad výše je pouze pracovní ilustrace známých kandidátů.
 
-## 9. Porovnání se skutečnou odpovědí vozidla
+## Tvrdé veto
 
-Po získání reálné odpovědi zjisti: CAN response ID, ISO-TP typ rámce,
-deklarovanou ISO-TP délku, skutečnou poskládanou délku, diagnostické
-response bajty, a se kterým kandidátem strukturálně sedí. Výběr decoderu
-se řídí **skutečnou** odpovědí, ne tou, co appka teoreticky umí.
+Kandidát je okamžitě vyřazen, pokud:
+- nesedí délka payloadu;
+- nesedí CAN addressing;
+- nesedí vozidlo/ECU varianta;
+- nesedí sémantika pole;
+- decoder čte bajty, které payload neobsahuje.
 
-## 10. ISO-TP se rekonstruuje před dekódováním, vždy
+Mezi přeživšími kandidáty se použije síla evidence A > B > C > D > E. Pokud není jednoznačný výsledek, použij `UNKNOWN_VARIANT` / `UNKNOWN_LAYOUT`.
 
-```
+## ISO-TP a diagnostika
+
+```text
 CAN rámce → ISO-TP parser → First/Consecutive Frames → kompletní payload
-→ kontrola délky → kontrola diagnostické odpovědi → signal decoder
+→ kontrola deklarované délky → diagnostická response → signal decoder
 ```
 
-Decoder nikdy nedostane první CAN rámec, ELM řádek, nebo částečně
-poskládanou odpověď jako by to byl kompletní payload.
+First Frame `10 LL ...` určuje závaznou deklarovanou délku. Decoder nikdy nesmí dostat první ELM řádek nebo částečný payload jako kompletní odpověď.
 
-## 11. Deklarovaná délka se bere jako fakt
+## Testy
 
-ISO-TP First Frame `10 LL ...` — `LL` je závazná deklarovaná délka.
-`declared length = 55` a kandidát vyžaduje `80` → `NO_VERIFIED_DECODER_MATCH`,
-ne pokus o dekódování zkrácené verze.
+Každý produkční decoder musí mít:
 
-## 12. Selekce kandidáta — tvrdá veta, ne aritmetika
+**Pozitivní test:** validní kompletní payload přesně odpovídající variantě → `Success` s očekávanou hodnotou.
 
-*(Zpřesnění oproti návrhu s bodovým skóre — číselné sčítání svádí k
-falešné přesnosti, kterou i původní návrh sám zpochybňoval.)*
+**Negativní testy minimálně:**
+- krátký payload → `PAYLOAD_TOO_SHORT`;
+- špatné CAN ID → `WRONG_CAN_ID`;
+- špatná diagnostická odpověď → `WRONG_RESPONSE`;
+- zkrácená ISO-TP sekvence → `INVALID_ISOTP`;
+- neznámá varianta → `WRONG_VARIANT` / `UNKNOWN_LAYOUT`;
+- poškozené pole → `INVALID_FIELD`.
 
-Nejdřív tvrdé veto podmínky — kterákoli platí → kandidát je **okamžitě
-vyřazený**, bez ohledu na jinak silnou evidenci:
+Zakázán je tichý fallback typu „zkus jiný offset“ nebo „ukaž příbuzné pole“.
 
-- délka payloadu nesedí
-- CAN addressing nesedí
-- vozidlo/ECU varianta nesedí
-- sémantický nesoulad pole (viz sekce 7)
-- decoder čte bajty, co v payloadu neexistují
+## Syrová evidence
 
-Teprve mezi kandidáty, co veto podmínky přežijí, se řadí kvalitativně
-podle síly evidence (sekce 3, A > B > C > D > E). Pokud po vyřazení
-zůstane víc než jeden kandidát se stejnou úrovní evidence a žádný
-jednoznačně nevede, výsledek je `UNKNOWN_VARIANT` — ne vynucená volba.
+Při odmítnutí se zachová request, CAN ID, raw CAN/ISO-TP data, deklarovaná délka, kompletní payload, kandidáti a důvod odmítnutí. RAW/DIAGNOSTIC EVIDENCE MODE je preferovaný výsledek před odhadnutou hodnotou.
 
-## 13. Variant selection
+## Provenance
 
-Pokud appky obsahují varianty (`Lz3a`, `Ld4a`, `Le4a`...), jejich decodery
-se **nikdy neslučují**. Každá zůstává samostatně reprezentovaná
-(request/addressing/offsety/typ/scaling/confidence zvlášť). Pokud detekce
-varianty není možná: `UNKNOWN_VARIANT` nebo `NO_VERIFIED_LAYOUT`, nikdy
-předstíraná jistota.
+Decoder musí nést důvod své existence přímo v kódu, například zdroj, variantu, request, addressing, field, offset, délku, endian, scale, unit a evidence level. Decoder musí být testovatelný bez vozidla a oddělený od WiCAN/TCP/ELM327 transportu.
 
-## 14. Testy — pozitivní A negativní, obojí povinné
-
-*(Zpřesnění: původní návrh měl pozitivní příklad schovaný pod nadpisem
-"negative tests", což přesně náš bug s `IsoTpDecoder.accept()` — funkce,
-co nikdy nevrátí hodnotu ani při validním vstupu — by nezachytilo.)*
-
-**Pozitivní test (povinný):** validní, kompletní payload odpovídající
-přesně dané variantě → decoder MUSÍ vrátit `Success` s očekávanou hodnotou.
-Bez tohohle testu projde i decoder, co vždy vrací `null`/`Rejected`.
-
-**Negativní testy (povinné, alespoň):**
-- kratší payload, než varianta vyžaduje → `PAYLOAD_TOO_SHORT`
-- špatné CAN ID → `WRONG_CAN_ID`
-- špatná diagnostická odpověď → `WRONG_RESPONSE`
-- zkrácená ISO-TP sekvence → `INVALID_ISOTP`
-- neznámá varianta → `WRONG_VARIANT` / `UNKNOWN_LAYOUT`
-- poškozený rámec → `INVALID_FIELD`
-
-Decoder se nepovažuje za produkčně připravený bez obojího druhu testu.
-
-## 15. Nikdy tichý fallback
-
-Zakázáno: "když offset 78 nejde, zkus 38"; "když isolation není dostupná,
-ukaž internal resistance"; "když decoder selže, odhadni hodnotu". Vždy
-místo toho: `NO_VERIFIED_DECODER_MATCH` + zachování syrové evidence.
-
-## 16. Syrová data zůstávají dostupná vždy
-
-Když dekódování selže, appka uchová: request, CAN ID, syrové CAN/ISO-TP
-rámce, deklarovanou délku, kompletní payload, zvažované kandidáty, důvod
-zamítnutí. Příklad:
-
-```
-21 01
-response: 0x762
-ISO-TP payload: 55 bytes
-candidate: Lz3a
-required: >=80 bytes
-result: REJECTED
-reason: PAYLOAD_TOO_SHORT
-```
-
-Tohle je cennější než zobrazené odhadnuté číslo.
-
-## 17. Provenance přímo v kódu
-
-```kotlin
-DecoderEvidence(
-    source = "phev-watchdog",
-    variant = "watchdog.lz3a.21_01",
-    request = "21 01",
-    requestCanId = 0x761,
-    responseCanId = 0x762,
-    field = "battery.isolation_resistance",
-    offset = 78,
-    length = 2,
-    endian = Endian.BIG,
-    scale = 1.0,
-    unit = "kΩ",
-    evidenceLevel = EvidenceLevel.DIRECT_EXTRACTION
-)
-```
-
-Kód musí umět odpovědět "proč tenhle decoder existuje" bez nutnosti
-reverzovat vlastní historii commitů.
-
-## 18. Decoder odděleně od transportu
-
-```
+```text
 Transport → CanFrame → IsoTpSession → DiagnosticPayload → Decoder → DecodedSignal → UI
 ```
 
-Nikdy nemíchat WiCAN/TCP/ELM327/ISO-TP/UDS/decoder/UI do jedné funkce —
-decoder musí jít testovat bez připojeného vozidla.
-
-## 19. Požadované decoder API
+## Požadované API
 
 ```kotlin
 interface DiagnosticDecoder<T> {
@@ -256,183 +113,42 @@ enum class RejectReason {
 }
 ```
 
-Decoder musí umět říct "tenhle payload neznám" jako plnohodnotný,
-očekávaný výsledek — ne výjimku, ne null bez důvodu.
+## Decoder Evidence Registry
 
-## 20. AI musí zdokumentovat své rozhodnutí
+Všechny kandidáty stejného konkrétního signálu se normalizují do perzistentního registry před vytvořením vlastního decoderu. Registry je mezivrstva mezi extrakcí a produkčním kódem a obsahuje kandidáty i skutečné vehicle captures.
 
-Před commitnutím decoderu, v implementačních poznámkách:
+Nové evidence se nepřepisují přes starší. Kandidát z jedné appky není automaticky pravda pro všechny varianty. `NO_VERIFIED_DECODER_MATCH` je legitimní výsledek.
 
-```
-TARGET: <signál>
-CANDIDATES: <počet>
-SELECTED: <decoder>
+Registry patří do externího repo `AutoDiag-WiCAN-Diagnostic-Data` pod `data/candidates/<signal_id>.json`. `diagnostic-data/` v tomto repozitáři je legacy/deprecated pro nová data.
+
+## AI decision record
+
+Před commitem decoderu musí být dohledatelné:
+
+```text
+TARGET: <signal>
+CANDIDATES: <count>
+SELECTED: <decoder or none>
 WHY: <evidence>
-VEHICLE/VARIANT: <varianta>
+VEHICLE/VARIANT: <variant>
 REQUEST: <request>
 ADDRESSING: <request → response>
-EXPECTED PAYLOAD: <délka>
-FIELD: <offset/typ>
+EXPECTED PAYLOAD: <length>
+FIELD: <offset/type>
 SCALE: <scale>
-UNIT: <jednotka>
-REJECTED CANDIDATES: <seznam + důvod>
-REMAINING UNCERTAINTY: <seznam>
+UNIT: <unit>
+REJECTED CANDIDATES: <candidate + reason>
+REMAINING UNCERTAINTY: <items>
 ```
 
-## 21. Hard stop podmínky
+## Hard stop
 
-AI musí zastavit implementaci číselného decoderu, pokud: neexistuje přímá
-evidence; délka kandidátního payloadu nesedí; CAN addressing je neznámý
-nebo nekompatibilní; vozidlo/ECU varianta nesedí; víc kandidátů si
-protiřečí a nejde je rozlišit; sémantický význam pole je nejistý; skutečná
-runtime odpověď kandidátovi odporuje. Namísto dekódování: **RAW/DIAGNOSTIC
-EVIDENCE MODE**.
+Číselný decoder se nesmí implementovat, pokud chybí přímá evidence, nesedí délka, addressing nebo varianta, kandidáti si protiřečí bez možnosti rozlišení, význam pole je nejistý, nebo skutečná runtime odpověď kandidátovi odporuje. Místo toho RAW/DIAGNOSTIC EVIDENCE MODE.
 
-## 22. Zlatá otázka
+## CI Evidence Gate
 
-Neptej se: *"Který decoder vypadá nejpravděpodobněji?"*
+CI gate má kontrolovat přítomnost odpovídajícího testovacího artefaktu pro každý `DiagnosticDecoder`, alespoň jeden pozitivní `Success` test a alespoň jeden negativní rejection reason. Gate se připojí na `check`.
 
-Ptej se: *"Který decoder má nejsilnější evidenci A je strukturálně
-kompatibilní se skutečnou odpovědí?"* a nakonec: *"Umím dokázat, že přesně
-tenhle payload dekóduje přesně tenhle decoder?"*
+Gate je pouze mechanická kontrola testovacího/evidence artefaktu. **Zelené CI nikdy neznamená vehicle verification.** Existence testu neprokazuje CAN addressing ani původ payloadu ze skutečného vozidla.
 
-Pokud ne: **nedekóduj. Zachovej syrová data. Nahlaš nesoulad.**
-
----
-
-## 22b. Decoder Evidence Registry — sjednocené kandidáty PŘED vlastním decoderem
-
-**Nevytváříme vlastní decoder tím, že zkopírujeme jeden zdroj (Watchdog).**
-Vlastní decoder je výsledek analýzy VŠECH nalezených zdrojů pro daný signál,
-ne náhrada za první z nich. Pokud existují 4 extrahované appky, dávají nám
-4 nezávislé kandidáty a důkazy — ne jednoho "vítěze" k okopírování.
-
-```
-4 extrahované appky
-        ↓
-všechny nalezené implementace pro daný signál
-        ↓
-normalizace kandidátů (request/CAN/ISO-TP/offset/typ/scale/unit/variant)
-        ↓
-Decoder Evidence Registry (perzistentní, verzovaný artefakt — ne jen
-                            analytický krok v hlavě AI)
-        ↓
-porovnání se skutečným CAN/ISO-TP capture z vozidla
-        ↓
-vyřazení nekompatibilních kandidátů (sekce 12 — tvrdá veta)
-        ↓
-NÁŠ decoder — samostatná implementace na variantu, ne kopie zdroje
-```
-
-Registry je autoritativní mezivrstva mezi extrakcí a produkčním decoderem.
-Jeden soubor registru reprezentuje jeden konkrétní signál a obsahuje
-všechny známé kandidáty i skutečné vehicle captures, které je mohou
-potvrdit nebo vyvrátit.
-
-Důležitá pravidla:
-- nové kandidáty se nepřepisují přes starší evidenci;
-- kandidát z jedné appky se nepovažuje automaticky za pravdu pro všechny
-  varianty vozidla;
-- runtime capture je veden jako samostatná evidence a musí být dohledatelný;
-- `NO_VERIFIED_DECODER_MATCH` je legitimní výsledek;
-- registry patří do externího repo `AutoDiag-WiCAN-Diagnostic-Data` pod
-  `data/candidates/<signal_id>.json`;
-- `diagnostic-data/` v tomto repozitáři je legacy/deprecated a pro nová data
-  se nepoužívá.
-
----
-
-## 23. CI Evidence Gate
-
-Cílem gate je zabránit tomu, aby nový produkční decoder vznikl bez
-odpovídajícího testu a bez explicitní evidence.
-
-Do `android/core/build.gradle.kts` lze přidat task `decoderEvidenceGate`,
-který:
-
-1. projde `src/main` a najde implementace `DiagnosticDecoder<...>`;
-2. pro každý decoder vyžaduje odpovídající `<DecoderName>Test.kt` v test
-   source setu;
-3. ověří přítomnost alespoň jednoho pozitivního `Success` testu;
-4. ověří přítomnost alespoň jednoho negativního testu a důvodu odmítnutí;
-5. při nesplnění skončí chybou s názvem decoderu a konkrétním chybějícím
-   artefaktem;
-6. task se připojí na `check`, takže běžný CI build gate automaticky
-   zahrne.
-
-Gate je kontrola přítomnosti testovacího/evidence artefaktu, nikoli náhrada
-za skutečné vehicle verification. Passing CI neznamená, že decoder byl
-ověřen na konkrétním vozidle.
-
-Doporučený minimální tvar tasku:
-
-```kotlin
-tasks.register("decoderEvidenceGate") {
-    group = "verification"
-    description = "Ensures every DiagnosticDecoder has positive and negative evidence tests."
-
-    doLast {
-        val mainRoot = file("src/main")
-        val testRoot = file("src/test")
-        val decoderFiles = mainRoot.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filter { it.readText().contains("DiagnosticDecoder<") }
-            .toList()
-
-        val failures = mutableListOf<String>()
-        decoderFiles.forEach { decoderFile ->
-            val source = decoderFile.readText()
-            val className = Regex("class\\s+(\\w+)\\s*[:(]")
-                .find(source)?.groupValues?.getOrNull(1)
-                ?: decoderFile.nameWithoutExtension
-            val test = testRoot.walkTopDown()
-                .filter { it.isFile && it.extension == "kt" }
-                .firstOrNull { it.nameWithoutExtension == "${className}Test" }
-
-            if (test == null) {
-                failures += "$className: missing ${className}Test.kt"
-                return@forEach
-            }
-
-            val testSource = test.readText()
-            if (!testSource.contains("Success")) {
-                failures += "$className: missing positive Success test"
-            }
-            val hasNegative = listOf(
-                "PAYLOAD_TOO_SHORT", "WRONG_CAN_ID", "WRONG_RESPONSE",
-                "INVALID_ISOTP", "WRONG_VARIANT", "UNKNOWN_LAYOUT",
-                "INVALID_FIELD"
-            ).any(testSource::contains)
-            if (!hasNegative) {
-                failures += "$className: missing negative rejection test"
-            }
-        }
-
-        if (failures.isNotEmpty()) {
-            throw GradleException(
-                "Decoder evidence gate failed:\n" + failures.joinToString("\n")
-            )
-        }
-    }
-}
-
-tasks.named("check") {
-    dependsOn("decoderEvidenceGate")
-}
-```
-
-Poznámka: tento minimální gate je záměrně jednoduchý a má být dále
-zpřesňován podle skutečného build systému. Nesmí být interpretován jako
-plná sémantická kontrola evidence.
-
-## 24. Co CI gate NESMÍ tvrdit
-
-- zelené CI ≠ vehicle verified;
-- existence testu ≠ důkaz správnosti CAN addressing;
-- existence `Success` testu ≠ důkaz, že testovaný payload pochází ze
-  skutečného vozidla;
-- registry bez runtime capture ≠ potvrzená aplikovatelnost na konkrétní
-  vozidlo.
-
-Jediný správný závěr je vždy odvozený z evidence: `VERIFIED`,
-`PARTIALLY_VERIFIED`, `NO_VERIFIED_DECODER_MATCH` nebo `UNKNOWN_VARIANT`.
+Správné výsledky evidence jsou například `VERIFIED`, `PARTIALLY_VERIFIED`, `NO_VERIFIED_DECODER_MATCH` nebo `UNKNOWN_VARIANT`.
