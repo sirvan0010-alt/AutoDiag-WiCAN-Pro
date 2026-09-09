@@ -14,6 +14,7 @@ import com.autodiag.core.capability.OutlanderResistanceKind
 import com.autodiag.core.capability.OutlanderResistanceSample
 import com.autodiag.core.capability.OutlanderResistanceSessionStats
 import com.autodiag.core.obd.Elm327Session
+import com.autodiag.core.obd.ObdLiveDataEngine
 import com.autodiag.core.transport.ConnectionState
 import com.autodiag.core.transport.SimulatorWiCanTransport
 import com.autodiag.core.transport.TcpWiCanTransport
@@ -77,6 +78,10 @@ class ConnectionViewModel(
     fun connectElm327(host: String, port: Int = 3333) = connect(host, port, TransportMode.ELM327, true)
     fun connectSlcan(host: String, port: Int = 23) = connect(host, port, TransportMode.SLCAN_RAW, false)
     fun connectSimulator() = connect("simulator", 0, TransportMode.SIMULATOR, true)
+
+    /** Read-only Mode 01 engine bound to the active initialized ELM session. */
+    fun liveDataEngine(): ObdLiveDataEngine? = session?.let { ObdLiveDataEngine(it) }
+
     fun setRawCanFilter(filter: String) = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(idFilter = filter)) }
     fun toggleRawCanPause() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.copy(paused = !it.rawCanMonitor.paused)) }
     fun clearRawCan() = _uiState.update { it.copy(rawCanMonitor = it.rawCanMonitor.clear()) }
@@ -101,9 +106,7 @@ class ConnectionViewModel(
             scope = viewModelScope,
             onResult = { result ->
                 val acceptedAny = acceptOutlanderLiveResult(result)
-                if (!acceptedAny) {
-                    _uiState.update { it.copy(outlanderLastMeasurementError = result.error ?: "21 01 neposkytl žádnou dekódovatelnou hodnotu.") }
-                }
+                if (!acceptedAny) _uiState.update { it.copy(outlanderLastMeasurementError = result.error ?: "21 01 neposkytl žádnou dekódovatelnou hodnotu.") }
             }
         )
         outlanderRunner = runner
@@ -112,23 +115,18 @@ class ConnectionViewModel(
     }
 
     fun stopOutlanderLiveMeasurement() {
-        outlanderRunner?.stop()
-        outlanderRunner = null
+        outlanderRunner?.stop(); outlanderRunner = null
         _uiState.update { it.copy(outlanderLiveMeasurementActive = false) }
     }
 
-    /** Accept each decoded 21 01 signal independently. */
     private fun acceptOutlanderLiveResult(result: OutlanderPhev21LiveMeasurementRunner.Result): Boolean {
         val isolation = result.isolationResistance
         val maxMeasurement = result.internalResistanceMax
         val minMeasurement = result.internalResistanceMin
-
         if (isolation == null && maxMeasurement == null && minMeasurement == null) return false
-
         isolation?.let { isolationHistory.add(OutlanderResistanceSample(result.timestampEpochMs, it.value, it.verification)) }
         maxMeasurement?.let { internalMaxHistory.add(OutlanderResistanceSample(result.timestampEpochMs, it.value, it.verification)) }
         minMeasurement?.let { internalMinHistory.add(OutlanderResistanceSample(result.timestampEpochMs, it.value, it.verification)) }
-
         _uiState.update { state ->
             state.copy(
                 outlanderIsolation = isolation?.let { state.outlanderIsolation.accept(it) } ?: state.outlanderIsolation,
