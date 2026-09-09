@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "AutoDiag-WiCAN-Pro"
-include(":app", ":core", ":simulator")
+include(":app", ":core", ":simulator", ":outlander2101")
