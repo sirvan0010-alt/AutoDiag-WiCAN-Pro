@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -34,14 +35,16 @@ import com.autodiag.wican.viewmodel.LiveDataViewModel
 /** Real read-only Mode 01 live-data screen. No synthetic values are generated here. */
 @Composable
 fun LiveDataScreen(
-    engine: ObdLiveDataEngine?,
+    engineProvider: () -> ObdLiveDataEngine?,
     onBack: () -> Unit,
     viewModel: LiveDataViewModel = viewModel()
 ) {
     val samples by viewModel.samples.collectAsState()
     val selectedPids by viewModel.selectedPids.collectAsState()
     val running by viewModel.running.collectAsState()
+    val allPids = remember { ObdPidRegistry.definitions.values.sortedBy { it.pid } }
     val history = remember { mutableStateMapOf<Int, MutableList<Double>>() }
+    val engine = engineProvider()
 
     LaunchedEffect(samples) {
         samples.forEach { sample ->
@@ -53,18 +56,12 @@ fun LiveDataScreen(
         }
     }
 
-    LaunchedEffect(engine) {
-        if (engine != null) {
-            viewModel.start(engine, ObdPidRegistry.definitions.keys)
-        }
-    }
-
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
-                Text("Live Data", style = MaterialTheme.typography.headlineSmall)
+                Text("AutoDiag · Live Data", style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "${selectedPids.size}/16 hodnot · skutečné Mode 01 odpovědi",
+                    "${selectedPids.size}/16 hodnot · ${if (running) "PŘIPOJENO" else "ZASTAVENO"}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -83,29 +80,31 @@ fun LiveDataScreen(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { if (running) viewModel.stop() else viewModel.start(engine, ObdPidRegistry.definitions.keys) }) {
-                Text(if (running) "Pauza" else "Spustit")
-            }
-            OutlinedButton(onClick = { viewModel.stop() }) { Text("Zastavit") }
+            Button(onClick = {
+                if (running) viewModel.stop() else viewModel.start(engine, allPids.map { it.pid }.toSet())
+            }) { Text(if (running) "Pauza" else "Spustit") }
+            OutlinedButton(onClick = { viewModel.stop() }, enabled = running) { Text("Zastavit") }
         }
         Spacer(Modifier.height(10.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
-                Text("Výběr standardních Mode 01 PID", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ObdPidRegistry.definitions.values.forEach { definition ->
-                        FilterChip(
-                            selected = definition.pid in selectedPids,
-                            onClick = { viewModel.setSelected(definition.pid, definition.pid !in selectedPids) },
-                            label = { Text("${definition.labelCs} (${definition.unit ?: "—"})") }
-                        )
+                Column {
+                    Text("Výběr standardních Mode 01 PID", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(6.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(allPids, key = { it.pid }) { definition ->
+                            FilterChip(
+                                selected = definition.pid in selectedPids,
+                                onClick = { viewModel.setSelected(definition.pid, definition.pid !in selectedPids) },
+                                label = { Text("${definition.labelCs} (${definition.unit ?: "—"})") }
+                            )
+                        }
                     }
                 }
             }
             items(
-                ObdPidRegistry.definitions.values.filter { it.pid in selectedPids },
+                allPids.filter { it.pid in selectedPids },
                 key = { it.pid }
             ) { definition ->
                 val sample = samples.firstOrNull { it.pid == definition.pid }
