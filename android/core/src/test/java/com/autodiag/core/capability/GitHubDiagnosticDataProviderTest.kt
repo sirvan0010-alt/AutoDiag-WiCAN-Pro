@@ -3,13 +3,14 @@ package com.autodiag.core.capability
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class GitHubDiagnosticDataProviderTest {
     @Test
     fun emptyManifest_isUsableWithoutDataFiles() = runBlocking {
         val http = FakeHttp(mapOf("manifest.json" to """
-            {"schemaVersion":1,"datasetVersion":"0.1.0","records":{"vehicles":0,"ecus":0,"signals":0,"dtc":0}}
+            {"schemaVersion":1,"datasetVersion":"0.1.0","records":{"vehicles":0,"ecus":0,"signals":0,"dtc":0,"candidates":0}}
         """.trimIndent()))
         val provider = GitHubDiagnosticDataProvider("https://example.test", http)
 
@@ -21,7 +22,7 @@ class GitHubDiagnosticDataProviderTest {
     @Test
     fun normalizedRecords_areMappedAndVerificationIsPreserved() = runBlocking {
         val http = FakeHttp(mapOf(
-            "manifest.json" to """{"records":{"vehicles":1,"ecus":1,"signals":1,"dtc":1}}""",
+            "manifest.json" to """{"records":{"vehicles":1,"ecus":1,"signals":1,"dtc":1,"candidates":0}}""",
             "data/vehicles.json" to """[{"vin":"TMBTEST12345678901","make":"Skoda","model":"Fabia","year":2020,"verification":"VERIFIED"}]""",
             "data/ecus.json" to """[{"ecuId":"ECM-1","displayName":"Engine ECU","manufacturer":"VW","verification":"PARTIALLY_VERIFIED"}]""",
             "data/signals.json" to """[{"id":"ECM-1:rpm","label":"Engine speed","unit":"rpm","request":"010C","scale":1.0,"offset":0.0,"verification":"VERIFIED"}]""",
@@ -45,7 +46,7 @@ class GitHubDiagnosticDataProviderTest {
     @Test
     fun candidateManifest_loads21_04Decoder() = runBlocking {
         val http = FakeHttp(mapOf(
-            "manifest.json" to """{"records":{"candidates":1}}""",
+            "manifest.json" to """{"records":{"candidates":1},"candidateFiles":["data/candidates/outlander_phev_watchdog_21_04.json"]}""",
             "data/candidates/outlander_phev_watchdog_21_04.json" to """
                 {
                   "schemaVersion":2,
@@ -75,6 +76,50 @@ class GitHubDiagnosticDataProviderTest {
         assertEquals("watchdog.21_04.output_group_32", candidates.single().signalId)
         assertEquals("V", candidates.single().decoder.unit)
         assertEquals(0.02, candidates.single().decoder.scale)
+    }
+
+    @Test
+    fun candidateManifest_missingFileList_failsLoudly() = runBlocking {
+        val http = FakeHttp(mapOf("manifest.json" to """{"records":{"candidates":1}}"""))
+        val provider = GitHubDiagnosticDataProvider("https://example.test", http)
+
+        val error = assertFailsWith<IllegalStateException> {
+            provider.findDecoderCandidates("21 04", null)
+        }
+
+        assertEquals(true, error.message!!.contains("candidateFiles"))
+    }
+
+    @Test
+    fun candidateManifest_countMismatch_failsLoudly() = runBlocking {
+        val http = FakeHttp(mapOf(
+            "manifest.json" to """{"records":{"candidates":2},"candidateFiles":["data/candidates/one.json"]}""",
+            "data/candidates/one.json" to "{}"
+        ))
+        val provider = GitHubDiagnosticDataProvider("https://example.test", http)
+
+        val error = assertFailsWith<IllegalStateException> {
+            provider.findDecoderCandidates("21 04", null)
+        }
+
+        assertEquals(true, error.message!!.contains("candidates=2"))
+        assertEquals(true, error.message!!.contains("1 entries"))
+    }
+
+    @Test
+    fun malformedCandidateFile_namesTheExactFile() = runBlocking {
+        val badFile = "data/candidates/bad.json"
+        val http = FakeHttp(mapOf(
+            "manifest.json" to """{"records":{"candidates":1},"candidateFiles":["$badFile"]}""",
+            badFile to "{not-json"
+        ))
+        val provider = GitHubDiagnosticDataProvider("https://example.test", http)
+
+        val error = assertFailsWith<IllegalStateException> {
+            provider.findDecoderCandidates("21 04", null)
+        }
+
+        assertEquals(true, error.message!!.contains(badFile))
     }
 
     private class FakeHttp(private val responses: Map<String, String>) : DiagnosticDataHttpClient {
