@@ -2,708 +2,448 @@
 
 ## Purpose
 
-This document is the persistent instruction set for AI agents working on `AutoDiag-WiCAN-Pro` and its diagnostic-data work. It records the external Tesla repositories that were reviewed, classifies their usefulness, and defines what should be extracted, what should only be referenced, and what should be ignored.
+This is the persistent extraction plan for `AutoDiag-WiCAN-Pro` and `AutoDiag-WiCAN-Diagnostic-Data`.
 
-The goal is **evidence-driven reuse**, not blind copying. External projects are references and evidence sources. Do not turn an external repository into a runtime dependency unless explicitly approved and technically justified.
+The objective is **evidence-driven reuse across the whole AutoDiag platform**. AutoDiag is not limited to passive diagnostics. It is a universal vehicle interface platform combining diagnostics, CAN/OBD/ISO-TP/UDS, live vehicle data, user application/dashboard functions, Wi-Fi/BLE/USB connectivity, vehicle history/evidence and user-authorized vehicle control where technically and safely supported.
 
-Primary project architecture to preserve:
+External repositories are sources of architecture, protocol knowledge, vehicle data, UI ideas, hardware/transport knowledge and control concepts. They are not runtime dependencies unless explicitly approved.
+
+Core architecture:
 
 `capture -> decode -> hunt -> correlate -> investigate`
 
-with a strict separation between:
+Protocol path:
 
-- raw CAN/SLCAN transport,
-- ISO-TP transport/session handling,
-- UDS request/response logic,
-- signal decoding and evidence,
-- DTC history and verification state,
-- vehicle-specific diagnostic data.
+`transport -> CAN/SLCAN/OBD -> ISO-TP -> UDS/manufacturer protocol -> decoder -> observation/state`
 
----
+Application consumers:
 
-## Priority model
+`observation/state -> diagnostics`
 
-### P0 — extract first / parallel with current APK and diagnostic work
+`observation/state -> live UI/dashboard`
 
-These repositories contain direct CAN, UDS, signal, diagnostic, telemetry, or reusable data-model evidence.
+`observation/state -> history/evidence`
 
-1. `outlandnish/tm3diag`
-2. `talas9/tesla_can_signals`
-3. `OBDb/Tesla-Model-Y`
-4. `bassmaster187/TeslaLogger`
-5. `ekr/candash`
-6. `tomas7470/tesladash`
-7. `tfoldi/fleetwise-iot-tesla3`
-8. `clowrey/S3XY-BMS`
-9. `evoffer/instrument-cluster-firmware`
-10. `timdorr/tesla-api`
+`user intent -> capability/policy check -> vehicle command -> transport -> response/result -> audit/history`
 
-### P1 — retain and inspect after P0
-
-These contain useful protocol/API, vehicle identification, or security-research evidence, but are less directly aligned with the core CAN diagnostic pipeline.
-
-11. `barnybug/tesla-cli`
-12. `teslahunt/tesla-vin`
-13. `cham/TeslaYay`
-14. `AnalyticETH/tesla-security-research`
-15. `evoffer/electric-liftgate-firmware`
-16. `evoffer/auto-present-door-handles-firmware`
-17. `pickeditmate/YardstickTeslaChargePortOpener`
-18. `0xfokki/tesla-ym50k`
-19. `0xfokki/tesla-yfjoy`
-
-### P2 — archive as reference; extract only when a related feature is needed
-
-20. `polymorphic/tesla-model-y-checklist`
-21. `nelsonic/tesla-mobile-office`
-22. `Corbin/Tesla-Theater-YT-BUG`
-23. `BinaryVortex/Tesla-Model-Y-Mock-Page`
-24. `midudev/landing-tesla`
-25. `rocketseat-content/youtube-clone-tesla-homepage`
-26. `dimitrypo/openpilot`
-
-### Invalid / unresolved URLs supplied by user
-
-27. `matthewhefferon/tesla-clone-y` — repository URL currently returns 404.
-28. `AmirhosseinDotZip/tesla-clone-y` — the supplied URL was malformed as `tesla-clone-ythttps`; the exact intended repository could not be verified from that URL.
-
-Do not invent replacement repositories for invalid URLs. Re-check later if the user supplies corrected links.
+The control path is deliberately separate from decoding so AutoDiag can support both read/observe and authorized control without turning a decoded signal into an unintended command.
 
 ---
 
-# Detailed repository decisions
+# Classification model
 
-## 1. outlandnish/tm3diag — P0 / highest priority
+Every useful external item is classified independently from repository priority:
 
-Repository: https://github.com/outlandnish/tm3diag
+- **KEEP** — directly reusable architecture/data for universal AutoDiag.
+- **ADAPT** — useful implementation/concept that must be redesigned for Kotlin/Android and AutoDiag boundaries.
+- **VEHICLE_SPECIFIC** — useful for a manufacturer/model/generation adapter or feature module.
+- **CONTROL** — active vehicle command/control capability; potentially part of AutoDiag, but only through the dedicated command/policy/result path.
+- **REFERENCE** — useful evidence or architectural inspiration, but not yet implementation-ready.
+- **REJECTED** — not useful or not appropriate for the project.
 
-### Why it matters
-
-This is the strongest direct diagnostic reference in the supplied set. Its README explicitly describes Tesla Model 3 CAN diagnostics and a general CAN/UDS interoperability framework. It contains an interactive diagnostic terminal, general UDS tooling, firmware-image parsing, CAN decoding, CAN-data-to-DBC conversion, gateway log parsing, a live CAN viewer, and bench emulators. The project explicitly supports both real SocketCAN hardware and `vcan` offline testing. fileciteturn42file0L2-L6
-
-### Extract first
-
-- CAN interface abstraction and message handling.
-- CAN frame capture/logging model.
-- UDS session/request/response patterns.
-- DID read/write abstractions.
-- routine-control abstractions.
-- ECU identity discovery patterns.
-- negative-response handling.
-- timeout/retry/session handling.
-- diagnostic terminal architecture.
-- CAN decoder architecture.
-- `candata_to_dbc.py` and `compact_to_dbc.py` concepts.
-- `clog.py` gateway log parsing.
-- `decode_bin.py`, firmware parsing, and firmware metadata extraction concepts.
-- Model Y-related extraction paths; the repository explicitly handles `.modely` extraction roots.
-- test strategy and virtual-CAN support.
-
-### Do NOT blindly port
-
-Do not copy firmware flashing or security-access behavior into AutoDiag-WiCAN-Pro without a separate safety/evidence gate. The README explicitly warns that ECU flashing can render safety-critical systems unrecoverable and that the project deliberately ships no seed/key or immobilizer algorithms. fileciteturn42file0L2-L6
-
-### AutoDiag integration target
-
-Map concepts into:
-
-`core/can -> core/isotp -> core/uds -> diagnostics -> diagnostic-data -> evidence`
-
-The desired result is an Android/Kotlin implementation of the architecture, not a Python dependency.
+`CONTROL` is **not** the same as `REJECTED`.
 
 ---
 
-## 2. talas9/tesla_can_signals — P0 / signal-data goldmine
+# Repository matrix — complete supplied Tesla set
 
-Repository: https://github.com/talas9/tesla_can_signals
+## P0 — direct platform value; extract in parallel with application work
 
-### Why it matters
+### 1. `outlandnish/tm3diag`
+**Role:** CAN/UDS/diagnostic architecture.
 
-The Model Y directory contains a `ModelY_ETH.compact.json` of approximately 518 KB and a `legacy_self_test_parser.json` of approximately 83 KB. The repository is explicitly organized by Model 3, Model S, Model X and Model Y. fileciteturn61file0L2-L10
+**Extract:** CAN transport abstraction, frame capture/logging, ISO-TP/UDS request-response patterns, DID/routine abstractions, ECU discovery, negative responses, timeout/retry/session handling, CAN decoding, DBC generation, gateway logs, virtual CAN/bench tests and Model Y extraction paths.
 
-### Extract first
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC.
 
-- Model Y compact signal database.
-- signal names.
-- CAN IDs.
-- bit positions and lengths.
-- scaling and offsets.
-- units.
-- multiplexing/enumerations where present.
-- ECU/bus associations.
-- legacy self-test parser information.
-- differences between Model Y and Model 3 signal definitions.
+**Safety:** firmware flashing and security-access material is not blindly imported.
 
-### Critical evidence rule
-
-Treat every signal as **external reference evidence**, not as vehicle-verified truth. Promote a signal to the AutoDiag verified set only when it is independently correlated with captures, a second source, or an actual vehicle test.
-
-### AutoDiag integration target
-
-Convert the useful portions into the project's diagnostic-data schema and provenance model. Keep source repository, source file, source revision, extraction timestamp, confidence, and verification state with each imported signal.
+**Status:** COMPLETE-INITIAL. Durable artifact: `tesla/sources/tm3diag_architecture_extraction.md`.
 
 ---
 
-## 3. OBDb/Tesla-Model-Y — P0 / structured Model Y signal catalog
+### 2. `talas9/tesla_can_signals`
+**Role:** Model Y signal-data source.
 
-Repository: https://github.com/OBDb/Tesla-Model-Y
+**Extract:** Model Y compact database, CAN IDs, bit layouts, scaling, units, enumerations, bus/ECU associations, self-test parser data and Model Y/Model 3 differences.
 
-### Why it matters
+**Classification:** VEHICLE_SPECIFIC / REFERENCE.
 
-This repository is specifically dedicated to Tesla Model Y signal-set configurations organized by model year and version. Its structure contains `generations.yaml` and `signalsets`, and its CI validates signalsets against a schema. fileciteturn47file0L2-L6 fileciteturn39file0L2-L10
+**Evidence:** all static signals start as `EXTERNAL_REFERENCE`.
 
-The current v3 directory contains `default.json`; the repository's structure and validation workflow are themselves valuable because they demonstrate a machine-checkable signal-data contract. fileciteturn46file0L2-L10
-
-### Extract first
-
-- generations/model-year classification.
-- signalset schema.
-- naming conventions.
-- Model Y-specific signal organization.
-- CI validation rules.
-- provenance/validation ideas.
-
-### AutoDiag integration target
-
-Use as a reference for a normalized diagnostic-data manifest and automated schema validation. Cross-correlate signal names and definitions against `talas9/tesla_can_signals`, `TeslaLogger`, `tm3diag`, and captured data.
+**Status:** PARTIAL/ONGOING. Priority candidates already extracted include BMS SOC, SOH, pack current, isolation and HV state candidates.
 
 ---
 
-## 4. bassmaster187/TeslaLogger — P0 / telemetry and historical-data architecture
+### 3. `OBDb/Tesla-Model-Y`
+**Role:** Model Y generation/schema/validation source.
 
-Repository: https://github.com/bassmaster187/TeslaLogger
+**Extract:** model-year/generation classification, signalset schema, naming, validation rules and machine-checkable data contracts.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC / REFERENCE.
 
-This is a very large, mature Tesla telemetry/logging project. The current repository is roughly 462 MB according to GitHub metadata. Its tree includes logging, MQTT, map generation, TeslaFi import, update infrastructure and a substantial TeslaLogger solution. fileciteturn31file0L2-L13
+**Important:** current `v3/default.json` has no populated command set and did not independently corroborate the current talas9 BMS signal candidates. Do not invent corroboration.
 
-### Extract first
-
-- telemetry data model.
-- trip/session model.
-- time-series storage concepts.
-- CAN/vehicle-state correlation where present.
-- charging-session history.
-- drive statistics.
-- alert/event handling.
-- MQTT integration patterns.
-- import/export structures.
-- data normalization and persistence strategies.
-- any Tesla vehicle API abstractions that complement CAN data.
-
-### AutoDiag integration target
-
-Use the data-model ideas for `DtcHistoryStore`, diagnostic sessions, event timelines, and evidence correlation. Do not import the whole application architecture.
+**Status:** COMPLETE-INITIAL. Durable artifact: `tesla/sources/OBDb_Tesla_Model_Y_extraction.md`.
 
 ---
 
-## 5. ekr/candash — P0 / Android dashboard and live CAN UI
+### 4. `bassmaster187/TeslaLogger`
+**Role:** telemetry, history, event and cloud/local data architecture.
 
-Repository: https://github.com/ekr/candash
+**Extract:** timestamped telemetry normalization, VIN-scoped ingestion, last-value/time-series state, invalid-value rejection, charging sessions, event/state history, ScanMyTesla integration, persistence, MQTT and API/data-model separation.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC / REFERENCE.
 
-CANdash is explicitly an Android application for Tesla Model 3/Y that turns an Android device into an instrument cluster. The repository contains an `android` project and is designed around live CAN-derived vehicle information and blind-spot visualization. fileciteturn43file0L2-L6
-
-The README describes live dashboard data, speed/power/battery displays, performance gauges, and blind-spot logic based on vehicle sensor information. It also documents the network relationship between Android and a CANserver. fileciteturn43file0L2-L6
-
-### Extract first
-
-- Android project structure.
-- CAN-to-UI data flow.
-- live-update loop.
-- vehicle-state model.
-- dashboard rendering strategy.
-- network/CANserver abstraction.
-- Tesla Model Y/3 UI assumptions.
-- sensor-derived feature logic.
-
-### AutoDiag integration target
-
-Use the Android-side architecture as a UI reference for a future live signal inspector and dashboard. Do not copy its network assumptions into the WiCAN transport layer.
+**Status:** COMPLETE-INITIAL. Durable artifact: `tesla/sources/TeslaLogger_extraction.md`.
 
 ---
 
-## 6. tomas7470/tesladash — P0 / Raspberry Pi + SocketCAN dashboard
+### 5. `ekr/candash`
+**Role:** Android live vehicle application/dashboard.
 
-Repository: https://github.com/tomas7470/tesladash
+**Extract:** Android project structure, CAN-to-UI flow, live update loop, state model, rendering strategy, network/CANserver boundary, live gauges, sensor-derived UI features and lifecycle/threading patterns.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC.
 
-This project is a DIY Model Y/Model 3 dashboard using Raspberry Pi 4, a 7-inch display, OBDLink MX+, Qt/PyQt, SocketCAN, and an ELM327-to-SocketCAN driver. It explicitly integrates a Model 3 DBC. fileciteturn44file0L2-L6
-
-The tree also contains `elmcan`, `setup_can0.sh`, a Tesla screen GUI, 3D models and STLs. fileciteturn35file0L2-L10
-
-### Extract first
-
-- SocketCAN setup and lifecycle.
-- ELM327-to-SocketCAN integration concepts.
-- DBC loading/use.
-- real-time UI update architecture.
-- startup/service handling.
-- hardware abstraction.
-- physical mounting only if a future hardware UI is needed.
-
-### AutoDiag integration target
-
-Use it as a second independent reference for the transport-to-dashboard boundary and DBC-based decoding.
+**Status:** NEXT ACTIVE EXTRACTION.
 
 ---
 
-## 7. tfoldi/fleetwise-iot-tesla3 — P0 / cloud telemetry + DBC evidence
+### 6. `tomas7470/tesladash`
+**Role:** SocketCAN/ELM327/DBC/live dashboard architecture.
 
-Repository: https://github.com/tfoldi/fleetwise-iot-tesla3
+**Extract:** ELM327-to-SocketCAN concepts, SocketCAN lifecycle, DBC loading, real-time UI updates, startup/service handling and hardware abstraction.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC.
 
-This project collects Tesla CAN telemetry and deploys an AWS IoT FleetWise edge/cloud solution. Its tree includes a full `model3can.dbc` (~322 KB), a reduced DBC, decoder manifest, signal catalog, campaign configurations and Grafana dashboard data. fileciteturn40file0L2-L10
-
-The README confirms the purpose as CAN-bus telemetry collection and edge/cloud deployment. fileciteturn55file0L2-L6
-
-### Extract first
-
-- `model3can.dbc`.
-- `model3can-reduced.dbc`.
-- `decoder_manifest.json`.
-- `signal_catalog.json`.
-- campaign configuration patterns.
-- signal-to-cloud mapping.
-- telemetry timestamping.
-- dashboard schema.
-
-### AutoDiag integration target
-
-Use the DBC and catalog as independent cross-checks, not as automatically verified Model Y data. The architecture is especially useful for the project's `capture -> decode -> correlate` pipeline.
+**Status:** NEXT ACTIVE EXTRACTION.
 
 ---
 
-## 8. clowrey/S3XY-BMS — P0 / BMS, CAN, isoSPI and test architecture
+### 7. `tfoldi/fleetwise-iot-tesla3`
+**Role:** CAN telemetry, DBC, decoder manifest and cloud schema.
 
-Repository: https://github.com/clowrey/S3XY-BMS
+**Extract:** `model3can.dbc`, reduced DBC, decoder manifest, signal catalog, campaign configuration, signal-to-cloud mapping, timestamps and dashboard schema.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC / REFERENCE.
 
-This repository is unusually rich in explicit engineering documentation. It contains a Tesla BMS interface port using RP2350A, CAN, isoSPI, serial APIs, cell monitoring, current sensing and an ESPHome touchscreen. The README documents a 108+ parameter API, dual serial interfaces, real-time cell monitoring, CAN broadcast, isoSPI master/snooper modes and a unified BMB test interface. fileciteturn54file0L1-L2
+**Critical conflict already found:** CAN 306 pack-current encoding differs from the talas9 Model Y candidate. Preserve both; this is not corroboration.
 
-The repository tree also contains dedicated documents for CAN message format, CAN integration, parameter API, implementation plans, exact balancing, dual serial API and development/session architecture. fileciteturn38file0L1-L2
-
-### Extract first
-
-- CAN message definitions.
-- parameter API schema.
-- signal naming conventions.
-- serial command/response design.
-- diagnostic/test harness concepts.
-- passive isoSPI snooping architecture.
-- evidence/test logging patterns.
-- cell-level telemetry model.
-- separation between acquisition, decoding, presentation and control.
-
-### Safety boundary
-
-Do not import contactor control, balancing control, pack-voltage actuation or other battery-control operations into AutoDiag merely because they exist here. For AutoDiag, the primary value is **read-only observation, decoding, logging and evidence architecture**.
+**Status:** COMPLETE-INITIAL. Durable artifact: `tesla/sources/FleetWise_Tesla3_extraction.md`.
 
 ---
 
-## 9. evoffer/instrument-cluster-firmware — P0/P1 / firmware artifacts and CAN-enabled aftermarket cluster
+### 8. `clowrey/S3XY-BMS`
+**Role:** BMS/CAN/isoSPI/serial/test architecture.
 
-Repository: https://github.com/evoffer/instrument-cluster-firmware
+**Extract:** CAN message format, parameter API, serial command/response architecture, passive isoSPI snooping, cell telemetry model, test harness, session architecture and acquisition/decode/presentation/control separation.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC / CONTROL.
 
-The repository is very large and contains many dated firmware packages, including files explicitly labelled `(CAN)`, multiple Model Y/3-compatible display variants, and update packages. fileciteturn37file0L2-L10
+**Control restriction:** battery balancing/contactor/actuation code is not automatically imported. Read-only observation is the first AutoDiag target.
 
-### Extract first
-
-- README/documentation.
-- firmware package metadata.
-- any plaintext configuration files.
-- CAN-related documentation.
-- firmware version-to-hardware mappings.
-- update package structure.
-- identifiers, signal names or message definitions if present in readable files.
-
-### Binary policy
-
-Do not assume that a firmware ZIP is useful merely because it exists. Catalog it first: filename, version/date, hardware family, checksum/hash if available, file types and whether readable source/configuration is present. Only perform binary reverse engineering when it answers a specific AutoDiag question.
+**Status:** NEXT ACTIVE EXTRACTION.
 
 ---
 
-## 10. timdorr/tesla-api — P0/P1 / official-ish historical owner API reference
+### 9. `evoffer/instrument-cluster-firmware`
+**Role:** firmware/hardware mapping and CAN-capable aftermarket cluster evidence.
 
-Repository: https://github.com/timdorr/tesla-api
+**Extract:** firmware package metadata, hardware/version mappings, readable configuration, CAN-related documentation and identifiers.
 
-### Why it matters
+**Classification:** VEHICLE_SPECIFIC / REFERENCE / ADAPT.
 
-This is a substantial historical Tesla API documentation/code repository. The root contains `ownerapi_endpoints.json` (~73 KB), API documentation, a Ruby library structure, specs and an API description. fileciteturn30file0L2-L2
+**Binary policy:** catalog binaries first; reverse engineer only to answer a concrete AutoDiag question.
 
-### Extract first
-
-- owner API endpoint catalog.
-- vehicle state/command vocabulary.
-- API object schemas.
-- endpoint naming and semantics.
-- historical authentication/session architecture only as context.
-- differences between cloud vehicle state and local CAN state.
-
-### AutoDiag integration target
-
-Use it to distinguish **cloud/Owner API evidence** from **local CAN/UDS evidence**. It should not replace local diagnostic transport.
+**Status:** P0/P1 extraction pending.
 
 ---
 
-## 11. barnybug/tesla-cli — P1 / practical Owner API CLI
+### 10. `timdorr/tesla-api`
+**Role:** Tesla cloud/Owner API vocabulary and vehicle-state/command model.
 
-Repository: https://github.com/barnybug/tesla-cli
+**Extract:** endpoint catalog, state objects, command vocabulary, authentication/session architecture as historical context and cloud-vs-local distinctions.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / CONTROL / REFERENCE.
 
-This is a small Go CLI for querying and controlling Tesla Model S/3/X/Y vehicles. It includes vehicle listing, vehicle state, charge state and an explicit power-saving mode that avoids waking sleeping vehicles. fileciteturn52file0L2-L6
+**Important:** cloud API data is a separate evidence domain from CAN/UDS and must not silently become CAN truth.
 
-### Extract
-
-- command abstraction.
-- sleep/wake semantics.
-- vehicle selection.
-- charge-state vocabulary.
-- cloud-vs-local distinction.
-
-Do not use it as a source of CAN IDs.
+**Status:** P0/P1 extraction pending.
 
 ---
 
-## 12. teslahunt/tesla-vin — P1 / vehicle identity enrichment
+### 11. `barnybug/tesla-cli`
+**Role:** practical Tesla cloud vehicle application/control model.
 
-Repository: https://github.com/teslahunt/tesla-vin
+**Extract:** vehicle selection, command abstraction, state/charge vocabulary, sleep/wake semantics and cloud interaction patterns.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / CONTROL / REFERENCE.
 
-The package decodes Tesla VINs into model, year, body type, motor, battery type, manufacturing plant and other identity attributes. The README states that it follows Model S/3/X/Y service manuals. fileciteturn51file0L2-L6
-
-### Extract
-
-- VIN parsing rules.
-- model/year/motor/battery classification.
-- identity schema.
-- mapping from VIN to vehicle-family selection.
-
-### AutoDiag integration target
-
-Use VIN-derived identity to select the correct diagnostic-data generation and decoder candidates before capture analysis. VIN inference must remain separate from vehicle-verified signal evidence.
+**Status:** P1 but promoted in importance because AutoDiag includes user application/control.
 
 ---
 
-## 13. cham/TeslaYay — P1 / historical application integration
+### 12. `teslahunt/tesla-vin`
+**Role:** vehicle identity and decoder/profile selection.
 
-Repository: https://github.com/cham/TeslaYay
+**Extract:** VIN parsing, model/year/body/motor/battery/plant classification and identity schema.
 
-### Why it matters
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC.
 
-TeslaYay is an application built on top of a TeslaAPI service, with Redis and a web application. It is not a CAN diagnostic project. fileciteturn57file0L2-L6
+**Use:** VIN identity may select candidate vehicle profiles, but never proves a CAN signal.
 
-### Extract
-
-Only reusable service/application patterns and API object assumptions. The README also points to a separate `TeslaAPI` repository; if that repository becomes discoverable, treat it as a separate candidate rather than assuming it is the same as `timdorr/tesla-api`.
-
----
-
-## 14. AnalyticETH/tesla-security-research — P1 / security architecture and evidence only
-
-Repository: https://github.com/AnalyticETH/tesla-security-research
-
-### Why it matters
-
-This is documented Tesla Model 3/Y infotainment security research covering ODIN, hermes, data-value access, persistence vulnerabilities and telemetry architecture. The repository says the vulnerabilities were responsibly disclosed and assigned CVEs where applicable. fileciteturn56file0L2-L6
-
-### Extract safely
-
-- infotainment architecture.
-- service/component names.
-- trust-boundary concepts.
-- telemetry provenance.
-- historical vulnerability/fix timeline.
-- defensive lessons for diagnostic tooling.
-- evidence that certain data originates from specific vehicle computers.
-
-### Do not operationalize
-
-Do not reproduce exploit chains, persistence mechanisms, token replay, telemetry spoofing, authentication bypasses, or commands against live vehicles as part of AutoDiag. The value here is architecture, threat modeling, provenance and defensive validation.
+**Status:** P1, should be moved earlier because universal vehicle identification is foundational.
 
 ---
 
-## 15. evoffer/electric-liftgate-firmware — P1 / actuator feature-specific firmware reference
+## P1 — strong value for user application, control, feature modules, security and vehicle integration
 
-Repository: https://github.com/evoffer/electric-liftgate-firmware
+### 13. `cham/TeslaYay`
+**Role:** TeslaAPI-backed user application/service integration.
 
-### Why it matters
+**Extract:** service boundaries, API object handling, state presentation and application integration patterns.
 
-The README documents multiple generations of aftermarket Tesla frunk/tailgate ECUs, hardware variants, BLE-connected versions and firmware/config update artifacts. It explicitly maps Model Y hardware/firmware variants. fileciteturn53file0L2-L6
-
-### Extract
-
-- hardware/firmware version mapping.
-- Model Y actuator feature variants.
-- BLE-capable ECU identification.
-- configuration-vs-firmware separation.
-- update artifact metadata.
-
-Use only when implementing feature-specific identification or aftermarket-device detection.
+**Classification:** ADAPT / CONTROL / REFERENCE.
 
 ---
 
-## 16. evoffer/auto-present-door-handles-firmware — P1 / actuator feature reference
+### 14. `AnalyticETH/tesla-security-research`
+**Role:** infotainment architecture, trust boundaries, telemetry provenance and defensive security.
 
-Repository: https://github.com/evoffer/auto-present-door-handles-firmware
+**Extract:** component architecture, service boundaries, data provenance and defensive validation lessons.
 
-### Decision
+**Classification:** KEEP / ADAPT / REFERENCE.
 
-Retain for later extraction of hardware/firmware version mappings and possible CAN/BLE/control-state evidence. It is not a first-line diagnostic decoder source.
-
----
-
-## 17. pickeditmate/YardstickTeslaChargePortOpener — P1/P2 / narrow hardware feature
-
-Repository: https://github.com/pickeditmate/YardstickTeslaChargePortOpener
-
-### Decision
-
-The repository is extremely small. Keep the URL in the reference set because a dedicated charge-port opener can reveal useful feature-specific communication details, but do not spend core extraction time on it until charge-port control/identification becomes an explicit AutoDiag requirement.
+**Do not operationalize:** exploit chains, persistence, token replay or authentication bypasses.
 
 ---
 
-## 18. 0xfokki/tesla-ym50k — P2 / too small for current extraction
+### 15. `evoffer/electric-liftgate-firmware`
+**Role:** feature-specific actuator hardware/firmware/BLE reference.
 
-Repository: https://github.com/0xfokki/tesla-ym50k
+**Extract:** hardware generations, firmware mapping, BLE-capable variants, configuration/firmware separation and feature identification.
 
-The current tree contains only a tiny JavaScript project with README, `index.js`, `package.json` and license. fileciteturn36file0L2-L10
-
-### Decision
-
-Archive/reference only. Re-check if the author later adds protocol, CAN, BLE or Tesla diagnostic code.
+**Classification:** VEHICLE_SPECIFIC / CONTROL / REFERENCE.
 
 ---
 
-## 19. 0xfokki/tesla-yfjoy — P2 / currently empty
+### 16. `evoffer/auto-present-door-handles-firmware`
+**Role:** feature-specific actuator, CAN/BLE and firmware reference.
 
-Repository: https://github.com/0xfokki/tesla-yfjoy
+**Extract:** hardware/firmware variants, communication architecture and feature-state identification.
 
-GitHub currently reports repository size 0 and no archived status. No useful source tree was identified.
-
-### Decision
-
-Watch only. No extraction now.
+**Classification:** VEHICLE_SPECIFIC / CONTROL / REFERENCE.
 
 ---
 
-## 20. polymorphic/tesla-model-y-checklist — P2 / vehicle inspection knowledge, not code
+### 17. `pickeditmate/YardstickTeslaChargePortOpener`
+**Role:** narrow charge-port hardware/control reference.
 
-Repository: https://github.com/polymorphic/tesla-model-y-checklist
+**Extract:** only communication, device-identification and command architecture relevant to a future charge-port feature.
 
-### Why retain
-
-The README is a detailed Model Y delivery/inspection checklist derived from owner reports, covering exterior, interior, charging, HVAC, cameras, blind spot, liftgate and other vehicle functions. fileciteturn50file0L2-L6
-
-### AutoDiag use
-
-Use as a **feature inventory and test-case source**, not as a software dependency. It can help turn physical vehicle functions into diagnostic verification scenarios.
+**Classification:** VEHICLE_SPECIFIC / CONTROL / REFERENCE.
 
 ---
 
-## 21. nelsonic/tesla-mobile-office — P2 / usability only
+### 18. `dimitrypo/openpilot`
+**Role:** large vehicle-interface/safety/CAN architecture reference with Tesla-specific work.
 
-Repository: https://github.com/nelsonic/tesla-mobile-office
+**Extract:** Tesla vehicle interface, CAN handling, state models, signal packing/unpacking, safety boundaries and integration architecture.
 
-### Decision
+**Classification:** KEEP / ADAPT / VEHICLE_SPECIFIC / REFERENCE.
 
-Retain for future Tesla usability/Android/mobile workflow ideas. Not a CAN/UDS extraction priority.
-
----
-
-## 22. Corbin/Tesla-Theater-YT-BUG — P2 / historical UI bug evidence
-
-Repository: https://github.com/Corbin/Tesla-Theater-YT-BUG
-
-### Decision
-
-Keep as historical Tesla web/UI behavior evidence. Do not prioritize for diagnostic decoding.
+**Do not import autonomous driving behavior or safety-critical actuation blindly.**
 
 ---
 
-## 23. BinaryVortex/Tesla-Model-Y-Mock-Page — P2 / UI mock
+### 19. `nelsonic/tesla-mobile-office`
+**Role:** mobile/Tesla user workflow.
 
-Repository: https://github.com/BinaryVortex/Tesla-Model-Y-Mock-Page
+**Extract:** only if AutoDiag develops vehicle/mobile workspace or Android workflow features.
 
-### Decision
-
-UI/reference only. Useful for interface ideas, not for CAN/UDS/signal extraction.
-
----
-
-## 24. midudev/landing-tesla — P2 / frontend design only
-
-Repository: https://github.com/midudev/landing-tesla
-
-### Decision
-
-Frontend/landing-page reference. No diagnostic extraction priority.
+**Classification:** ADAPT / REFERENCE.
 
 ---
 
-## 25. rocketseat-content/youtube-clone-tesla-homepage — P2 / frontend clone
+### 20. `polymorphic/tesla-model-y-checklist`
+**Role:** vehicle feature inventory and real-world test-case source.
 
-Repository: https://github.com/rocketseat-content/youtube-clone-tesla-homepage
+**Extract:** vehicle functions that can become AutoDiag inspection/verification scenarios: charging, HVAC, cameras, blind spot, liftgate, etc.
 
-### Decision
+**Classification:** KEEP / VEHICLE_SPECIFIC / REFERENCE.
 
-Frontend training/example project. Do not extract for vehicle diagnostics.
-
----
-
-## 26. dimitrypo/openpilot — P2 / large autonomy reference
-
-Repository: https://github.com/dimitrypo/openpilot
-
-### Why retain
-
-The repository has a Tesla-specific default branch named `frogtesla`, indicating a Tesla-oriented fork/branch. GitHub reports a very large codebase. This makes it potentially valuable for vehicle interface, CAN, signal, safety and integration concepts.
-
-### Extract later
-
-- Tesla-specific vehicle interface code.
-- CAN message handling.
-- signal packing/unpacking.
-- vehicle state architecture.
-- safety boundary concepts.
-- actuator/state abstractions.
-
-### Safety boundary
-
-Do not import autonomous driving/control logic into AutoDiag. Extract only read-only protocol/data-model concepts relevant to diagnostics.
+This is more useful than previously classified because AutoDiag needs user-facing feature tests, not just CAN decoding.
 
 ---
 
-# Cross-repository extraction order
+## P2 — retain/watch; extract when a concrete feature needs it
 
-## Phase A — current APK/Android diagnostic foundations
+### 21. `0xfokki/tesla-ym50k`
+Tiny JS project. Watch for future protocol/CAN/BLE additions.
 
-Run in parallel with the current AutoDiag-WiCAN-Pro implementation:
+**Classification:** REFERENCE.
 
+### 22. `0xfokki/tesla-yfjoy`
+Currently no useful source tree identified.
+
+**Classification:** WATCH.
+
+### 23. `Corbin/Tesla-Theater-YT-BUG`
+Historical web/UI behavior.
+
+**Classification:** REFERENCE.
+
+### 24. `BinaryVortex/Tesla-Model-Y-Mock-Page`
+UI mock/reference.
+
+**Classification:** REFERENCE.
+
+### 25. `midudev/landing-tesla`
+Frontend/visual design reference only.
+
+**Classification:** REFERENCE.
+
+### 26. `rocketseat-content/youtube-clone-tesla-homepage`
+Frontend training/clone project.
+
+**Classification:** REFERENCE.
+
+### 27. `gucluceyhan/tesla-sr-bot`
+Historical Model Y inventory/order bot.
+
+**Classification:** REFERENCE only for inventory filtering/UI/logging if such a feature is ever requested.
+
+**Do not import:** payment-card handling, bot-detection bypass or automated purchasing.
+
+---
+
+## Invalid/unresolved supplied URLs
+
+### 28. `matthewhefferon/tesla-clone-y`
+Supplied repository URL returned 404. Do not invent a replacement.
+
+### 29. `AmirhosseinDotZip/tesla-clone-y`
+Supplied URL was malformed (`tesla-clone-ythttps`). Exact repository could not be verified. Re-check only if a corrected URL is supplied.
+
+---
+
+# Re-prioritized extraction order
+
+## Track A — universal transport/diagnostics
 1. `tm3diag`
-2. `candash`
-3. `tesladash`
-4. `tesla_can_signals`
-5. `OBDb/Tesla-Model-Y`
+2. `tesla-vin`
+3. `tesla_can_signals`
+4. `OBDb/Tesla-Model-Y`
+5. `fleetwise-iot-tesla3`
 
-Primary questions:
+## Track B — Android/user application/live data
+6. `candash`
+7. `tesladash`
+8. `TeslaLogger`
+9. `Tesla Model Y checklist`
 
-- How is raw CAN represented?
-- How are streams/fragments reconstructed?
-- How are ISO-TP sessions represented?
-- How are UDS requests and responses matched?
-- How are signals mapped to frames?
-- How are Model Y generations separated?
-- How is live data delivered to an Android UI?
-
-## Phase B — evidence/data expansion
-
-6. `TeslaLogger`
-7. `fleetwise-iot-tesla3`
-8. `S3XY-BMS`
-9. `instrument-cluster-firmware`
+## Track C — user control/cloud/feature integration
 10. `tesla-api`
-
-Primary questions:
-
-- How do we persist time-series vehicle evidence?
-- How do we correlate multiple sources?
-- How do we normalize DBC/signal catalogs?
-- How do we record source provenance?
-- How do we distinguish cloud state from local bus state?
-- How can BMS/ECU evidence be represented safely?
-
-## Phase C — identity, feature and security context
-
-11. `tesla-vin`
-12. `tesla-cli`
+11. `tesla-cli`
+12. `TeslaYay`
 13. `electric-liftgate-firmware`
 14. `auto-present-door-handles-firmware`
-15. `TeslaYay`
-16. `tesla-security-research`
-17. `openpilot` Tesla branch
+15. `YardstickTeslaChargePortOpener`
 
-## Phase D — only when required
+## Track D — BMS/ECU/firmware evidence
+16. `S3XY-BMS`
+17. `instrument-cluster-firmware`
+18. `openpilot`
 
-UI clones, mock pages, mobile-office projects and narrow feature repositories.
+## Track E — security/provenance/defensive architecture
+19. `tesla-security-research`
+
+Everything else remains available as reference and is extracted when a concrete AutoDiag feature benefits from it.
 
 ---
 
-# Evidence rules for AI
+# Evidence rules
 
-1. Never mark a Tesla signal as `vehicle_verified` merely because it exists in a public DBC, JSON database, Python decoder or GitHub repository.
-2. Record every imported item with source repository, path, revision/commit, extraction date and original identifier.
-3. Prefer independent agreement between at least two technically independent sources.
-4. Prefer actual captured vehicle evidence over static documentation.
-5. When sources disagree, preserve both candidates and mark the conflict; do not silently choose one.
-6. Model Y data must not be assumed identical to Model 3 data.
-7. VIN/model-year information should influence candidate selection but never prove a CAN signal by itself.
+1. A public GitHub signal is never automatically `VEHICLE_VERIFIED`.
+2. Model 3 data is not automatically Model Y data.
+3. VIN/model-year identity selects candidates but does not prove signal correctness.
+4. Prefer actual vehicle captures over static documentation.
+5. Prefer technically independent second-source agreement for `CROSS_CORRELATED`.
+6. Preserve conflicting signal definitions side-by-side.
+7. Cloud/API state, CAN state and diagnostic/UDS state are separate evidence domains until correlated.
 8. Firmware artifacts are evidence sources, not automatically executable inputs.
-9. Security research is for architecture, provenance and defensive validation unless a separate, explicitly authorized research task exists.
-10. Battery/BMS/contactor/control functionality is read-only by default in AutoDiag.
-11. External code is reference architecture, not a dependency.
-12. Any useful Python/C/C++/Go implementation must be translated into Kotlin/Android-native architecture where appropriate rather than mechanically ported.
+9. Control features are allowed as AutoDiag capabilities, but require explicit command/policy/result architecture and stronger safeguards for safety-critical functions.
+10. Autonomous control, exploit chains, credential bypass, payment automation and other unrelated/high-risk behavior are not copied merely because an external project contains them.
+11. External code remains reference architecture unless deliberately adapted into AutoDiag.
+12. Every extracted item records provenance, confidence and verification state.
 
 ---
 
 # Required extraction record
 
-For every repository actually mined, create or update a repository evidence record containing:
+For every mined repository record:
 
-- repository URL
-- owner/name
-- default branch
-- inspected commit SHA
-- inspection date
-- license
-- repository role
-- priority
-- useful files/directories
-- functions/data extracted
-- target AutoDiag module
-- confidence
-- verification state
-- known conflicts
-- safety restrictions
-- follow-up extraction tasks
+- repository URL;
+- owner/name;
+- default branch;
+- inspected commit SHA;
+- inspection date;
+- license/status where available;
+- repository role;
+- priority;
+- useful files/directories;
+- architecture/data/protocol/UI/control concepts extracted;
+- classification (`KEEP`, `ADAPT`, `VEHICLE_SPECIFIC`, `CONTROL`, `REFERENCE`, `REJECTED`);
+- target AutoDiag module;
+- confidence;
+- verification state;
+- known conflicts;
+- safety restrictions;
+- follow-up tasks.
 
-Recommended target modules:
+Target modules include:
 
 - `core/can`
 - `core/slcan`
 - `core/isotp`
 - `core/uds`
+- `transport/wifi`
+- `transport/bluetooth`
+- `transport/usb`
+- `vehicle-profiles`
 - `diagnostics`
-- `diagnostic-data`
+- `decoder`
 - `evidence`
 - `DtcHistoryStore`
 - `VerificationState`
-- live signal viewer/dashboard
+- `live-dashboard`
+- `vehicle-control`
+- `command-audit`
 
 ---
 
-# Immediate next action
+# Current durable extraction state
 
-Do not spend time extracting frontend clone repositories. Start a parallel technical extraction of:
+Completed initial durable artifacts:
 
-**`tm3diag + tesla_can_signals + OBDb/Tesla-Model-Y + TeslaLogger + CANdash + tesladash + fleetwise-iot-tesla3 + S3XY-BMS`**
+- `tm3diag_architecture_extraction.md`
+- `OBDb_Tesla_Model_Y_extraction.md`
+- `FleetWise_Tesla3_extraction.md`
+- `TeslaLogger_extraction.md`
+- Model Y candidate signal files from `talas9/tesla_can_signals`
 
-The highest-value immediate targets are:
+Known unresolved issue:
 
-1. `tm3diag` — CAN/UDS/diagnostic implementation patterns.
-2. `tesla_can_signals` — large Model Y signal database.
-3. `OBDb/Tesla-Model-Y` — structured Model Y signal-set schema and validation.
-4. `fleetwise-iot-tesla3` — large DBC + decoder manifest + signal catalog.
-5. `TeslaLogger` — mature telemetry/history architecture.
-6. `CANdash` and `tesladash` — live dashboard and Android/SocketCAN integration.
-7. `S3XY-BMS` — BMS/CAN/isoSPI/test architecture and detailed engineering documentation.
+- Tesla Model Y CAN 306 pack-current candidate and FleetWise Model 3 CAN 306 pack-current definition conflict in bit layout/scaling. Keep both with vehicle scope; do not merge them.
 
-These should be cross-correlated before promoting any new signal or diagnostic capability into the main AutoDiag-WiCAN-Pro evidence set.
+Next immediate work:
+
+1. Inspect concrete source in `ekr/candash`.
+2. Inspect concrete source in `tomas7470/tesladash`.
+3. Create durable Android/live-dashboard extraction artifact.
+4. Update this manifest with current source revisions and results.
+5. Continue to `S3XY-BMS`.
+6. In parallel, begin the cloud/control and vehicle-identity tracks without allowing them to contaminate local CAN evidence.
+
+The goal is not to collect repositories for their own sake. The goal is to extract everything useful for building a **universal AutoDiag vehicle platform** while preserving provenance, vehicle scope, evidence quality and safe control boundaries.
