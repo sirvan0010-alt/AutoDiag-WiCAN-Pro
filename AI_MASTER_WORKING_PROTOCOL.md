@@ -139,7 +139,30 @@ The Android application may contain:
 - history/evidence;
 - user-authorized control.
 
-## 8. Work loop
+## 8. Multi-agent and automation architecture
+
+AutoDiag uses specialist agents and automated gates rather than one undifferentiated AI pass. The durable role registry is `AI_AGENT_ARCHITECTURE.md`.
+
+Core roles are:
+
+- Build/CI Agent;
+- CodeQL Security Agent;
+- Diagnostic Evidence Agent;
+- Protocol/Decoder Auditor;
+- Diagnostic Data Build Agent;
+- Dependency/Actions Hygiene Agent;
+- Documentation/State Consistency Agent;
+- Repository Extraction Agent.
+
+Treat automated analyzers as evidence-producing specialists, not as authorities over vehicle truth. CodeQL can establish security findings; it cannot establish a CAN/UDS layout or vehicle verification.
+
+The project gate sequence is:
+
+`BUILD -> TEST -> SECURITY -> DATA/EVIDENCE -> PROTOCOL/DECODER -> RELEASE`
+
+A green build is not a green evidence gate. A green CodeQL result is not vehicle verification. A green evidence gate is not proof that a decoder is correct on a physical vehicle.
+
+## 9. Work loop
 
 For each source:
 
@@ -151,21 +174,23 @@ For each source:
 6. Cross-correlate independent sources.
 7. Assign verification state.
 8. Add tests where behavior is implemented.
-9. Commit durable artifacts/code/manifests.
-10. Continue to the next track without losing the accumulated state.
+9. Run applicable build/security/evidence/protocol gates.
+10. Commit durable artifacts/code/manifests.
+11. Continue to the next track without losing the accumulated state.
 
-## 9. Durable memory rule
+## 10. Durable memory rule
 
 Every meaningful discovery ends in one of:
 
 1. source/data manifest;
 2. evidence record;
 3. implementation commit;
-4. explicit reference/rejected decision.
+4. explicit reference/rejected decision;
+5. CI/security result.
 
 GitHub is the durable memory of the project.
 
-## 10. Current extraction strategy
+## 11. Current extraction strategy
 
 Tesla repositories are evaluated for the **whole AutoDiag platform**, not only for CAN decoding. Therefore inspect for:
 
