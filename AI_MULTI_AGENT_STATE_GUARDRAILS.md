@@ -12,8 +12,10 @@ For execution state, use this order:
 2. `AutoDiag-WiCAN-Diagnostic-Data/TESLA_P0_EXTRACTION_MANIFEST.md`;
 3. source-specific extraction records under `tesla/sources/`;
 4. implementation/tests already committed;
-5. `AI_MASTER_WORKING_PROTOCOL.md`;
-6. `AI_TESLA_REPOSITORY_EXTRACTION_PLAN.md`.
+5. CI and security results;
+6. `AI_MASTER_WORKING_PROTOCOL.md`;
+7. `AI_TESLA_REPOSITORY_EXTRACTION_PLAN.md`;
+8. chat/session discussion.
 
 A lower item cannot silently override a higher item.
 
@@ -34,7 +36,8 @@ When editing AI instructions, preserve:
 - provenance requirements;
 - current execution order;
 - explicit safety boundaries;
-- newly discovered repositories/dependencies.
+- newly discovered repositories/dependencies;
+- security findings and accepted risk decisions.
 
 A shorter document is not an improvement if it removes project state.
 
@@ -52,8 +55,9 @@ For each unexpected change:
 2. compare them with the manifest;
 3. check whether completed artifacts still exist;
 4. identify stale, contradictory, destructive or useful content;
-5. repair contradictions immediately;
-6. preserve useful discoveries.
+5. inspect applicable CI/security results;
+6. repair contradictions immediately;
+7. preserve useful discoveries.
 
 Do not delete valid prior work merely because its commit author is the same shared account.
 
@@ -84,7 +88,41 @@ Legitimate scope includes:
 
 Control is classified as `CONTROL`, not automatically rejected. Safety-critical and irreversible commands require dedicated capability, policy, evidence, testing and audit layers.
 
-## 8. Continuous execution
+## 8. Agent separation and gates
+
+Specialist agents must stay within their authority. The persistent role registry is `AI_AGENT_ARCHITECTURE.md`.
+
+Minimum roles:
+
+- Build/CI;
+- CodeQL Security;
+- Diagnostic Evidence;
+- Protocol/Decoder Audit;
+- Diagnostic Data Build;
+- Dependency/Actions Hygiene;
+- Documentation/State Consistency;
+- Repository Extraction.
+
+The gate chain is:
+
+`BUILD -> TEST -> SECURITY -> DATA/EVIDENCE -> PROTOCOL/DECODER -> RELEASE`
+
+A specialist may report its own result but may not promote that result into another domain's verification state. In particular:
+
+- CodeQL green does not mean protocol verified;
+- build green does not mean vehicle verified;
+- evidence validated does not mean a decoder is vehicle-correct;
+- an external repository does not become an AutoDiag dependency merely because an agent extracted useful code.
+
+## 9. Security automation rule
+
+CodeQL Advanced Setup is part of the durable project structure. The workflow is `.github/workflows/codeql.yml`.
+
+Security automation should use least-privilege permissions and maintained action versions. Security findings must not be silently suppressed. Any accepted risk requires a durable decision record.
+
+Security analyzers may report vulnerabilities, workflow risks and unsafe data flows. They do not replace manual review of vehicle-control or diagnostic semantics.
+
+## 10. Continuous execution
 
 Do not ask for confirmation between extraction steps unless there is a genuinely blocking technical decision.
 
@@ -93,6 +131,7 @@ After each meaningful discovery:
 1. create/update durable evidence;
 2. commit it;
 3. update the manifest;
-4. continue automatically.
+4. run applicable gates;
+5. continue automatically.
 
-When the initial queue is exhausted, perform a second pass for cross-correlation, contradictions and newly discovered repositories/dependencies, then continue the cycle.
+When the initial queue is exhausted, perform a second pass for cross-correlation, contradictions, security findings and newly discovered repositories/dependencies, then continue the cycle.
