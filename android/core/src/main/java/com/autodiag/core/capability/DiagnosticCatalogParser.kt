@@ -61,6 +61,31 @@ object DiagnosticCatalogParser {
             DtcDataDefinition(o.getString("code"), o.optStringOrNull("description"), o.optStringOrNull("system"), verification(o), provenance(o))
         }
     }
+
+    /** Candidate decoder rows from diagnostic-data candidate JSON files. */
+    fun decoderCandidates(body: String): List<SignalDecoderDefinition> {
+        val arr = arrayOf(body, "candidates")
+            ?: arrayOf(body, "decoderCandidates")
+            ?: arrayOf(body, "signals")
+            ?: return emptyList()
+        return List(arr.length()) { i ->
+            val o = arr.getJSONObject(i)
+            val req = parseRequest(o.opt("request")).elmPayload
+                ?: o.optStringOrNull("request")?.replace(" ", "")
+                ?: o.optString("id").replace(" ", "")
+            SignalDecoderDefinition(
+                request = req.uppercase(),
+                variantId = o.optStringOrNull("variantId") ?: o.optStringOrNull("variant"),
+                label = o.optStringOrNull("label") ?: o.optStringOrNull("name"),
+                unit = o.optStringOrNull("unit"),
+                scale = o.optDouble("scale", 1.0),
+                offset = o.optDouble("offset", 0.0),
+                verification = verification(o),
+                provenance = provenance(o)
+            )
+        }
+    }
+
     fun datasetVersion(manifestBody: String): String = JSONObject(manifestBody).optString("datasetVersion", "unknown")
     fun recordCounts(manifestBody: String): Map<String, Int> {
         val r = JSONObject(manifestBody).optJSONObject("records") ?: return emptyMap()
@@ -78,10 +103,6 @@ object DiagnosticCatalogParser {
         if (trimmed.isEmpty()) return null
         if (trimmed.startsWith("[")) return JSONArray(trimmed)
         return JSONObject(trimmed).optJSONArray(key)
-    }
-    private fun stringList(o: JSONObject, key: String): List<String> {
-        val a = o.optJSONArray(key) ?: return emptyList()
-        return List(a.length()) { a.optString(it) }.filter { it.isNotBlank() }
     }
     private fun verification(o: JSONObject) = runCatching { VerificationState.valueOf(o.optString("verification", "UNVERIFIED")) }.getOrDefault(VerificationState.UNVERIFIED)
     private fun provenance(o: JSONObject): String {
