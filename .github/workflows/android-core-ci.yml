@@ -16,6 +16,7 @@ permissions:
 jobs:
   core-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: android
@@ -32,4 +33,4 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Run core unit tests and compile app
-        run: gradle :core:testDebugUnitTest :app:assembleDebug --no-daemon
+        run: gradle :core:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
