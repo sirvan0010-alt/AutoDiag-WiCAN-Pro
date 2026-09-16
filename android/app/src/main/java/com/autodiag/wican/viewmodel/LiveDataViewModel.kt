@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 class LiveDataViewModel : ViewModel() {
     private val _samples = MutableStateFlow<List<ObdLiveDataEngine.SensorSample>>(emptyList())
     val samples: StateFlow<List<ObdLiveDataEngine.SensorSample>> = _samples.asStateFlow()
-    private val _selectedPids = MutableStateFlow(ObdPidRegistry.all().take(8).map { it.pid })
+    private val _selectedPids = MutableStateFlow(ObdPidRegistry.definitions.values.take(8).map { it.pid })
     val selectedPids: StateFlow<List<Int>> = _selectedPids.asStateFlow()
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()

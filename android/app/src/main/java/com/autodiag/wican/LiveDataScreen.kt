@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.autodiag.core.obd.LiveDataPoint
 import com.autodiag.core.obd.MeasurementAvailability
@@ -141,7 +142,12 @@ private fun Sparkline(history: List<List<Double>>, index: Int) {
             val x2 = i * step
             val y1 = size.height - ((values[i - 1] - min) / range * size.height).toFloat()
             val y2 = size.height - ((values[i] - min) / range * size.height).toFloat()
-            drawLine(Offset(x1, y1), Offset(x2, y2), strokeWidth = 3f)
+            drawLine(
+                color = Color.Gray,
+                start = Offset(x1, y1),
+                end = Offset(x2, y2),
+                strokeWidth = 3f
+            )
         }
     }
 }

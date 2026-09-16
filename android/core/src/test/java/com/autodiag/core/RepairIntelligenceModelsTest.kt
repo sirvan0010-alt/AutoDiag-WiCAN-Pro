@@ -1,5 +1,6 @@
 package com.autodiag.core
 
+import com.autodiag.core.capability.DtcDataDefinition
 import com.autodiag.core.diagnostics.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -40,7 +41,10 @@ class RepairIntelligenceModelsTest {
             access = SourceAccess.COMMUNITY,
             verification = VerificationState.VERIFIED
         )
-        val dtc = DtcKnowledgeEntry("P0000", "Test", "Test explanation")
+        val dtc = DtcDataDefinition(
+            code = "P0000",
+            description = "Test explanation"
+        )
         val intelligence = RepairIntelligenceResolver.resolve(
             dtc = dtc,
             sources = listOf(source),

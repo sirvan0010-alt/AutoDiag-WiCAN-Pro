@@ -10,6 +10,9 @@ interface DiagnosticDataProvider {
     suspend fun findEcu(identity: EcuDataIdentity): EcuDataDefinition?
     suspend fun findSignals(identity: EcuDataIdentity): List<SignalDataDefinition>
     suspend fun findDtc(code: String): DtcDataDefinition?
+    /** Decoder candidates are hypotheses until vehicle-verified; default is empty. */
+    suspend fun findDecoderCandidates(request: String, variantId: String?): List<SignalDecoderDefinition> =
+        emptyList()
 }
 
 data class EcuDataIdentity(
@@ -55,10 +58,26 @@ data class DtcDataDefinition(
     val provenance: String = "diagnostic-data"
 )
 
+/**
+ * Static/catalog decoder candidate. Never treat as VEHICLE_VERIFIED by default.
+ */
+data class SignalDecoderDefinition(
+    val request: String,
+    val variantId: String? = null,
+    val label: String? = null,
+    val unit: String? = null,
+    val scale: Double = 1.0,
+    val offset: Double = 0.0,
+    val verification: VerificationState = VerificationState.UNVERIFIED,
+    val provenance: String = "diagnostic-data"
+)
+
 /** No-data implementation: absence of a database never becomes an error. */
 object EmptyDiagnosticDataProvider : DiagnosticDataProvider {
     override suspend fun findVehicle(vin: String): VehicleDataDefinition? = null
     override suspend fun findEcu(identity: EcuDataIdentity): EcuDataDefinition? = null
     override suspend fun findSignals(identity: EcuDataIdentity): List<SignalDataDefinition> = emptyList()
     override suspend fun findDtc(code: String): DtcDataDefinition? = null
+    override suspend fun findDecoderCandidates(request: String, variantId: String?): List<SignalDecoderDefinition> =
+        emptyList()
 }

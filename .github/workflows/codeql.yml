@@ -31,10 +31,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -42,8 +43,11 @@ jobs:
           languages: java-kotlin
           build-mode: manual
 
+      # Android sources live under android/. There is no Unix gradlew at repo root
+      # (only android/gradlew.bat). Match android-core-ci.yml invocation.
       - name: Build for CodeQL
-        run: ./gradlew :core:compileDebugKotlin :app:compileDebugKotlin --no-daemon --stacktrace
+        working-directory: android
+        run: gradle :core:compileDebugKotlin :app:compileDebugKotlin --no-daemon --stacktrace
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
