@@ -13,13 +13,14 @@ class IsoTpSession(
     val rxId: Long,
     private val sendFrame: suspend (CanFrame) -> Unit,
     private val blockSize: Int = 0,
-    private val stMinUs: Long = 0L
+    private val stMinUs: Long = 0L,
+    private val isExtended: Boolean = false
 ) {
     private val reassembler = IsoTp.Reassembler()
 
     init {
-        require(txId in 0..0x7FF) { "Classic ISO-TP session currently supports standard 11-bit IDs" }
-        require(rxId in 0..0x7FF)
+        require(txId in 0..0x1FFFFFFF) { "CAN TX identifier out of range" }
+        require(rxId in 0..0x1FFFFFFF) { "CAN RX identifier out of range" }
         require(blockSize in 0..255)
         require(stMinUs >= 0)
     }
@@ -27,7 +28,7 @@ class IsoTpSession(
     suspend fun send(payload: ByteArray): Result<Unit> = runCatching {
         val segmented = IsoTp.segment(payload)
         if (!segmented.flowControlRequired) {
-            sendFrame(CanFrame(txId, segmented.frames.single()))
+            sendFrame(CanFrame(txId, segmented.frames.single(), isExtended = isExtended))
             return@runCatching
         }
         // The first frame is sent here. Consecutive frames are sent only after
@@ -35,11 +36,11 @@ class IsoTpSession(
         pendingFrames = segmented.frames.drop(1)
         nextPendingIndex = 0
         sentSinceFlowControl = 0
-        sendFrame(CanFrame(txId, segmented.frames.first()))
+        sendFrame(CanFrame(txId, segmented.frames.first(), isExtended = isExtended))
     }
 
     suspend fun accept(frame: CanFrame): Result<ByteArray?> = runCatching {
-        if (frame.id != rxId || frame.isRemote) return@runCatching null
+        if (frame.id != rxId || frame.isExtended != isExtended || frame.isRemote) return@runCatching null
         val data = frame.data
         if (data.isEmpty()) return@runCatching null
         val pci = data[0].toInt() and 0xF0
@@ -64,7 +65,7 @@ class IsoTpSession(
         var sent = 0
         while (nextPendingIndex < pendingFrames.size && sent < limit) {
             val frame = pendingFrames[nextPendingIndex++]
-            sendFrame(CanFrame(txId, frame))
+            sendFrame(CanFrame(txId, frame, isExtended = isExtended))
             sent++
             if (fc.separationTimeUs > 0 && nextPendingIndex < pendingFrames.size) delay((fc.separationTimeUs / 1000L).coerceAtLeast(1L))
         }
