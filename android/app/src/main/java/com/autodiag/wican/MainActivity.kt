@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
                         TransportMode.SLCAN_RAW -> conn.host?.let { connectionViewModel.connectSlcan(it, conn.port ?: 23) }
                         else -> conn.host?.let { connectionViewModel.connectElm327(it, conn.port ?: 3333) }
                     }
-                }, connectionViewModel::setRawCanFilter, connectionViewModel::toggleRawCanPause, connectionViewModel::clearRawCan, connectionViewModel::startOutlanderLiveMeasurement, connectionViewModel::stopOutlanderLiveMeasurement, connectionViewModel::setOutlanderSamplingInterval, { LiveDataScreen(connectionViewModel.liveDataEngine(), it) })
+                }, connectionViewModel::setRawCanFilter, connectionViewModel::toggleRawCanPause, connectionViewModel::clearRawCan, connectionViewModel::startOutlanderLiveMeasurement, connectionViewModel::stopOutlanderLiveMeasurement, connectionViewModel::setOutlanderSamplingInterval, { LiveDataScreen(connectionViewModel::liveDataEngine, it) })
             }
         }
     }

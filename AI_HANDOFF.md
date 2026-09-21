@@ -15,12 +15,17 @@ Před architekturou nebo změnou diagnostického jádra čti:
 1. `README.md`
 2. `AI_CONTEXT.md`
 3. `ROADMAP.md`
-4. `docs/ARCHITECTURE_OVERVIEW.md`
-5. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
-6. `docs/LONG_TERM_FEATURE_PRESERVATION.md`
-7. `docs/AI_APK_EXTRACTION_GUIDE.md`
-8. `docs/AI_APK_EXTRACTION_GUIDE_2026-09-05.md`
-9. `docs/AI_HANDOFF_APK_EXTRACTION_2026-09-05.md`
+4. `AI_DECODER_PROTOCOL.md`
+5. `docs/ARCHITECTURE_OVERVIEW.md`
+6. `docs/DIAGNOSTIC_KNOWLEDGE_BASE.md`
+7. `docs/LONG_TERM_FEATURE_PRESERVATION.md`
+8. `docs/AI_APK_EXTRACTION_GUIDE.md`
+9. `docs/AI_APK_EXTRACTION_GUIDE_2026-09-05.md`
+10. `docs/AI_HANDOFF_APK_EXTRACTION_2026-09-05.md`
+
+## DECODER GOVERNANCE
+
+`AI_DECODER_PROTOCOL.md` is mandatory governance for diagnostic decoder work. It defines evidence hierarchy, layer separation, payload-length and addressing vetoes, ISO-TP normalization, fail-closed resolution, required negative tests, provenance, raw evidence retention and the CI evidence gate. Concrete production evidence remains in the external Diagnostic-Data repository; illustrative examples in governance documentation are not evidence.
 
 ## SINGLE SOURCE OF TRUTH — MANDATORY
 
