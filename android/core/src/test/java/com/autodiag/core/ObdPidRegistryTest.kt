@@ -15,31 +15,51 @@ class ObdPidRegistryTest {
         assertEquals(0.0, Mode01Decoder.decode("41 0C 00 00")!!.value!!, 0.01)
         assertEquals(1726.0, Mode01Decoder.decode("41 0C 1A F8")!!.value!!, 0.01)
     }
+
+    @Test fun contiguousMode01BytesAreAccepted() {
+        assertEquals(1726.0, Mode01Decoder.decode("410C1AF8")!!.value!!, 0.01)
+    }
+
+    @Test fun canHeaderBeforePositiveResponseIsIgnored() {
+        assertEquals(1726.0, Mode01Decoder.decode("7E8 06 41 0C 1A F8")!!.value!!, 0.01)
+    }
+
     @Test fun coolantTemperatureUsesMinus40() {
         val d = Mode01Decoder.decode("41 05 5A")!!
         assertEquals(50.0, d.value!!, 0.01)
         assertEquals("°C", d.unit)
     }
+
     @Test fun throttlePositionScalesToPercent() {
         assertEquals(100.0, Mode01Decoder.decode("41 11 FF")!!.value!!, 0.1)
     }
+
     @Test fun controlModuleVoltageUsesMillivoltScale() {
         assertEquals(12.786, Mode01Decoder.decode("41 42 31 F2")!!.value!!, 0.001)
     }
+
+    @Test fun absoluteLoadUsesFullTwoByteValue() {
+        // J1979 PID 43: 100 * (A*256+B) / (255*256).
+        assertEquals(100.0, Mode01Decoder.decode("41 43 FF FF")!!.value!!, 0.001)
+    }
+
     @Test fun unknownPidIsExplicit() {
         val d = Mode01Decoder.decodeDetailed("41 99 AA")!!
         assertNull(d.value)
         assertEquals(ObdValueAvailability.UNKNOWN_PID, d.availability)
     }
+
     @Test fun insufficientPayloadIsUnavailable() {
         val d = Mode01Decoder.decodeDetailed("41 0C 1A")!!
         assertNull(d.value)
         assertEquals(ObdValueAvailability.UNAVAILABLE, d.availability)
     }
+
     @Test fun noDataReturnsNull() {
         assertNull(Mode01Decoder.decode("NO DATA"))
         assertNull(Mode01Decoder.decodeDetailed("NO DATA"))
     }
+
     @Test fun registryContainsExpectedCoverage() {
         assertTrue(ObdPidRegistry.definitions.size >= 16)
         assertTrue(ObdPidRegistry.isSupported(0x0C))
