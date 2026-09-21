@@ -83,11 +83,33 @@ běžícího runtime před dokončením předchozí fronty.
 
 ---
 
+## 🧭 DECODER EVIDENCE PROTOCOL — POVINNÉ
+
+Před implementací nebo úpravou jakéhokoli diagnostického decoderu musí AI přečíst **`AI_DECODER_PROTOCOL.md`**.
+
+Tento protokol je závazný poslední krok mezi APK/CAN evidencí a produkčním decoderem. Vyžaduje zejména:
+
+- průzkum všech relevantních extrahovaných aplikací,
+- srovnávací matici všech kandidátů,
+- tvrdá veto pravidla pro payload length / addressing / variant / semantic mismatch,
+- povinnou ISO-TP reassembly před dekódováním,
+- oddělení `UNVERIFIED` / `INFERRED` od verified výsledků,
+- zákaz tichého fallbacku mezi různými poli nebo variantami,
+- povinné pozitivní **i** negativní testy,
+- zachování RAW evidence při odmítnutí decoderu,
+- provenance přímo u decoderu,
+- mechanický CI Decoder Evidence Gate.
+
+**Zásadní pravidlo:** správně extrahovaný decoder může být stále špatný decoder pro konkrétní vozidlo. Pokud skutečný payload strukturálně neodpovídá kandidátovi, kandidát se odmítá — nehledá se „pravděpodobnější“ offset.
+
+---
+
 ## 🟢 HOTOVO / AKTUÁLNĚ V `main`
 
 ### Dokumentace / pravidla
 
 - `README.md`, `AI_CONTEXT.md`, `ROADMAP.md`
+- `AI_DECODER_PROTOCOL.md` — decoder selection/evidence gate
 - `docs/` včetně `CAPABILITY_DISCOVERY.md`, `AUTOMATION_ENGINE.md`, `PRE_PURCHASE_TEST.md`, `PRE_PURCHASE_EV_TEST.md`, `EV_ACCELERATION_BATTERY_ANALYSIS.md`, `IMPLEMENTATION_TASKS.md`, `DIAGNOSTIC_KNOWLEDGE_BASE.md` a dalších
 - `AI_CONTEXT.md` nyní obsahuje explicitní repository/evidence synchronization rules
 - tento `AI_HANDOFF.md` popisuje code baseline a odděluje jej od následných dokumentačních commitů
@@ -130,8 +152,6 @@ SLCAN **neprohlašuje** OBD AVAILABLE jen proto, že TCP funguje.
 - CI/status checks na recent commits mohou být neověřené — lokální `assembleDebug` + test na zařízení je stále nutný.
 - Outlander PHEV větev/PR obsahuje více candidate dekodérů, ale žádný z nich není tímto handoffem prohlášen za vehicle-verified.
 
----
-
 ## 🔴 CHYBÍ / NENÍ VEHICLE-VERIFIED
 
 - Plný Mode 01 **parser hodnot** pro produkční použití s verified OBD mapováním.
@@ -146,8 +166,6 @@ SLCAN **neprohlašuje** OBD AVAILABLE jen proto, že TCP funguje.
 - WRITE_COMMAND subsystem (izolovaný, default off).
 
 **Důležité:** existence reverse-engineered evidence, candidate JSON nebo parseru sama o sobě neznamená `VERIFIED`.
-
----
 
 ## 🔵 PLÁNOVÁNO
 
