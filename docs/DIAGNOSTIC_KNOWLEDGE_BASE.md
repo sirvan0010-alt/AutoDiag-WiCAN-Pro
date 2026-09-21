@@ -2,144 +2,85 @@
 
 ## Purpose
 
-The Diagnostic Knowledge Base (DKB) connects a recognized DTC, alert, warning or diagnostic observation with transparent explanations and trustworthy technical sources. It is a provenance layer, not a collection of AI-generated repair guesses.
-
-## Source priority
-
-1. OEM service manual / official diagnostic documentation
-2. OEM service bulletins and official technical documentation
-3. Verified vehicle-specific engineering documentation
-4. Reproducible community reverse engineering
-5. Community discussion / anecdotal information
-
-Lower-level sources must never be displayed as OEM instructions.
-
-## Knowledge entry
-
-Each entry should support:
+Every user-visible DTC, alert or diagnostic finding should open an evidence trail instead of a bare code.
 
 ```text
-code / alert ID
-vehicle scope
-ECU / subsystem
-official description
-severity
-symptoms / effects
-possible causes
-related measurements
-recommended checks
-OEM troubleshooting procedure
-OEM service / repair reference
-community references
-source URLs
-verification state
-last reviewed
+Finding
+  -> what it means
+  -> affected system/component
+  -> observed vehicle data
+  -> why AutoDiag flagged it
+  -> official source
+  -> troubleshooting/service reference
+  -> related measurements
 ```
 
-## DTC / Alert distinction
+## Source hierarchy
 
-The decoder must distinguish manufacturer DTCs, vehicle alerts, generic OBD-II DTCs, raw diagnostic responses, AutoDiag observations and AutoDiag inferences. A calculated observation is never silently converted into an OEM DTC.
+1. **OEM service documentation** — highest priority for meaning, conditions, affected components and repair procedure.
+2. **Regulatory / safety authority** — recalls, safety defects, emissions requirements and regulatory context.
+3. **Verified engineering documentation** — protocol/decoder information with explicit scope.
+4. **Community verified** — useful when OEM information is unavailable, but never presented as OEM guidance.
+5. **Generated explanation** — language assistance only; it must not invent a repair procedure or source.
 
-## UI behavior
-
-When a code is selected:
-
-```text
-BMS / CODE
-
-🔴 SAFETY RELEVANT
-
-What does it mean?        >
-What can be affected?     >
-What should be checked?   >
-
-Official documentation    >
-Troubleshooting procedure >
-Repair/service procedure  >
-
-Source: OEM
-Verification: VERIFIED
-```
-
-If an official explanation is not in the database, the UI says so and can show separately labeled community/engineering references. It must not fill the missing OEM explanation with an AI hallucination.
-
-## OEM links
-
-A knowledge entry may contain several references:
+Every knowledge item carries:
 
 ```json
 {
-  "kind": "troubleshooting",
-  "title": "OEM troubleshooting procedure",
+  "source_type": "oem_service | regulatory | engineering | community_verified | generated_explanation",
+  "verification": "unverified | partially_verified | verified",
+  "scope": "vehicle/model/software scope",
   "url": "https://...",
-  "source_type": "oem",
-  "verification": "verified",
-  "last_verified": "ISO8601"
+  "last_checked": "ISO8601",
+  "status": "active | needs_review | broken | unavailable"
 }
 ```
 
-URLs must be stored only when the destination has actually been checked. Do not generate URLs from guessed naming conventions. OEM links are reviewed because manufacturers can move or remove service pages.
+## Tesla official links
 
-For Tesla, prefer official Tesla owner/support material for explanations and official Tesla service information where legitimately available. If a repair procedure is not publicly accessible, the app says so rather than pretending a community guide is an OEM procedure.
+AutoDiag should prefer the official Tesla Service portal for Tesla explanations. Tesla publishes repair and maintenance information, service manuals, wiring diagrams and diagnostic information there. The portal also documents Service Mode, DTCs and diagnostic software.
 
-## Tesla implementation
+- Tesla Service: https://service.tesla.com/
+- Czech Tesla Service portal: https://service.tesla.com/cs-CZ/
+- Tesla Diagnostic Software: https://service.tesla.com/cs-CZ/diagnostic-software
+- Tesla Remote Connections and Diagnostics: https://service.tesla.com/en-US/remote-connections-diagnostics
 
-Tesla documentation is vehicle-generation-specific. A Model Y procedure must not automatically be shown for every Tesla because the DTC text looks similar. The knowledge entry therefore carries model/year/ECU scope and verification status.
+For a Tesla DTC/alert, the UI should expose an **Official Tesla explanation** button when a matching official article is known. If the official article requires Tesla authentication/subscription, the UI must say so rather than pretending the article is publicly available.
 
-When a matching official source is verified, AutoDiag should expose a direct **Tesla explanation** or **Tesla service information** action. The link is a navigation aid; AutoDiag does not claim that an external page is available unless it has been verified.
+## Repair guidance rule
 
-## Community knowledge
+The app may summarize a verified source. It must not fabricate torque values, component locations, connector pins, isolation procedures, calibration sequences or software commands.
 
-Community sources are useful for reverse-engineering CAN signals and discovering practical symptoms, but are stored separately:
+If no verified repair procedure exists:
+
+> Official repair procedure not available in the AutoDiag knowledge base. Open the manufacturer service source or consult a qualified technician.
+
+## Explanation card
 
 ```text
-OEM
- └── official procedure
+DTC / ALERT
+P0XXX / vehicle-specific alert
 
-Engineering
- └── verified reverse-engineered behavior
+WHAT IT MEANS
+Short source-backed explanation.
 
-Community
- └── observed behavior / discussion
+WHY IT APPEARED
+Observed signal(s), ECU and conditions.
+
+IMPACT
+Driver-facing consequence, if documented.
+
+AUTO DIAGNOSIS
+STATIC / LOAD / RECOVERY / TREND / CONFIDENCE
+
+SOURCES
+✓ OEM Service Documentation
+  [Open official explanation]
+
+RELATED DATA
+Battery voltage · temperature · current · Riso · charging state
 ```
 
-A community statement such as "this usually means a weak cell" is not sufficient to create a production diagnostic rule.
+## Link integrity
 
-## Evidence for thresholds
-
-Thresholds use the same evidence model as battery diagnostics. Each threshold records source, source type, vehicle scope, test conditions, confidence and resolution state. No production threshold may be hardcoded solely because it appeared in a forum post.
-
-## Safety-critical classification
-
-At minimum:
-
-- `INFO`
-- `ADVISORY`
-- `WARNING`
-- `SAFETY_RELEVANT`
-- `CRITICAL`
-- `UNKNOWN`
-
-Safety classification itself requires a source. When unknown, use `UNKNOWN` rather than guessing.
-
-## Repair language rules
-
-Allowed:
-
-> "The OEM procedure identifies the following checks..."
-
-> "This value was reported by the vehicle; AutoDiag did not calculate it."
-
-> "A matching OEM procedure is available."
-
-Not allowed:
-
-> "Replace the battery" — unless that conclusion is explicitly supported by the source and diagnostic conditions.
-
-> "This cell is bad" — from one voltage sample alone.
-
-> "Riso is 8 MΩ" — when the vehicle supplied only an OK/fault status.
-
-## Knowledge-base maintenance
-
-Every entry should record `source_url`, `source_title`, `source_type`, `vehicle_scope`, `verification`, `last_reviewed`, and optional notes. When an OEM website changes or removes a procedure, the entry becomes `needs_review` rather than silently pointing to an unverified replacement.
+Links are periodically checked. A broken or redirected source becomes `needs_review`; it is never silently replaced with a random third-party page.
