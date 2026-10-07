@@ -2,6 +2,7 @@ package com.autodiag.core.diagnostic
 
 import com.autodiag.core.can.CanFrame
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -22,7 +23,8 @@ class IsoTpExtendedAddressingTest {
 
         assertEquals(0x1FFFFFFF, sent.single().id)
         assertTrue(sent.single().isExtended)
-        assertNull(session.accept(CanFrame(0x1ABCDEFF, byteArrayOf(0x03, 0x62, 0xF1.toByte(), 0x90))).getOrThrow())
+        val response = session.accept(CanFrame(0x1ABCDEFF, byteArrayOf(0x04, 0x62, 0xF1.toByte(), 0x90, 0x01))).getOrThrow()
+        assertArrayEquals(byteArrayOf(0x62, 0xF1.toByte(), 0x90, 0x01), response)
         assertEquals(0x1ABCDEFF, session.rxId)
     }
 
