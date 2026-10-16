@@ -1,5 +1,9 @@
 package com.autodiag.core.can
 
+import com.autodiag.core.can.mining.CanFrameView
+import com.autodiag.core.can.mining.CanMiningCounterFilter
+import com.autodiag.core.can.mining.CanMiningFrameClassifier
+
 /** A time interval in the monotonic, capture-relative timestamp domain. Bounds are inclusive. */
 data class CanMiningWindow(val startNanos: Long, val endNanos: Long) {
     init {
@@ -21,7 +25,11 @@ data class CanMiningCandidate(
     val changedBytePositions: List<Int>,
     val eventOnlyPayloads: List<String>,
     val reasons: List<String>,
-    val score: Int
+    val score: Int,
+    /** Descriptive timing label from event-window observations; never a semantic verification. */
+    val trafficClass: String = "UNKNOWN",
+    /** Byte indexes that match a rolling-counter heuristic; may include false positives. */
+    val likelyCounterBytePositions: List<Int> = emptyList()
 )
 
 data class CanMiningDiffReport(
@@ -53,6 +61,27 @@ object CanMiningDiff {
         val event = session.records.filter { eventWindow.contains(it.timestampNanos) }
         val baselineGroups = baseline.groupBy { key(it.frame) }
         val eventGroups = event.groupBy { key(it.frame) }
+        val eventViews = event.map { record ->
+            val frame = record.frame
+            CanFrameView(
+                timestampMillis = record.timestampNanos / 1_000_000L,
+                canId = frame.id,
+                extended = frame.isExtended,
+                remote = frame.isRemote,
+                dlc = frame.dataLength,
+                payload = frame.data.copyOf()
+            )
+        }
+        val timingByKey = CanMiningFrameClassifier.classify(eventViews)
+        val counterPatterns = setOf(
+            CanMiningCounterFilter.BytePattern.COUNTER_NIBBLE_HI,
+            CanMiningCounterFilter.BytePattern.COUNTER_NIBBLE_LO,
+            CanMiningCounterFilter.BytePattern.COUNTER_BYTE
+        )
+        val counterPositionsByKey = CanMiningCounterFilter.analyze(eventViews)
+            .filter { it.pattern in counterPatterns }
+            .groupBy({ it.key }, { it.byteIndex })
+            .mapValues { (_, positions) -> positions.distinct().sorted() }
         val candidates = (baselineGroups.keys + eventGroups.keys).distinct().mapNotNull { key ->
             val before = baselineGroups[key].orEmpty()
             val during = eventGroups[key].orEmpty()
@@ -75,11 +104,14 @@ object CanMiningDiff {
             val score = (if (before.isEmpty()) 10 else 0) +
                 changedPositions.size * 2 +
                 eventOnlyPayloads.size
+            val miningKey = CanFrameView.Key(key.id, key.extended, key.remote, key.dlc)
             CanMiningCandidate(
                 canId = key.id, isExtended = key.extended, isRemote = key.remote, dlc = key.dlc,
                 baselineFrameCount = before.size, eventFrameCount = during.size,
                 changedBytePositions = changedPositions, eventOnlyPayloads = eventOnlyPayloads,
-                reasons = reasons, score = score
+                reasons = reasons, score = score,
+                trafficClass = timingByKey[miningKey]?.frameClass?.name ?: "UNKNOWN",
+                likelyCounterBytePositions = counterPositionsByKey[miningKey].orEmpty()
             )
         }.sortedWith(compareByDescending<CanMiningCandidate> { it.score }.thenBy { it.canId }.thenBy { it.dlc })
 
