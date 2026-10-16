@@ -40,7 +40,7 @@ class CanMiningFrameClassifierTest {
     }
 
     @Test fun recurringLongGapsIndicateMixedTiming() {
-        val offsets = listOf(0L, 10, 20, 30, 40, 50, 60, 70, 80, 90, 600, 610, 620, 630, 640, 650, 660, 670, 680, 690, 1200, 1210, 1220)
+        val offsets = listOf(0L, 10, 20, 30, 40, 50, 60, 70, 80, 90, 600, 610, 620, 630, 640, 650, 660, 670, 680, 690, 1200, 1210, 1220, 1800, 1810, 1820)
         val frames = offsets.map { CanFrameView(it, key.canId, false, false, 2, byteArrayOf(0, 0)) }
         val stats = CanMiningFrameClassifier.classify(frames).getValue(key)
         assertEquals(CanMiningFrameClassifier.FrameClass.MIXED, stats.frameClass)
