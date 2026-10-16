@@ -33,3 +33,9 @@ Proprietary raw ROD/Haynes/VCDS databases are not stored in the public repositor
 `vehicle/VIN -> ECU identity -> data provider -> cached/remote definition -> decoder -> DiagnosticEvidence`
 
 The diagnostic engine remains functional when the provider is unavailable. Unknown data remains unknown instead of being guessed.
+
+## CAN-mining implementation
+
+The runtime implementation roadmap is maintained in [`CAN_MINING_IMPLEMENTATION_ROADMAP.md`](CAN_MINING_IMPLEMENTATION_ROADMAP.md). The private data repository owns the plan and schemas: [AutoDiag-WiCAN-Diagnostic-Data](https://github.com/sirvan0010-alt/AutoDiag-WiCAN-Diagnostic-Data), `docs/CAN_MINING_PIPELINE_PLAN.md` and `schema/can-mining-*.schema.json`.
+
+The first milestone is read-only capture ingest and offline validation. No CAN transmit path, vehicle-control command, automated wake cycle, fuzzing or firmware write is in scope. External API state may annotate an event but is not proof of a particular CAN frame's meaning. Unknown signals and firmware applicability must remain unknown until evidenced.
