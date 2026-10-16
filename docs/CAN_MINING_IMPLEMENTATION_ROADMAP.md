@@ -113,8 +113,9 @@ Next: run the Android core unit tests and debug build on this branch, fix any fa
 - Added `CanMiningFrameClassifier.kt` to classify each ID/flags/DLC layout within the supplied window as PERIODIC, EVENT or MIXED, with a configurable gap filter and exposed interval statistics.
 - Added `CanMiningCounterFilter.kt` to label likely constant/toggle/nibble-counter/byte-counter/varying positions and optionally exclude likely counter positions from candidate sets.
 - Added deterministic synthetic unit tests for classifier behavior, counter patterns, sparse skipped increments, candidate filtering and the capture adapter.
-- These labels are heuristics only. A PERIODIC/EVENT classification does not establish causality; a counter label is not a verified counter. The existing diff engine is not yet wired to apply classifier weights or counter filtering automatically.
+- The diff report now includes each candidate's event-window timing label (`trafficClass`) and `likelyCounterBytePositions` from the counter heuristic. These fields are descriptive metadata; they do not suppress candidates, alter the score, or imply semantic verification.
+- Added a regression test confirming that a periodic event-window stream with an incrementing byte exposes `PERIODIC` and marks that byte as a likely counter.
 - No transport, CAN transmit, vehicle command, fuzzing or replay-to-vehicle path was added.
-- CI has not been verified for this new slice in this log; wait for the branch workflow result before calling it green.
+- CI was triggered for the updated branch. The Android test/build and corrected CodeQL workflow were still running at the last status check; do not call this slice green until both report success.
 
-Next: run `./gradlew :android:core:testDebugUnitTest :android:core:assembleDebug` (adapt task names to the repository's actual Gradle project naming), fix any failures, then wire the classifier/filter into a separate candidate-scoring layer and add transport/tool-version capture metadata.
+Next: confirm Android tests/build and CodeQL, then add capture provenance/hash metadata and transport/tool-version metadata. The actual Android CI command runs from `android/` using `gradle :core:testDebugUnitTest :app:assembleDebug`; there is no Unix `gradlew` wrapper checked into this repository.
