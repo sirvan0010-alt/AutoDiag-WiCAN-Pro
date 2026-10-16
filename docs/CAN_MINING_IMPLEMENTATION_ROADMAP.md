@@ -119,3 +119,13 @@ Next: run the Android core unit tests and debug build on this branch, fix any fa
 - CI was triggered for the updated branch. The Android test/build and corrected CodeQL workflow were still running at the last status check; do not call this slice green until both report success.
 
 Next: confirm Android tests/build and CodeQL, then add capture provenance/hash metadata and transport/tool-version metadata. The actual Android CI command runs from `android/` using `gradle :core:testDebugUnitTest :app:assembleDebug`; there is no Unix `gradlew` wrapper checked into this repository.
+
+
+### 2026-10-17 — M2 candidate scoring integration
+
+- Added `CanMiningCandidateScorer.kt` with configurable linear weights for traffic class, event-only identifiers, novel payload variants and changed non-counter bytes.
+- Added `CanMiningScorerAdapter.kt` to map `CanMiningDiffReport` to the scorer's stable `DiffCandidate` contract and retain capture-window references.
+- Added seven synthetic scorer tests covering ordering, counter-only noise, event-only bonus, novelty cap, payload contribution, threshold filtering and deterministic sorting.
+- Scorer explanations preserve component-level evidence. Its output is an ordering hint only; it does not set verification status or suppress evidence by itself.
+- Added basic configuration/input validation to avoid invalid byte positions or non-finite weights.
+- CI must run against the new HEAD before this change is considered verified.
