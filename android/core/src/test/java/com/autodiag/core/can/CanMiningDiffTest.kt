@@ -81,4 +81,25 @@ class CanMiningDiffTest {
         assertEquals(listOf(0), candidate.changedBytePositions)
     }
 
+    @Test
+    fun scorerAdapterPreservesDiffFactsAndWindowRefs() {
+        val session = CanCaptureSession(
+            startedAtNanos = 0L,
+            records = listOf(
+                record(10, 0x100, 0x00),
+                record(110, 0x200, 0xA5),
+            ),
+        )
+        val baselineWindow = CanMiningWindow(0, 50)
+        val eventWindow = CanMiningWindow(100, 150)
+        val report = CanMiningDiff.analyze(session, baselineWindow, eventWindow)
+
+        val candidate = CanMiningScorerAdapter.toDiffCandidates(report, listOf("artifact:sha256:abc")).single()
+        assertEquals(0x200L, candidate.key.canId)
+        assertTrue(candidate.eventOnly)
+        assertEquals(setOf(0), candidate.changedBytePositions)
+        assertEquals(1, candidate.novelPayloadVariantCount)
+        assertTrue(candidate.evidenceRefs.contains("artifact:sha256:abc"))
+        assertTrue(candidate.evidenceRefs.contains("capture-window:event:100-150"))
+    }
 }
