@@ -12,6 +12,9 @@ object CanMiningFrameClassifier {
         val frameCount: Int,
         val medianIntervalMillis: Double,
         val intervalCv: Double,
+        /** Count of intervals above gapFactor × median; repeated gaps can indicate mixed traffic. */
+        val longGapCount: Int,
+        val longGapFraction: Double,
         val frameClass: FrameClass,
     )
 
@@ -46,10 +49,12 @@ object CanMiningFrameClassifier {
             .filter { it >= 0L }
 
         if (intervals.isEmpty()) {
-            return IdStats(sorted.first().key, sorted.size, Double.NaN, Double.NaN, FrameClass.EVENT)
+            return IdStats(sorted.first().key, sorted.size, Double.NaN, Double.NaN, 0, 0.0, FrameClass.EVENT)
         }
 
         val median = intervals.median()
+        val longGapCount = intervals.count { it.toDouble() > median * config.gapFactor }
+        val longGapFraction = longGapCount.toDouble() / intervals.size.toDouble()
         val kept = intervals.filter { it.toDouble() <= median * config.gapFactor }
         val dispersionBase = if (kept.size >= 2) kept else intervals
         val mean = dispersionBase.average()
@@ -62,13 +67,15 @@ object CanMiningFrameClassifier {
         }
 
         val classification = when {
+            // One isolated gap is treated as capture loss; recurring gaps are evidence of mixed timing.
+            longGapCount >= 2 && longGapFraction >= 0.1 -> FrameClass.MIXED
             sorted.size >= config.minPeriodicFrames &&
                 median <= config.maxPeriodicMedianMillis &&
                 cv <= config.maxPeriodicCv -> FrameClass.PERIODIC
             median >= config.minEventMedianMillis -> FrameClass.EVENT
             else -> FrameClass.MIXED
         }
-        return IdStats(sorted.first().key, sorted.size, median, cv, classification)
+        return IdStats(sorted.first().key, sorted.size, median, cv, longGapCount, longGapFraction, classification)
     }
 
     private fun List<Long>.median(): Double {
