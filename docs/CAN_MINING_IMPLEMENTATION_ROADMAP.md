@@ -105,3 +105,16 @@ CAN-mining schemas and provenance rules live in the separate Diagnostic-Data rep
 - Test/build execution has not yet been confirmed in this session. Do not label the implementation CI-verified until the branch workflow reports success.
 
 Next: run the Android core unit tests and debug build on this branch, fix any failures, then add capture provenance/hash metadata and the first real artifact-ingest boundary.
+
+### 2026-10-16 — M2 traffic classification and counter-noise heuristic
+
+- Added `com.autodiag.core.can.mining.CanFrameView`, a read-only immutable view that keeps analysis independent from the capture artifact model.
+- Added `CanCaptureMiningAdapter.kt` to map existing `CanCaptureSession` records into the mining view at the ingest boundary. Payload bytes are copied; timestamps are converted from capture-relative nanoseconds to milliseconds for interval analysis.
+- Added `CanMiningFrameClassifier.kt` to classify each ID/flags/DLC layout within the supplied window as PERIODIC, EVENT or MIXED, with a configurable gap filter and exposed interval statistics.
+- Added `CanMiningCounterFilter.kt` to label likely constant/toggle/nibble-counter/byte-counter/varying positions and optionally exclude likely counter positions from candidate sets.
+- Added deterministic synthetic unit tests for classifier behavior, counter patterns, sparse skipped increments, candidate filtering and the capture adapter.
+- These labels are heuristics only. A PERIODIC/EVENT classification does not establish causality; a counter label is not a verified counter. The existing diff engine is not yet wired to apply classifier weights or counter filtering automatically.
+- No transport, CAN transmit, vehicle command, fuzzing or replay-to-vehicle path was added.
+- CI has not been verified for this new slice in this log; wait for the branch workflow result before calling it green.
+
+Next: run `./gradlew :android:core:testDebugUnitTest :android:core:assembleDebug` (adapt task names to the repository's actual Gradle project naming), fix any failures, then wire the classifier/filter into a separate candidate-scoring layer and add transport/tool-version capture metadata.
