@@ -56,4 +56,29 @@ class CanMiningDiffTest {
             CanMiningWindow(50, 150)
         )
     }
+
+    @Test
+    fun enriches_candidates_with_timing_class_and_counter_heuristics() {
+        val baseline = listOf(
+            record(10_000_000, 0x123, 0x00, 0xAA),
+            record(20_000_000, 0x123, 0x00, 0xAA),
+            record(30_000_000, 0x123, 0x00, 0xAA),
+        )
+        val event = (0..4).map { index ->
+            record(110_000_000L + index * 10_000_000L, 0x123, 0x10 + index, 0xAA)
+        }
+        val session = CanCaptureSession(startedAtNanos = 0L, records = baseline + event)
+
+        val report = CanMiningDiff.analyze(
+            session,
+            CanMiningWindow(0L, 50_000_000L),
+            CanMiningWindow(100_000_000L, 160_000_000L),
+        )
+
+        val candidate = report.candidates.single()
+        assertEquals("PERIODIC", candidate.trafficClass)
+        assertEquals(listOf(0), candidate.likelyCounterBytePositions)
+        assertEquals(listOf(0), candidate.changedBytePositions)
+    }
+
 }
