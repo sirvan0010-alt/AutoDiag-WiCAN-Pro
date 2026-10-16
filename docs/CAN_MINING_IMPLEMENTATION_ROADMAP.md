@@ -94,3 +94,14 @@ Names above are target responsibilities, not claims that these classes already e
 ## Data contract
 
 CAN-mining schemas and provenance rules live in the separate Diagnostic-Data repository. Runtime must treat imported data as reference knowledge, preserve verification status, and operate with local validated cache when the private repository is unavailable.
+## Implementation log
+
+### 2026-10-16 — initial implementation slice
+
+- Repository inspection confirmed an existing versioned capture artifact format (`autodiag-can-capture-v1`), JSON encode/decode support, bounded in-memory capture, CSV export and offline replay. These are reused; no duplicate capture format was introduced.
+- Added `CanMiningDiff.kt`, a deterministic offline baseline/event-window comparator. It groups by CAN ID, extended/remote flags and DLC; reports event-only layouts, new payload variants and byte positions whose observed value sets differ.
+- Added `CanMiningDiffTest.kt` for event-only identifiers, changed byte positions, identical observations, out-of-window exclusion and overlapping-window rejection.
+- The diff engine is a candidate finder only: it has no transport/TX API and does not assign signal semantics or prove causality.
+- Test/build execution has not yet been confirmed in this session. Do not label the implementation CI-verified until the branch workflow reports success.
+
+Next: run the Android core unit tests and debug build on this branch, fix any failures, then add capture provenance/hash metadata and the first real artifact-ingest boundary.
