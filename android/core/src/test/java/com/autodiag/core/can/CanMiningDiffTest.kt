@@ -7,7 +7,7 @@ import org.junit.Test
 
 class CanMiningDiffTest {
     private fun record(time: Long, id: Long, vararg bytes: Int, extended: Boolean = false) =
-        CanCaptureRecord(time, CanFrame(id = id, data = bytes.map(Int::toByte).toByteArray(), isExtended = extended, timestampNanos = time))
+        CanCaptureRecord(time, CanFrame(id = id, data = bytes.map { it.toByte() }.toByteArray(), isExtended = extended, timestampNanos = time))
 
     @Test
     fun reports_event_only_identifier_without_claiming_signal_semantics() {
